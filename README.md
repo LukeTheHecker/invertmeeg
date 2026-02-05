@@ -72,6 +72,7 @@ stc.plot()
 ## Features
 
 - **96 inverse solvers** accessible through a single `Solver("solver_id")` interface
+- [**Interactive benchmark leaderboard**](https://lukethehecker.github.io/invertmeeg/benchmarks/) -- compare solver performance across datasets, metrics, and categories
 - Automatic regularization (GCV, L-curve, product methods)
 - Returns standard `mne.SourceEstimate` objects
 - Simulation utilities for benchmarking
