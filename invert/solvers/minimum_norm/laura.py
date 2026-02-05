@@ -11,13 +11,15 @@ logger = logging.getLogger(__name__)
 
 
 class SolverLAURA(BaseSolver):
-    """Improved Local AUtoRegressive Average (LAURA) inverse solution.
+    """Local AUtoRegressive Average (LAURA) inverse solution.
 
-    This version fixes numerical stability issues and adds optional depth bias
-    correction and adaptive regularization.
+    LAURA uses spatially weighted source priors based on electromagnetic field
+    decay laws (1/r^2 for potentials, 1/r^3 for currents) to enforce
+    biophysically plausible spatial smoothness.
 
-    LAURA uses spatially weighted source priors based on the distance between
-    sources and their connectivity in the cortical mesh.
+    Optional extensions (disabled by default for pure LAURA):
+    - depth_weight: Depth bias correction (Lin et al. 2006)
+    - use_mesh_adjacency: Restrict neighbors to mesh-connected sources
 
     References
     ----------
@@ -40,10 +42,19 @@ class SolverLAURA(BaseSolver):
         ],
     )
 
-    def __init__(self, name="LAURA", depth_weight=0.5, adaptive_alpha=True, **kwargs):
+    def __init__(
+        self,
+        name="LAURA",
+        depth_weight=0.5,
+        use_mesh_adjacency=True,
+        **kwargs,
+    ):
         self.name = name
         self.depth_weight = depth_weight
-        self.adaptive_alpha = adaptive_alpha
+        self.use_mesh_adjacency = use_mesh_adjacency
+        # LAURA handles depth weighting internally via W_j, so disable base class
+        # depth weighting to avoid double compensation
+        kwargs.setdefault("prep_leadfield", False)
         return super().__init__(**kwargs)
 
     def make_inverse_operator(
@@ -77,7 +88,6 @@ class SolverLAURA(BaseSolver):
         self : object returns itself for convenience
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
-        adjacency = mne.spatial_src_adjacency(forward["src"], verbose=verbose).toarray()
         n_chans, n_dipoles = self.leadfield.shape
         pos = pos_from_forward(forward, verbose=verbose)
 
@@ -87,32 +97,44 @@ class SolverLAURA(BaseSolver):
         # Compute spatial distance matrix
         d = cdist(pos, pos)
 
-        # Apply adjacency constraint
-        d_adj = d * adjacency
+        # Determine neighborhood structure
+        if self.use_mesh_adjacency:
+            # Use mesh connectivity (extension)
+            adjacency = mne.spatial_src_adjacency(forward["src"], verbose=verbose).toarray()
+            d_adj = d * adjacency
+        else:
+            # Pure LAURA: use all sources (full distance matrix, exclude diagonal)
+            d_adj = d.copy()
+            np.fill_diagonal(d_adj, 0)
 
-        # Compute spatial weighting matrix with inverse distance weighting
-        A = np.zeros_like(d_adj)
-        mask = (
-            d_adj > 0
-        )  # Only non-zero distances (excluding diagonal and non-adjacent)
-        A[mask] = d_adj[mask] ** (-drop_off)
+        # Compute spatial weighting matrix A following LAURA paper:
+        # Off-diagonal: A_ik = -d_ki^{-e} (negative inverse distance for neighbors)
+        # Diagonal: A_ii = (N/N_i) * sum_{k in neighbors} d_ki^{-e}
+        # This creates a Laplacian-like structure enforcing local autoregressive averaging
 
-        # Normalize each row to sum to 1 (probabilistic interpretation)
-        row_sums = A.sum(axis=1, keepdims=True)
-        row_sums[row_sums == 0] = 1  # Avoid division by zero for isolated sources
-        A_normalized = A / row_sums
+        A = np.zeros((n_dipoles, n_dipoles))
 
-        # Add diagonal for self-interaction (identity component)
-        # This ensures the matrix is well-conditioned
-        A_full = A_normalized + np.identity(n_dipoles)
+        # Compute inverse distance weights for adjacent sources
+        mask = d_adj > 0  # Only non-zero distances (neighbors)
+        inv_dist_weights = np.zeros_like(d_adj)
+        inv_dist_weights[mask] = d_adj[mask] ** (-drop_off)
 
-        # Source space metric: W_j encodes local spatial smoothness
-        # Following LAURA theory: M_j.T @ M_j represents the spatial correlation
-        M_j = A_full
+        # Off-diagonal elements: NEGATIVE inverse distance weights
+        A[mask] = -inv_dist_weights[mask]
+
+        # Diagonal elements: (N/N_i) * sum of neighbor weights
+        n_neighbors = (d_adj > 0).sum(axis=1)
+        n_neighbors = np.maximum(n_neighbors, 1)  # avoid division by zero
+        neighbor_weight_sums = inv_dist_weights.sum(axis=1)
+        A[np.diag_indices(n_dipoles)] = (n_dipoles / n_neighbors) * neighbor_weight_sums
+
+        # Source space metric: W_j = (M^T M)^{-1} where M = A
+        # (W matrix is identity in standard LAURA formulation)
+        M_j = A
 
         # Compute spatial prior covariance (source space metric)
         # This is positive definite by construction
-        W_j = M_j.T @ M_j
+        W_j = np.linalg.inv(M_j.T @ M_j)
 
         # Apply depth weighting to correct for depth bias
         # Key fix: Use NEGATIVE exponent to down-weight superficial sources
@@ -149,53 +171,25 @@ class SolverLAURA(BaseSolver):
         noise_cov = (noise_cov + noise_cov.T) / 2
         noise_cov += 1e-12 * np.trace(noise_cov) / n_chans * np.identity(n_chans)
 
-        # Compute adaptive alpha scaling if requested
-        if self.adaptive_alpha:
-            # Scale based on the ratio of leadfield and noise power
-            leadfield_power = np.trace(self.leadfield @ self.leadfield.T) / n_chans
-            noise_power = np.trace(noise_cov) / n_chans
-            alpha_scale = noise_power / max(leadfield_power, 1e-12)
-        else:
-            alpha_scale = 1e-6  # Original hard-coded value
+        # LAURA inverse operator formula:
+        # T = W_j @ L.T @ (L @ W_j @ L.T + alpha * Sigma_noise)^(-1)
+        LW = self.leadfield @ W_j
+        LWLT = LW @ self.leadfield.T
 
-        if verbose > 0:
-            logger.info(f"LAURA: Using alpha_scale = {alpha_scale:.2e}")
-
-        # NOTE: In LAURA, `alpha` acts as a dimensionless knob `r` (it enters as
-        # r^2 in the noise term). We therefore do *not* scale it by leadfield
-        # eigenvalues (unlike classic MNE where α is used in L Lᵀ + αI).
-        if alpha == "auto":
-            r_grid = np.asarray(self.r_values, dtype=float)
-        else:
-            r_grid = np.asarray([float(alpha)], dtype=float)
-        self.alphas = list(r_grid)
+        # Scale alphas relative to LWLT
+        self.get_alphas(reference=LWLT)
 
         inverse_operators = []
-        for r in r_grid:
-            # LAURA inverse operator formula:
-            # T = W_j @ L.T @ (L @ W_j @ L.T + alpha^2 * Sigma_noise)^(-1)
-            # where:
-            #   W_j = source space spatial prior covariance (with depth weighting)
-            #   L = leadfield
-            #   Sigma_noise = noise covariance
-            #   alpha = regularization parameter
-
-            # Compute middle term efficiently
-            LW = self.leadfield @ W_j  # (n_chans x n_dipoles)
-            LWLT = LW @ self.leadfield.T  # (n_chans x n_chans)
-
-            # Regularization term
-            reg_term = (float(r) ** 2 * alpha_scale) * noise_cov
-
+        for alpha in self.alphas:
             # Inverse of regularized data covariance
             try:
-                C_inv = np.linalg.inv(LWLT + reg_term)
+                C_inv = np.linalg.inv(LWLT + alpha * noise_cov)
             except np.linalg.LinAlgError:
                 if verbose > 0:
                     logger.warning(
-                        f"Singular matrix for alpha={r}, using pseudo-inverse"
+                        f"Singular matrix for alpha={alpha}, using pseudo-inverse"
                     )
-                C_inv = np.linalg.pinv(LWLT + reg_term)
+                C_inv = np.linalg.pinv(LWLT + alpha * noise_cov)
 
             # Final inverse operator
             inverse_operator = W_j @ self.leadfield.T @ C_inv
