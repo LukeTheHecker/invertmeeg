@@ -1,0 +1,116 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "invertmeeg"
+version = "0.1.0"
+description = "A high-level M/EEG Python library for EEG inverse solutions"
+readme = "README.md"
+license = {text = "Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)"}
+requires-python = ">=3.9"
+authors = [
+    { name = "Lukas Hecker", email = "lukas.hecker.job@gmail.com" },
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: Other/Proprietary License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "numpy",
+    "scipy",
+    "mne",
+    "scikit-learn",
+    "matplotlib",
+    "tqdm",
+
+    "pandas",
+    "POT",
+    "nibabel>=5.3.3",
+    "pydantic>=2.12.5",
+]
+
+[project.scripts]
+invertmeeg = "invert.__main__:main"
+
+[project.optional-dependencies]
+ann = [
+    "torch",
+]
+viz = [
+    "pyvista",
+    "pyvistaqt",
+    "PyQt5",
+]
+docs = [
+    "mkdocs-material",
+    "mkdocstrings[python]",
+    "mkdocs-gen-files",
+    "mkdocs-literate-nav",
+    "ruff",
+]
+dev = [
+    "pytest",
+    "ruff",
+    "mypy",
+    "pre-commit",
+    "invertmeeg[ann,viz]",
+]
+
+[project.urls]
+Homepage = "https://github.com/LukeTheHecker/invertmeeg"
+Documentation = "https://lukethehecker.github.io/invertmeeg/"
+License = "https://creativecommons.org/licenses/by-nc/4.0/"
+
+[tool.hatch.build.targets.wheel]
+packages = ["invert"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py39"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "C90", # mccabe complexity
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+    "N",   # pep8-naming
+]
+ignore = [
+    "N803",  # Allow uppercase in argument names (common in math)
+    "N806",  # Allow uppercase in variable names (common in math)
+    "N802",  # Allow uppercase in function names (common in math)
+    "N801",  # Allow non-CapWords class names
+    "N812",  # Allow lowercase imported as non-lowercase
+    "N999",  # Allow invalid module name
+    "E741",  # Allow ambiguous variable names (l, I, O - common in math)
+    "C901",  # Allow complex functions (scientific algorithms are inherently complex)
+    "E501",  # Allow long lines (handled by formatter for code, comments can be long)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "F403", "F405"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = false
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+
+[dependency-groups]
+dev = [
+    "ipykernel>=6.31.0",
+]

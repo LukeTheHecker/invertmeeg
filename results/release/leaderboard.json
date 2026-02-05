@@ -1,0 +1,3414 @@
+{
+  "ranks": {
+    "extended_source": {
+      "SharpFlexESMV": 3.0,
+      "SharpFlexESMV2": 3.8,
+      "FlexESMV": 4.0,
+      "SafeFlexESMV": 4.0,
+      "AdaptFlexESMV": 4.4,
+      "DeblurFlexESMV": 5.2,
+      "ESMV2": 8.6,
+      "ESMV3": 9.2,
+      "SSP-IR-ESMV": 9.6,
+      "IR-ESMV": 9.6,
+      "ESMV": 10.4,
+      "HOCMCMV": 12.2,
+      "SMV": 12.6,
+      "WNMV": 12.8,
+      "SSP-ESMV": 13.0,
+      "HOCMV": 13.4,
+      "LCMV": 13.4,
+      "SAM": 14.2,
+      "UNIG": 14.4,
+      "MCMV": 19.0,
+      "MVAB": 19.2
+    },
+    "focal_source": {
+      "FlexESMV": 1.0,
+      "IR-ESMV": 1.6,
+      "ESMV3": 1.8,
+      "SSP-IR-ESMV": 2.0,
+      "ESMV2": 2.2,
+      "DeblurFlexESMV": 2.4,
+      "SharpFlexESMV2": 2.6,
+      "SafeFlexESMV": 2.8,
+      "SharpFlexESMV": 3.0,
+      "ESMV": 3.2,
+      "AdaptFlexESMV": 3.2,
+      "SMV": 9.2,
+      "SAM": 9.6,
+      "HOCMCMV": 9.6,
+      "HOCMV": 9.8,
+      "UNIG": 10.0,
+      "LCMV": 10.0,
+      "WNMV": 10.0,
+      "MCMV": 14.8,
+      "SSP-ESMV": 15.2,
+      "MVAB": 19.4
+    },
+    "multi_source": {
+      "FlexESMV": 3.0,
+      "SafeFlexESMV": 4.8,
+      "SharpFlexESMV2": 4.8,
+      "ESMV2": 5.8,
+      "SharpFlexESMV": 5.8,
+      "ESMV3": 6.4,
+      "DeblurFlexESMV": 6.8,
+      "ESMV": 7.6,
+      "AdaptFlexESMV": 8.2,
+      "IR-ESMV": 8.6,
+      "SSP-IR-ESMV": 11.0,
+      "UNIG": 11.8,
+      "SAM": 12.2,
+      "SSP-ESMV": 12.6,
+      "WNMV": 12.6,
+      "SMV": 13.0,
+      "LCMV": 13.4,
+      "HOCMCMV": 13.6,
+      "HOCMV": 14.0,
+      "MCMV": 19.6,
+      "MVAB": 21.0
+    },
+    "noisy": {
+      "FlexESMV": 3.4,
+      "SSP-IR-ESMV": 4.6,
+      "IR-ESMV": 4.6,
+      "ESMV": 5.8,
+      "SSP-ESMV": 6.0,
+      "SafeFlexESMV": 6.0,
+      "SharpFlexESMV2": 6.2,
+      "ESMV3": 6.2,
+      "SharpFlexESMV": 6.4,
+      "DeblurFlexESMV": 7.4,
+      "AdaptFlexESMV": 8.6,
+      "ESMV2": 10.8,
+      "WNMV": 14.2,
+      "LCMV": 14.4,
+      "HOCMCMV": 14.4,
+      "SMV": 14.6,
+      "HOCMV": 14.8,
+      "UNIG": 15.8,
+      "MVAB": 16.0,
+      "SAM": 16.2,
+      "MCMV": 19.4
+    }
+  },
+  "global_ranks": {
+    "FlexESMV": 2.85,
+    "SharpFlexESMV2": 4.35,
+    "SafeFlexESMV": 4.4,
+    "SharpFlexESMV": 4.55,
+    "DeblurFlexESMV": 5.45,
+    "ESMV3": 5.9,
+    "AdaptFlexESMV": 6.1,
+    "IR-ESMV": 6.1,
+    "ESMV": 6.75,
+    "SSP-IR-ESMV": 6.8,
+    "ESMV2": 6.85,
+    "SSP-ESMV": 11.7,
+    "SMV": 12.35,
+    "WNMV": 12.4,
+    "HOCMCMV": 12.45,
+    "LCMV": 12.8,
+    "HOCMV": 13.0,
+    "UNIG": 13.0,
+    "SAM": 13.05,
+    "MCMV": 18.2,
+    "MVAB": 18.9
+  },
+  "metadata": {
+    "name": "invertmeeg Leaderboard",
+    "description": "Official leaderboard run using biosemi32/ico2 with 50 samples per dataset across all solver categories.",
+    "timestamp": "2026-02-05T01:00:01.547722",
+    "n_samples": 25,
+    "random_seed": null,
+    "solvers": [
+      "AdaptFlexESMV",
+      "DeblurFlexESMV",
+      "ESMV",
+      "ESMV2",
+      "ESMV3",
+      "FlexESMV",
+      "HOCMCMV",
+      "HOCMV",
+      "IR-ESMV",
+      "LCMV",
+      "MCMV",
+      "MVAB",
+      "SAM",
+      "SMV",
+      "SSP-ESMV",
+      "SSP-IR-ESMV",
+      "SafeFlexESMV",
+      "SharpFlexESMV",
+      "SharpFlexESMV2",
+      "UNIG",
+      "WNMV"
+    ],
+    "m": 32,
+    "n": 324,
+    "m_electrodes": 32,
+    "n_sources": 324,
+    "n_leadfield_columns": 324,
+    "n_orient": 1
+  },
+  "datasets": {
+    "focal_source": {
+      "name": "Focal Source",
+      "description": "Single focal dipole source with moderate noise",
+      "n_sources": 1,
+      "n_orders": 0,
+      "snr_range": [
+        3.0,
+        5.0
+      ],
+      "n_timepoints": 50,
+      "n_samples": 50
+    },
+    "multi_source": {
+      "name": "Multi Source",
+      "description": "Multiple focal dipole sources with low-to-moderate noise",
+      "n_sources": [
+        2,
+        4
+      ],
+      "n_orders": 0,
+      "snr_range": [
+        1.0,
+        3.0
+      ],
+      "n_timepoints": 50,
+      "n_samples": 50
+    },
+    "extended_source": {
+      "name": "Extended Source",
+      "description": "Multiple extended patch sources with spatial smoothing",
+      "n_sources": [
+        2,
+        4
+      ],
+      "n_orders": [
+        1,
+        3
+      ],
+      "snr_range": [
+        1.0,
+        3.0
+      ],
+      "n_timepoints": 50,
+      "n_samples": 50
+    },
+    "noisy": {
+      "name": "Noisy",
+      "description": "Variable sources under challenging low-SNR conditions",
+      "n_sources": [
+        1,
+        3
+      ],
+      "n_orders": [
+        0,
+        2
+      ],
+      "snr_range": [
+        -5.0,
+        0.0
+      ],
+      "n_timepoints": 50,
+      "n_samples": 50
+    }
+  },
+  "results": [
+    {
+      "solver_name": "AdaptFlexESMV",
+      "dataset_name": "focal_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.23133985080230102,
+          "std": 1.1333291832744543,
+          "median": 0.0,
+          "worst_10_pct": 0.0
+        },
+        "emd": {
+          "mean": 0.0,
+          "std": 0.0,
+          "median": 0.0,
+          "worst_10_pct": 0.0
+        },
+        "spatial_dispersion": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "average_precision": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "correlation": {
+          "mean": 0.9777208925284643,
+          "std": 0.024833419722583877,
+          "median": 0.9883115987975444,
+          "worst_10_pct": 0.9336617794367751
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "DeblurFlexESMV",
+      "dataset_name": "focal_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.23133985080230102,
+          "std": 1.1333291832744543,
+          "median": 0.0,
+          "worst_10_pct": 0.0
+        },
+        "emd": {
+          "mean": 0.0,
+          "std": 0.0,
+          "median": 0.0,
+          "worst_10_pct": 0.0
+        },
+        "spatial_dispersion": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "average_precision": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "correlation": {
+          "mean": 0.9883205404977042,
+          "std": 0.013936456859866579,
+          "median": 0.9946025294035714,
+          "worst_10_pct": 0.963467435856528
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "ESMV",
+      "dataset_name": "focal_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.31902559525186996,
+          "std": 1.5628998465095065,
+          "median": 0.0,
+          "worst_10_pct": 0.0
+        },
+        "emd": {
+          "mean": 0.0,
+          "std": 0.0,
+          "median": 0.0,
+          "worst_10_pct": 0.0
+        },
+        "spatial_dispersion": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "average_precision": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "correlation": {
+          "mean": 0.9960374525534688,
+          "std": 0.0057140092171427325,
+          "median": 0.9975889543355355,
+          "worst_10_pct": 0.9929219814332652
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "ESMV2",
+      "dataset_name": "focal_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.23133985080230102,
+          "std": 1.1333291832744543,
+          "median": 0.0,
+          "worst_10_pct": 0.0
+        },
+        "emd": {
+          "mean": 0.0,
+          "std": 0.0,
+          "median": 0.0,
+          "worst_10_pct": 0.0
+        },
+        "spatial_dispersion": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "average_precision": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "correlation": {
+          "mean": 0.9892930816290856,
+          "std": 0.011284429900304293,
+          "median": 0.9925382307437419,
+          "worst_10_pct": 0.9789232106272144
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "ESMV3",
+      "dataset_name": "focal_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.23133985080230102,
+          "std": 1.1333291832744543,
+          "median": 0.0,
+          "worst_10_pct": 0.0
+        },
+        "emd": {
+          "mean": 0.0,
+          "std": 0.0,
+          "median": 0.0,
+          "worst_10_pct": 0.0
+        },
+        "spatial_dispersion": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "average_precision": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "correlation": {
+          "mean": 0.9942480779486158,
+          "std": 0.008799502734654026,
+          "median": 0.9969248084953837,
+          "worst_10_pct": 0.9899306025321926
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "FlexESMV",
+      "dataset_name": "focal_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.0,
+          "std": 0.0,
+          "median": 0.0,
+          "worst_10_pct": 0.0
+        },
+        "emd": {
+          "mean": 0.0,
+          "std": 0.0,
+          "median": 0.0,
+          "worst_10_pct": 0.0
+        },
+        "spatial_dispersion": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "average_precision": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "correlation": {
+          "mean": 0.9999969677567421,
+          "std": 9.009585404178191e-06,
+          "median": 0.9999999203241687,
+          "worst_10_pct": 0.9999951145971895
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "HOCMCMV",
+      "dataset_name": "focal_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 28.248223627161565,
+          "std": 6.306962747322454,
+          "median": 28.358498751144708,
+          "worst_10_pct": 35.81717211432115
+        },
+        "emd": {
+          "mean": 21.54221774637874,
+          "std": 26.301855048258666,
+          "median": 2.350412978239779,
+          "worst_10_pct": 64.61644685472167
+        },
+        "spatial_dispersion": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "average_precision": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "correlation": {
+          "mean": 0.47542615907203967,
+          "std": 0.13931217226728002,
+          "median": 0.5133543009950727,
+          "worst_10_pct": 0.25104125528144744
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "HOCMV",
+      "dataset_name": "focal_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 28.248223627161565,
+          "std": 6.306962747322454,
+          "median": 28.358498751144708,
+          "worst_10_pct": 35.81717211432115
+        },
+        "emd": {
+          "mean": 21.54221774637878,
+          "std": 26.301855048258663,
+          "median": 2.3504129782397882,
+          "worst_10_pct": 64.61644685472164
+        },
+        "spatial_dispersion": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "average_precision": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "correlation": {
+          "mean": 0.47542615907204033,
+          "std": 0.13931217226728063,
+          "median": 0.5133543009950726,
+          "worst_10_pct": 0.25104125528144833
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "IR-ESMV",
+      "dataset_name": "focal_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.23133985080230102,
+          "std": 1.1333291832744543,
+          "median": 0.0,
+          "worst_10_pct": 0.0
+        },
+        "emd": {
+          "mean": 0.0,
+          "std": 0.0,
+          "median": 0.0,
+          "worst_10_pct": 0.0
+        },
+        "spatial_dispersion": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "average_precision": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "correlation": {
+          "mean": 0.99489049574386,
+          "std": 0.0071091842268773105,
+          "median": 0.9969867055323767,
+          "worst_10_pct": 0.9914213778849417
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "LCMV",
+      "dataset_name": "focal_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 28.248223627161565,
+          "std": 6.306962747322454,
+          "median": 28.358498751144708,
+          "worst_10_pct": 35.81717211432115
+        },
+        "emd": {
+          "mean": 21.54221774637878,
+          "std": 26.301855048258687,
+          "median": 2.3504129782397585,
+          "worst_10_pct": 64.6164468547217
+        },
+        "spatial_dispersion": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "average_precision": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "correlation": {
+          "mean": 0.47542615907203983,
+          "std": 0.13931217226728088,
+          "median": 0.5133543009950675,
+          "worst_10_pct": 0.2510412552814464
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "MCMV",
+      "dataset_name": "focal_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 27.76723388442929,
+          "std": 5.120917184064356,
+          "median": 28.18538909787905,
+          "worst_10_pct": 34.476046027260324
+        },
+        "emd": {
+          "mean": 32.60308912806057,
+          "std": 25.398411501360325,
+          "median": 30.055419332701955,
+          "worst_10_pct": 64.2085715220895
+        },
+        "spatial_dispersion": {
+          "mean": 1.1326753038836253,
+          "std": 0.4835069275346963,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "average_precision": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "correlation": {
+          "mean": 0.43389559407731626,
+          "std": 0.12952876334503538,
+          "median": 0.4404568882110979,
+          "worst_10_pct": 0.25143061152622614
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "MVAB",
+      "dataset_name": "focal_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 21.468317138727684,
+          "std": 6.472461082106278,
+          "median": 20.409238059733276,
+          "worst_10_pct": 31.11150662193107
+        },
+        "emd": {
+          "mean": 69.9118518387937,
+          "std": 6.24891036943497,
+          "median": 69.06867297411372,
+          "worst_10_pct": 77.84612289638265
+        },
+        "spatial_dispersion": {
+          "mean": 123.9961302659409,
+          "std": 32.06289505878263,
+          "median": 118.61222228161002,
+          "worst_10_pct": 168.19063137783652
+        },
+        "average_precision": {
+          "mean": 0.7883982683982683,
+          "std": 0.3509546690642695,
+          "median": 1.0,
+          "worst_10_pct": 0.14285714285714285
+        },
+        "correlation": {
+          "mean": 0.11690958537310485,
+          "std": 0.011988510313896061,
+          "median": 0.11678759320823953,
+          "worst_10_pct": 0.10378950314435668
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SAM",
+      "dataset_name": "focal_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 28.248223627161565,
+          "std": 6.306962747322454,
+          "median": 28.358498751144708,
+          "worst_10_pct": 35.81717211432115
+        },
+        "emd": {
+          "mean": 21.542217824739833,
+          "std": 26.30185512910067,
+          "median": 2.3504129097627584,
+          "worst_10_pct": 64.61644683202948
+        },
+        "spatial_dispersion": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "average_precision": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "correlation": {
+          "mean": 0.4754261651949564,
+          "std": 0.1393121737311804,
+          "median": 0.5133542773156656,
+          "worst_10_pct": 0.25104125227637053
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SMV",
+      "dataset_name": "focal_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 28.248223627161565,
+          "std": 6.306962747322454,
+          "median": 28.358498751144708,
+          "worst_10_pct": 35.81717211432115
+        },
+        "emd": {
+          "mean": 21.542217746378746,
+          "std": 26.301855048258663,
+          "median": 2.350412978239687,
+          "worst_10_pct": 64.61644685472167
+        },
+        "spatial_dispersion": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "average_precision": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "correlation": {
+          "mean": 0.4754261590720404,
+          "std": 0.13931217226728027,
+          "median": 0.5133543009950707,
+          "worst_10_pct": 0.25104125528144877
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SSP-ESMV",
+      "dataset_name": "focal_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 1.4565552421923094,
+          "std": 6.0617834729679325,
+          "median": 0.0,
+          "worst_10_pct": 0.0
+        },
+        "emd": {
+          "mean": 1.462596110736067,
+          "std": 7.165228342165132,
+          "median": 0.0,
+          "worst_10_pct": 0.0
+        },
+        "spatial_dispersion": {
+          "mean": 1.1464512137486609,
+          "std": 0.7174614917909832,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "average_precision": {
+          "mean": 0.9601886792452831,
+          "std": 0.1950348436706606,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "correlation": {
+          "mean": 0.9565312992478942,
+          "std": 0.1955727322190544,
+          "median": 0.9975497117686666,
+          "worst_10_pct": 0.9934995432625982
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SSP-IR-ESMV",
+      "dataset_name": "focal_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.23133985080230102,
+          "std": 1.1333291832744543,
+          "median": 0.0,
+          "worst_10_pct": 0.0
+        },
+        "emd": {
+          "mean": 0.0,
+          "std": 0.0,
+          "median": 0.0,
+          "worst_10_pct": 0.0
+        },
+        "spatial_dispersion": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "average_precision": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "correlation": {
+          "mean": 0.9925921798848981,
+          "std": 0.00893086125274119,
+          "median": 0.9947389455388178,
+          "worst_10_pct": 0.9888864363971313
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SafeFlexESMV",
+      "dataset_name": "focal_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.23133985080230102,
+          "std": 1.1333291832744543,
+          "median": 0.0,
+          "worst_10_pct": 0.0
+        },
+        "emd": {
+          "mean": 0.0,
+          "std": 0.0,
+          "median": 0.0,
+          "worst_10_pct": 0.0
+        },
+        "spatial_dispersion": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "average_precision": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "correlation": {
+          "mean": 0.9786317855627985,
+          "std": 0.02426934466639371,
+          "median": 0.9891333355942615,
+          "worst_10_pct": 0.9338499265075524
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SharpFlexESMV",
+      "dataset_name": "focal_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.23133985080230102,
+          "std": 1.1333291832744543,
+          "median": 0.0,
+          "worst_10_pct": 0.0
+        },
+        "emd": {
+          "mean": 0.0,
+          "std": 0.0,
+          "median": 0.0,
+          "worst_10_pct": 0.0
+        },
+        "spatial_dispersion": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "average_precision": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "correlation": {
+          "mean": 0.9786289529751108,
+          "std": 0.024273048625862492,
+          "median": 0.9891323473743587,
+          "worst_10_pct": 0.933841069838238
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SharpFlexESMV2",
+      "dataset_name": "focal_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.23133985080230102,
+          "std": 1.1333291832744543,
+          "median": 0.0,
+          "worst_10_pct": 0.0
+        },
+        "emd": {
+          "mean": 0.0,
+          "std": 0.0,
+          "median": 0.0,
+          "worst_10_pct": 0.0
+        },
+        "spatial_dispersion": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "average_precision": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "correlation": {
+          "mean": 0.9883194230773639,
+          "std": 0.013938027801555506,
+          "median": 0.9946021084213806,
+          "worst_10_pct": 0.9634638777272077
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "UNIG",
+      "dataset_name": "focal_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 28.248223627161565,
+          "std": 6.306962747322454,
+          "median": 28.358498751144708,
+          "worst_10_pct": 35.81717211432115
+        },
+        "emd": {
+          "mean": 21.542217824739836,
+          "std": 26.301855129100467,
+          "median": 2.3504129097634365,
+          "worst_10_pct": 64.61644683202965
+        },
+        "spatial_dispersion": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "average_precision": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "correlation": {
+          "mean": 0.47542616519492936,
+          "std": 0.13931217373118915,
+          "median": 0.5133542773156471,
+          "worst_10_pct": 0.25104125227636914
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "WNMV",
+      "dataset_name": "focal_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 28.248223627161565,
+          "std": 6.306962747322454,
+          "median": 28.358498751144708,
+          "worst_10_pct": 35.81717211432115
+        },
+        "emd": {
+          "mean": 21.54221774637876,
+          "std": 26.301855048258673,
+          "median": 2.350412978239752,
+          "worst_10_pct": 64.6164468547217
+        },
+        "spatial_dispersion": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "average_precision": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "correlation": {
+          "mean": 0.47542615907203967,
+          "std": 0.13931217226728101,
+          "median": 0.513354300995068,
+          "worst_10_pct": 0.2510412552814484
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "AdaptFlexESMV",
+      "dataset_name": "multi_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 9.851646873491829,
+          "std": 3.913017171362997,
+          "median": 9.101901823333067,
+          "worst_10_pct": 14.439950896001685
+        },
+        "emd": {
+          "mean": 26.374485379575813,
+          "std": 10.70538606255852,
+          "median": 27.026106601041644,
+          "worst_10_pct": 38.972390516788884
+        },
+        "spatial_dispersion": {
+          "mean": 1.8820669844577855,
+          "std": 1.6225225123298888,
+          "median": 1.400599617025401,
+          "worst_10_pct": 3.3286379522038434
+        },
+        "average_precision": {
+          "mean": 0.8883824179539943,
+          "std": 0.15011692988178996,
+          "median": 1.0,
+          "worst_10_pct": 0.7038095238095238
+        },
+        "correlation": {
+          "mean": 0.4168511660754116,
+          "std": 0.1626731969902437,
+          "median": 0.3985167636733271,
+          "worst_10_pct": 0.22492767774986194
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "DeblurFlexESMV",
+      "dataset_name": "multi_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 9.517549136541936,
+          "std": 4.279553793962764,
+          "median": 8.987390951551552,
+          "worst_10_pct": 13.367743599785118
+        },
+        "emd": {
+          "mean": 24.66721669804953,
+          "std": 11.430537124802997,
+          "median": 27.02971861310133,
+          "worst_10_pct": 38.87518173406654
+        },
+        "spatial_dispersion": {
+          "mean": 1.7787073362910548,
+          "std": 1.5049933962535709,
+          "median": 1.3773847505997534,
+          "worst_10_pct": 3.10317926945639
+        },
+        "average_precision": {
+          "mean": 0.8880546905202078,
+          "std": 0.15667433644634937,
+          "median": 1.0,
+          "worst_10_pct": 0.7044991789819375
+        },
+        "correlation": {
+          "mean": 0.444533531372506,
+          "std": 0.1794000336478064,
+          "median": 0.43788446055792746,
+          "worst_10_pct": 0.23011745803438727
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "ESMV",
+      "dataset_name": "multi_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 12.86661481882655,
+          "std": 6.899789246078532,
+          "median": 11.301339638678797,
+          "worst_10_pct": 22.683236909035692
+        },
+        "emd": {
+          "mean": 24.36809725584598,
+          "std": 13.865740818450025,
+          "median": 22.228670602077493,
+          "worst_10_pct": 46.742634355725286
+        },
+        "spatial_dispersion": {
+          "mean": 1.346989897609973,
+          "std": 0.9658996096295405,
+          "median": 1.0,
+          "worst_10_pct": 2.774761368292794
+        },
+        "average_precision": {
+          "mean": 0.7872193310510935,
+          "std": 0.2470924533447839,
+          "median": 0.8333333333333333,
+          "worst_10_pct": 0.3044603936436235
+        },
+        "correlation": {
+          "mean": 0.5413452976364618,
+          "std": 0.1735297350666758,
+          "median": 0.5570192924977457,
+          "worst_10_pct": 0.31288909915148455
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "ESMV2",
+      "dataset_name": "multi_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 9.023586696629762,
+          "std": 4.766667977769514,
+          "median": 8.1688040170543,
+          "worst_10_pct": 14.159089267243845
+        },
+        "emd": {
+          "mean": 22.53656618140123,
+          "std": 11.262105114605207,
+          "median": 20.66783666025992,
+          "worst_10_pct": 36.06414164595286
+        },
+        "spatial_dispersion": {
+          "mean": 1.6507313290502976,
+          "std": 1.8262914041654879,
+          "median": 1.0,
+          "worst_10_pct": 3.3095069944296522
+        },
+        "average_precision": {
+          "mean": 0.8745053144766678,
+          "std": 0.18899035725708127,
+          "median": 1.0,
+          "worst_10_pct": 0.5911842105263158
+        },
+        "correlation": {
+          "mean": 0.4705011397713957,
+          "std": 0.18520396397791428,
+          "median": 0.5041920205795047,
+          "worst_10_pct": 0.23005296428201633
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "ESMV3",
+      "dataset_name": "multi_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 12.27108247126479,
+          "std": 7.985025398377881,
+          "median": 9.347824417812014,
+          "worst_10_pct": 24.604044412617977
+        },
+        "emd": {
+          "mean": 22.845400181503237,
+          "std": 10.653708507139514,
+          "median": 20.80363396770694,
+          "worst_10_pct": 37.95199419049286
+        },
+        "spatial_dispersion": {
+          "mean": 1.3864685584665681,
+          "std": 0.8793188486001701,
+          "median": 1.0,
+          "worst_10_pct": 2.588715384327954
+        },
+        "average_precision": {
+          "mean": 0.8090512105960006,
+          "std": 0.25881209349702,
+          "median": 1.0,
+          "worst_10_pct": 0.32883116883116886
+        },
+        "correlation": {
+          "mean": 0.4980918812922468,
+          "std": 0.1703420361684814,
+          "median": 0.50575929328403,
+          "worst_10_pct": 0.2827463659653866
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "FlexESMV",
+      "dataset_name": "multi_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 7.360806047873972,
+          "std": 5.667688743114481,
+          "median": 7.118305322665395,
+          "worst_10_pct": 13.367743599785118
+        },
+        "emd": {
+          "mean": 20.121174003337504,
+          "std": 13.490004744035412,
+          "median": 17.39012339524126,
+          "worst_10_pct": 38.81090334404121
+        },
+        "spatial_dispersion": {
+          "mean": 1.5187406327998714,
+          "std": 1.5464012530608315,
+          "median": 1.0,
+          "worst_10_pct": 2.586544657457373
+        },
+        "average_precision": {
+          "mean": 0.8879076316966783,
+          "std": 0.1567468937486348,
+          "median": 1.0,
+          "worst_10_pct": 0.7044991789819375
+        },
+        "correlation": {
+          "mean": 0.5592618191123688,
+          "std": 0.2441123127480279,
+          "median": 0.5799630307523425,
+          "worst_10_pct": 0.25467463042516114
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "HOCMCMV",
+      "dataset_name": "multi_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 13.10902125977449,
+          "std": 9.837899993737537,
+          "median": 9.017202318801399,
+          "worst_10_pct": 27.435745289450434
+        },
+        "emd": {
+          "mean": 44.650298817113416,
+          "std": 4.126975783273484,
+          "median": 45.71205940505395,
+          "worst_10_pct": 49.63346806603328
+        },
+        "spatial_dispersion": {
+          "mean": 12.620750257879324,
+          "std": 12.187468481861274,
+          "median": 7.38978890704214,
+          "worst_10_pct": 23.49700657451579
+        },
+        "average_precision": {
+          "mean": 0.8031241405653171,
+          "std": 0.2420974137091907,
+          "median": 0.8875,
+          "worst_10_pct": 0.4511688311688312
+        },
+        "correlation": {
+          "mean": 0.1970997546186356,
+          "std": 0.06840422708373912,
+          "median": 0.17012173401950725,
+          "worst_10_pct": 0.11596015425408815
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "HOCMV",
+      "dataset_name": "multi_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 13.10902125977449,
+          "std": 9.837899993737537,
+          "median": 9.017202318801399,
+          "worst_10_pct": 27.435745289450434
+        },
+        "emd": {
+          "mean": 44.650298817113416,
+          "std": 4.126975783273492,
+          "median": 45.71205940505396,
+          "worst_10_pct": 49.633468066033316
+        },
+        "spatial_dispersion": {
+          "mean": 12.620750257879324,
+          "std": 12.187468481861274,
+          "median": 7.38978890704214,
+          "worst_10_pct": 23.49700657451579
+        },
+        "average_precision": {
+          "mean": 0.8031241405653171,
+          "std": 0.2420974137091907,
+          "median": 0.8875,
+          "worst_10_pct": 0.4511688311688312
+        },
+        "correlation": {
+          "mean": 0.19709975461863521,
+          "std": 0.06840422708373867,
+          "median": 0.17012173401950711,
+          "worst_10_pct": 0.11596015425408823
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "IR-ESMV",
+      "dataset_name": "multi_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 12.952521950368814,
+          "std": 6.982183382666022,
+          "median": 11.301339638678797,
+          "worst_10_pct": 22.683236909035692
+        },
+        "emd": {
+          "mean": 25.022479338384947,
+          "std": 13.720215395030234,
+          "median": 22.776346627150062,
+          "worst_10_pct": 47.029840346423605
+        },
+        "spatial_dispersion": {
+          "mean": 1.3401788705908282,
+          "std": 0.9471316925832116,
+          "median": 1.0,
+          "worst_10_pct": 2.4938923611736312
+        },
+        "average_precision": {
+          "mean": 0.7768545076239113,
+          "std": 0.25180311480348966,
+          "median": 0.8333333333333333,
+          "worst_10_pct": 0.3024267937944409
+        },
+        "correlation": {
+          "mean": 0.5372442714427685,
+          "std": 0.17243422638974784,
+          "median": 0.55550745072216,
+          "worst_10_pct": 0.309089821869777
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "LCMV",
+      "dataset_name": "multi_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 13.10902125977449,
+          "std": 9.837899993737537,
+          "median": 9.017202318801399,
+          "worst_10_pct": 27.435745289450434
+        },
+        "emd": {
+          "mean": 44.65029881711341,
+          "std": 4.126975783273501,
+          "median": 45.71205940505395,
+          "worst_10_pct": 49.63346806603331
+        },
+        "spatial_dispersion": {
+          "mean": 12.620750257879324,
+          "std": 12.187468481861274,
+          "median": 7.38978890704214,
+          "worst_10_pct": 23.49700657451579
+        },
+        "average_precision": {
+          "mean": 0.8031241405653171,
+          "std": 0.2420974137091907,
+          "median": 0.8875,
+          "worst_10_pct": 0.4511688311688312
+        },
+        "correlation": {
+          "mean": 0.19709975461863544,
+          "std": 0.06840422708373922,
+          "median": 0.17012173401950548,
+          "worst_10_pct": 0.11596015425408937
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "MCMV",
+      "dataset_name": "multi_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 21.517872820275624,
+          "std": 12.30968914534656,
+          "median": 19.79306460217451,
+          "worst_10_pct": 38.78949143694313
+        },
+        "emd": {
+          "mean": 47.53829725892344,
+          "std": 4.229215929902628,
+          "median": 47.1614059295937,
+          "worst_10_pct": 52.7874223727378
+        },
+        "spatial_dispersion": {
+          "mean": 13.732385249051774,
+          "std": 9.06643250547348,
+          "median": 13.603457597326853,
+          "worst_10_pct": 27.336199536070648
+        },
+        "average_precision": {
+          "mean": 0.5537328172896996,
+          "std": 0.3330122960942903,
+          "median": 0.6719298245614035,
+          "worst_10_pct": 0.12255535713611276
+        },
+        "correlation": {
+          "mean": 0.15878769392441605,
+          "std": 0.05519374996267235,
+          "median": 0.1609392633748472,
+          "worst_10_pct": 0.09326744177320573
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "MVAB",
+      "dataset_name": "multi_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 38.300590272181616,
+          "std": 9.814653563037984,
+          "median": 36.80344903030333,
+          "worst_10_pct": 51.24608536941212
+        },
+        "emd": {
+          "mean": 50.227446960906654,
+          "std": 5.589772215588006,
+          "median": 49.077705415471804,
+          "worst_10_pct": 56.56832782833137
+        },
+        "spatial_dispersion": {
+          "mean": 60.30054611415639,
+          "std": 22.33177555417097,
+          "median": 52.706034166098014,
+          "worst_10_pct": 86.66947532615295
+        },
+        "average_precision": {
+          "mean": 0.12854261095966113,
+          "std": 0.14792993664813806,
+          "median": 0.06688829787234042,
+          "worst_10_pct": 0.033818181818181824
+        },
+        "correlation": {
+          "mean": 0.11778622779172317,
+          "std": 0.01436509012978895,
+          "median": 0.11626398446540068,
+          "worst_10_pct": 0.10437091976731007
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SAM",
+      "dataset_name": "multi_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 13.10902125977449,
+          "std": 9.837899993737537,
+          "median": 9.017202318801399,
+          "worst_10_pct": 27.435745289450434
+        },
+        "emd": {
+          "mean": 44.65029881449585,
+          "std": 4.126975790196615,
+          "median": 45.712059402936504,
+          "worst_10_pct": 49.633468085409206
+        },
+        "spatial_dispersion": {
+          "mean": 12.620750257879324,
+          "std": 12.187468481861274,
+          "median": 7.38978890704214,
+          "worst_10_pct": 23.49700657451579
+        },
+        "average_precision": {
+          "mean": 0.8031241405653171,
+          "std": 0.2420974137091907,
+          "median": 0.8875,
+          "worst_10_pct": 0.4511688311688312
+        },
+        "correlation": {
+          "mean": 0.19709975572338212,
+          "std": 0.0684042287775602,
+          "median": 0.17012173658748606,
+          "worst_10_pct": 0.11596015637743377
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SMV",
+      "dataset_name": "multi_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 13.10902125977449,
+          "std": 9.837899993737537,
+          "median": 9.017202318801399,
+          "worst_10_pct": 27.435745289450434
+        },
+        "emd": {
+          "mean": 44.65029881711341,
+          "std": 4.126975783273498,
+          "median": 45.712059405054,
+          "worst_10_pct": 49.6334680660333
+        },
+        "spatial_dispersion": {
+          "mean": 12.620750257879324,
+          "std": 12.187468481861274,
+          "median": 7.38978890704214,
+          "worst_10_pct": 23.49700657451579
+        },
+        "average_precision": {
+          "mean": 0.8031241405653171,
+          "std": 0.2420974137091907,
+          "median": 0.8875,
+          "worst_10_pct": 0.4511688311688312
+        },
+        "correlation": {
+          "mean": 0.1970997546186361,
+          "std": 0.06840422708373994,
+          "median": 0.17012173401951364,
+          "worst_10_pct": 0.11596015425408908
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SSP-ESMV",
+      "dataset_name": "multi_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 25.297786247041145,
+          "std": 9.531844963891775,
+          "median": 25.091534069645277,
+          "worst_10_pct": 37.25487603507507
+        },
+        "emd": {
+          "mean": 35.92001286731538,
+          "std": 16.291971958596772,
+          "median": 33.75427241823844,
+          "worst_10_pct": 50.93098072823015
+        },
+        "spatial_dispersion": {
+          "mean": 1.2455330023590472,
+          "std": 0.8879674309816662,
+          "median": 1.0,
+          "worst_10_pct": 2.4720105607821914
+        },
+        "average_precision": {
+          "mean": 0.44948185679834113,
+          "std": 0.2723451861720268,
+          "median": 0.3488275862068965,
+          "worst_10_pct": 0.20867679621893573
+        },
+        "correlation": {
+          "mean": 0.46179767724839105,
+          "std": 0.256108382351576,
+          "median": 0.39958047274180175,
+          "worst_10_pct": 0.13216178777519286
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SSP-IR-ESMV",
+      "dataset_name": "multi_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 17.190935411772916,
+          "std": 9.2374524368441,
+          "median": 13.239924289000129,
+          "worst_10_pct": 30.45356047574905
+        },
+        "emd": {
+          "mean": 28.92798555688796,
+          "std": 13.85452663400948,
+          "median": 28.26763413240309,
+          "worst_10_pct": 47.4537773146385
+        },
+        "spatial_dispersion": {
+          "mean": 1.2798701336390321,
+          "std": 0.9451681601535954,
+          "median": 1.0,
+          "worst_10_pct": 2.6236626756367665
+        },
+        "average_precision": {
+          "mean": 0.7017862938279424,
+          "std": 0.2665543664713688,
+          "median": 0.7275,
+          "worst_10_pct": 0.29492208940484804
+        },
+        "correlation": {
+          "mean": 0.5232776980577414,
+          "std": 0.175743733017339,
+          "median": 0.519442737169762,
+          "worst_10_pct": 0.3191567185374249
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SafeFlexESMV",
+      "dataset_name": "multi_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 9.410131676798567,
+          "std": 4.225115945914322,
+          "median": 8.987390951551552,
+          "worst_10_pct": 13.367743599785118
+        },
+        "emd": {
+          "mean": 20.404960910931194,
+          "std": 11.53008867532735,
+          "median": 17.425768098345806,
+          "worst_10_pct": 36.6034667656889
+        },
+        "spatial_dispersion": {
+          "mean": 1.5770741795847403,
+          "std": 1.5392331031061377,
+          "median": 1.0,
+          "worst_10_pct": 2.759580212767664
+        },
+        "average_precision": {
+          "mean": 0.8879076316966783,
+          "std": 0.1567468937486348,
+          "median": 1.0,
+          "worst_10_pct": 0.7044991789819375
+        },
+        "correlation": {
+          "mean": 0.4955303822390657,
+          "std": 0.19274936894973,
+          "median": 0.5213382493775474,
+          "worst_10_pct": 0.2493526370906966
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SharpFlexESMV",
+      "dataset_name": "multi_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 9.410131676798567,
+          "std": 4.225115945914322,
+          "median": 8.987390951551552,
+          "worst_10_pct": 13.367743599785118
+        },
+        "emd": {
+          "mean": 25.851718223217073,
+          "std": 10.330340570633101,
+          "median": 26.562184835126377,
+          "worst_10_pct": 38.730866003012835
+        },
+        "spatial_dispersion": {
+          "mean": 0.9377742687726179,
+          "std": 0.42227601661369224,
+          "median": 1.0,
+          "worst_10_pct": 1.4271916302225394
+        },
+        "average_precision": {
+          "mean": 0.8879076316966783,
+          "std": 0.1567468937486348,
+          "median": 1.0,
+          "worst_10_pct": 0.7044991789819375
+        },
+        "correlation": {
+          "mean": 0.41608773598855636,
+          "std": 0.16193989266312364,
+          "median": 0.4009720728043029,
+          "worst_10_pct": 0.22734221862997162
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SharpFlexESMV2",
+      "dataset_name": "multi_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 9.517549136541936,
+          "std": 4.279553793962764,
+          "median": 8.987390951551552,
+          "worst_10_pct": 13.367743599785118
+        },
+        "emd": {
+          "mean": 24.49884307939685,
+          "std": 11.25491408167501,
+          "median": 26.183524535439975,
+          "worst_10_pct": 38.69843158607973
+        },
+        "spatial_dispersion": {
+          "mean": 0.9377742687726179,
+          "std": 0.42227601661369224,
+          "median": 1.0,
+          "worst_10_pct": 1.4271916302225394
+        },
+        "average_precision": {
+          "mean": 0.8880546905202078,
+          "std": 0.15667433644634937,
+          "median": 1.0,
+          "worst_10_pct": 0.7044991789819375
+        },
+        "correlation": {
+          "mean": 0.44084497647027665,
+          "std": 0.1781152705463922,
+          "median": 0.4220325662633587,
+          "worst_10_pct": 0.23330240380031447
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "UNIG",
+      "dataset_name": "multi_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 13.10902125977449,
+          "std": 9.837899993737537,
+          "median": 9.017202318801399,
+          "worst_10_pct": 27.435745289450434
+        },
+        "emd": {
+          "mean": 44.65029881449583,
+          "std": 4.126975790196568,
+          "median": 45.71205940293651,
+          "worst_10_pct": 49.633468085409206
+        },
+        "spatial_dispersion": {
+          "mean": 12.620750257879324,
+          "std": 12.187468481861274,
+          "median": 7.38978890704214,
+          "worst_10_pct": 23.49700657451579
+        },
+        "average_precision": {
+          "mean": 0.8031241405653171,
+          "std": 0.2420974137091907,
+          "median": 0.8875,
+          "worst_10_pct": 0.4511688311688312
+        },
+        "correlation": {
+          "mean": 0.1970997557233827,
+          "std": 0.06840422877755799,
+          "median": 0.17012173658744906,
+          "worst_10_pct": 0.11596015637743194
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "WNMV",
+      "dataset_name": "multi_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 13.10902125977449,
+          "std": 9.837899993737537,
+          "median": 9.017202318801399,
+          "worst_10_pct": 27.435745289450434
+        },
+        "emd": {
+          "mean": 44.650298817113395,
+          "std": 4.1269757832734895,
+          "median": 45.71205940505396,
+          "worst_10_pct": 49.63346806603327
+        },
+        "spatial_dispersion": {
+          "mean": 12.620750257879324,
+          "std": 12.187468481861274,
+          "median": 7.38978890704214,
+          "worst_10_pct": 23.49700657451579
+        },
+        "average_precision": {
+          "mean": 0.8031241405653171,
+          "std": 0.2420974137091907,
+          "median": 0.8875,
+          "worst_10_pct": 0.4511688311688312
+        },
+        "correlation": {
+          "mean": 0.19709975461863624,
+          "std": 0.06840422708373879,
+          "median": 0.17012173401951558,
+          "worst_10_pct": 0.1159601542540891
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "AdaptFlexESMV",
+      "dataset_name": "extended_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 20.775160722010504,
+          "std": 7.753193135969383,
+          "median": 21.286003729872213,
+          "worst_10_pct": 30.258761839071102
+        },
+        "emd": {
+          "mean": 27.087739441636607,
+          "std": 8.254093142073573,
+          "median": 27.37476879016354,
+          "worst_10_pct": 37.75745162496178
+        },
+        "spatial_dispersion": {
+          "mean": 4.380279566518268,
+          "std": 3.456665861142046,
+          "median": 3.283620336800487,
+          "worst_10_pct": 9.318860658819721
+        },
+        "average_precision": {
+          "mean": 0.521750631230456,
+          "std": 0.1783435862907952,
+          "median": 0.5333361511555619,
+          "worst_10_pct": 0.3719701907288337
+        },
+        "correlation": {
+          "mean": 0.3649587104080198,
+          "std": 0.11847875585500994,
+          "median": 0.3581386603083717,
+          "worst_10_pct": 0.2305341824226513
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "DeblurFlexESMV",
+      "dataset_name": "extended_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 20.79230823188038,
+          "std": 8.266594197268901,
+          "median": 21.286003729872213,
+          "worst_10_pct": 31.30934159550124
+        },
+        "emd": {
+          "mean": 27.1569681190701,
+          "std": 8.322112211013165,
+          "median": 28.256749598019727,
+          "worst_10_pct": 37.718387753659556
+        },
+        "spatial_dispersion": {
+          "mean": 4.221450164460465,
+          "std": 3.3619540204406593,
+          "median": 2.9322863851877368,
+          "worst_10_pct": 9.641229931360108
+        },
+        "average_precision": {
+          "mean": 0.5001245024850572,
+          "std": 0.1764200307434746,
+          "median": 0.5182211335408239,
+          "worst_10_pct": 0.31377730804203596
+        },
+        "correlation": {
+          "mean": 0.3652353752446005,
+          "std": 0.12185261822300107,
+          "median": 0.35005210693248,
+          "worst_10_pct": 0.22945263966891222
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "ESMV",
+      "dataset_name": "extended_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 26.076692735517664,
+          "std": 8.294295520554746,
+          "median": 27.018936951396583,
+          "worst_10_pct": 36.038910379794004
+        },
+        "emd": {
+          "mean": 29.18239355092523,
+          "std": 8.054985315538515,
+          "median": 29.264896286009886,
+          "worst_10_pct": 38.105102339313234
+        },
+        "spatial_dispersion": {
+          "mean": 2.45622866538463,
+          "std": 2.3353902154758996,
+          "median": 1.8559052202222326,
+          "worst_10_pct": 4.97961555387879
+        },
+        "average_precision": {
+          "mean": 0.293213404453744,
+          "std": 0.10827466436321008,
+          "median": 0.29500991460329845,
+          "worst_10_pct": 0.13915713642491817
+        },
+        "correlation": {
+          "mean": 0.25395890542108296,
+          "std": 0.1087777939467254,
+          "median": 0.24126191471724867,
+          "worst_10_pct": 0.12653718953598228
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "ESMV2",
+      "dataset_name": "extended_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 21.777935966529395,
+          "std": 6.329199045463234,
+          "median": 20.61728719981529,
+          "worst_10_pct": 30.02064165383431
+        },
+        "emd": {
+          "mean": 29.702396725410637,
+          "std": 7.833652512520831,
+          "median": 29.236354276068447,
+          "worst_10_pct": 38.80999521765513
+        },
+        "spatial_dispersion": {
+          "mean": 2.651803616598944,
+          "std": 1.9709463090976966,
+          "median": 1.9764917757004827,
+          "worst_10_pct": 4.368089026183559
+        },
+        "average_precision": {
+          "mean": 0.3145625175112545,
+          "std": 0.10980329316648019,
+          "median": 0.31557681346588157,
+          "worst_10_pct": 0.16233588195937013
+        },
+        "correlation": {
+          "mean": 0.23153540669138806,
+          "std": 0.09680369242134178,
+          "median": 0.22692285257884576,
+          "worst_10_pct": 0.1063522730370235
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "ESMV3",
+      "dataset_name": "extended_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 24.646223973108416,
+          "std": 7.962546721905433,
+          "median": 24.662284129559055,
+          "worst_10_pct": 35.32669964017093
+        },
+        "emd": {
+          "mean": 28.354652410104062,
+          "std": 6.312084239389752,
+          "median": 28.220787185116475,
+          "worst_10_pct": 36.01841379943429
+        },
+        "spatial_dispersion": {
+          "mean": 2.75210149582973,
+          "std": 2.2814166245771403,
+          "median": 2.2129030702429753,
+          "worst_10_pct": 5.827137535147405
+        },
+        "average_precision": {
+          "mean": 0.304864502635354,
+          "std": 0.11488178626339371,
+          "median": 0.30754804278659387,
+          "worst_10_pct": 0.14509454150927711
+        },
+        "correlation": {
+          "mean": 0.2545061389365961,
+          "std": 0.10643048037394401,
+          "median": 0.2469710263210934,
+          "worst_10_pct": 0.12469852904975928
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "FlexESMV",
+      "dataset_name": "extended_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 20.754294208234953,
+          "std": 8.338366820299921,
+          "median": 21.286003729872213,
+          "worst_10_pct": 31.30934159550124
+        },
+        "emd": {
+          "mean": 28.514645062369528,
+          "std": 8.506470772802105,
+          "median": 29.32331302913847,
+          "worst_10_pct": 39.3217580994548
+        },
+        "spatial_dispersion": {
+          "mean": 3.8274805125271842,
+          "std": 3.492311762546526,
+          "median": 2.6472909072618784,
+          "worst_10_pct": 9.44605088280192
+        },
+        "average_precision": {
+          "mean": 0.5118676476580364,
+          "std": 0.1791163569685214,
+          "median": 0.5336902946078715,
+          "worst_10_pct": 0.3425222828757304
+        },
+        "correlation": {
+          "mean": 0.400224331712527,
+          "std": 0.1424229019067553,
+          "median": 0.36856587154285614,
+          "worst_10_pct": 0.2568589975350163
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "HOCMCMV",
+      "dataset_name": "extended_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 23.286964074730076,
+          "std": 8.3158605444645,
+          "median": 20.378350027669214,
+          "worst_10_pct": 34.33900569194559
+        },
+        "emd": {
+          "mean": 44.062038213650375,
+          "std": 8.214877142573641,
+          "median": 42.21095217280011,
+          "worst_10_pct": 53.06836411946395
+        },
+        "spatial_dispersion": {
+          "mean": 21.36006942260734,
+          "std": 15.994119140928868,
+          "median": 17.92529159815222,
+          "worst_10_pct": 38.00177943997322
+        },
+        "average_precision": {
+          "mean": 0.29030351722132186,
+          "std": 0.09991031593268311,
+          "median": 0.2841839636666974,
+          "worst_10_pct": 0.19103845232302255
+        },
+        "correlation": {
+          "mean": 0.13629808643317215,
+          "std": 0.04366205009745344,
+          "median": 0.13905239296028327,
+          "worst_10_pct": 0.07466468290095658
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "HOCMV",
+      "dataset_name": "extended_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 23.286964074730076,
+          "std": 8.3158605444645,
+          "median": 20.378350027669214,
+          "worst_10_pct": 34.33900569194559
+        },
+        "emd": {
+          "mean": 44.0620382136504,
+          "std": 8.214877142573652,
+          "median": 42.21095217280008,
+          "worst_10_pct": 53.068364119463986
+        },
+        "spatial_dispersion": {
+          "mean": 21.36006942260734,
+          "std": 15.994119140928868,
+          "median": 17.92529159815222,
+          "worst_10_pct": 38.00177943997322
+        },
+        "average_precision": {
+          "mean": 0.29030351722132186,
+          "std": 0.09991031593268311,
+          "median": 0.2841839636666974,
+          "worst_10_pct": 0.19103845232302255
+        },
+        "correlation": {
+          "mean": 0.13629808643317096,
+          "std": 0.04366205009745222,
+          "median": 0.13905239296028354,
+          "worst_10_pct": 0.07466468290095549
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "IR-ESMV",
+      "dataset_name": "extended_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 25.81243834984698,
+          "std": 8.36728246069478,
+          "median": 27.280788558868988,
+          "worst_10_pct": 36.038910379794004
+        },
+        "emd": {
+          "mean": 29.010276326419174,
+          "std": 8.111246593915972,
+          "median": 29.538931058980097,
+          "worst_10_pct": 38.03213345880772
+        },
+        "spatial_dispersion": {
+          "mean": 2.385046789240856,
+          "std": 2.245209372721626,
+          "median": 1.8559052202222326,
+          "worst_10_pct": 4.698754855734313
+        },
+        "average_precision": {
+          "mean": 0.2916725854365074,
+          "std": 0.10745108529004455,
+          "median": 0.29519733257568254,
+          "worst_10_pct": 0.1389591647126037
+        },
+        "correlation": {
+          "mean": 0.25454547738796846,
+          "std": 0.11066306141032863,
+          "median": 0.2389660435719271,
+          "worst_10_pct": 0.12635434321325345
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "LCMV",
+      "dataset_name": "extended_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 23.286964074730076,
+          "std": 8.3158605444645,
+          "median": 20.378350027669214,
+          "worst_10_pct": 34.33900569194559
+        },
+        "emd": {
+          "mean": 44.0620382136504,
+          "std": 8.214877142573654,
+          "median": 42.21095217280012,
+          "worst_10_pct": 53.06836411946395
+        },
+        "spatial_dispersion": {
+          "mean": 21.36006942260734,
+          "std": 15.994119140928868,
+          "median": 17.92529159815222,
+          "worst_10_pct": 38.00177943997322
+        },
+        "average_precision": {
+          "mean": 0.29030351722132186,
+          "std": 0.09991031593268311,
+          "median": 0.2841839636666974,
+          "worst_10_pct": 0.19103845232302255
+        },
+        "correlation": {
+          "mean": 0.13629808643317096,
+          "std": 0.043662050097452776,
+          "median": 0.1390523929602842,
+          "worst_10_pct": 0.07466468290095635
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "MCMV",
+      "dataset_name": "extended_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 31.436176111210234,
+          "std": 10.331668062438697,
+          "median": 29.557559234782985,
+          "worst_10_pct": 39.366982868060326
+        },
+        "emd": {
+          "mean": 44.803180634632575,
+          "std": 8.023738875468426,
+          "median": 43.87283820070326,
+          "worst_10_pct": 53.20297404137909
+        },
+        "spatial_dispersion": {
+          "mean": 16.155750635581818,
+          "std": 9.702037852155412,
+          "median": 13.805442104149991,
+          "worst_10_pct": 31.08787556050159
+        },
+        "average_precision": {
+          "mean": 0.2121073584404949,
+          "std": 0.07602760070806841,
+          "median": 0.21315967041529643,
+          "worst_10_pct": 0.11631386116127365
+        },
+        "correlation": {
+          "mean": 0.06977000488957734,
+          "std": 0.034282485291080356,
+          "median": 0.07538197023591223,
+          "worst_10_pct": 0.023542405585605813
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "MVAB",
+      "dataset_name": "extended_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 37.18816726463692,
+          "std": 10.84018946019723,
+          "median": 37.482570260797594,
+          "worst_10_pct": 50.773155054168754
+        },
+        "emd": {
+          "mean": 46.298613949980925,
+          "std": 7.581348761173414,
+          "median": 45.583100273939586,
+          "worst_10_pct": 53.201206024879625
+        },
+        "spatial_dispersion": {
+          "mean": 59.59415267504928,
+          "std": 22.57493304251947,
+          "median": 56.99461732616772,
+          "worst_10_pct": 95.10399010659654
+        },
+        "average_precision": {
+          "mean": 0.21697742531089717,
+          "std": 0.0939310643425718,
+          "median": 0.21464070776594701,
+          "worst_10_pct": 0.08512228904123442
+        },
+        "correlation": {
+          "mean": 0.144452255050299,
+          "std": 0.027603307417617927,
+          "median": 0.14099281266527158,
+          "worst_10_pct": 0.10892361318544298
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SAM",
+      "dataset_name": "extended_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 23.286964074730076,
+          "std": 8.3158605444645,
+          "median": 20.378350027669214,
+          "worst_10_pct": 34.33900569194559
+        },
+        "emd": {
+          "mean": 44.062038220972255,
+          "std": 8.214877140269525,
+          "median": 42.210952134017184,
+          "worst_10_pct": 53.06836410172781
+        },
+        "spatial_dispersion": {
+          "mean": 21.36006942260734,
+          "std": 15.994119140928868,
+          "median": 17.92529159815222,
+          "worst_10_pct": 38.00177943997322
+        },
+        "average_precision": {
+          "mean": 0.29030351722132186,
+          "std": 0.09991031593268311,
+          "median": 0.2841839636666974,
+          "worst_10_pct": 0.19103845232302255
+        },
+        "correlation": {
+          "mean": 0.13629808629727783,
+          "std": 0.04366205076590521,
+          "median": 0.13905239436677913,
+          "worst_10_pct": 0.07466468166017168
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SMV",
+      "dataset_name": "extended_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 23.286964074730076,
+          "std": 8.3158605444645,
+          "median": 20.378350027669214,
+          "worst_10_pct": 34.33900569194559
+        },
+        "emd": {
+          "mean": 44.062038213650396,
+          "std": 8.214877142573648,
+          "median": 42.21095217280017,
+          "worst_10_pct": 53.06836411946397
+        },
+        "spatial_dispersion": {
+          "mean": 21.36006942260734,
+          "std": 15.994119140928868,
+          "median": 17.92529159815222,
+          "worst_10_pct": 38.00177943997322
+        },
+        "average_precision": {
+          "mean": 0.29030351722132186,
+          "std": 0.09991031593268311,
+          "median": 0.2841839636666974,
+          "worst_10_pct": 0.19103845232302255
+        },
+        "correlation": {
+          "mean": 0.13629808643317157,
+          "std": 0.043662050097453525,
+          "median": 0.13905239296028324,
+          "worst_10_pct": 0.07466468290095744
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SSP-ESMV",
+      "dataset_name": "extended_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 29.160888987152205,
+          "std": 9.08084720621543,
+          "median": 29.018976518096512,
+          "worst_10_pct": 39.28898886011539
+        },
+        "emd": {
+          "mean": 34.497606530806394,
+          "std": 14.952281723889277,
+          "median": 34.09508087248031,
+          "worst_10_pct": 46.069899530437006
+        },
+        "spatial_dispersion": {
+          "mean": 1.7661064821046903,
+          "std": 1.312078458573903,
+          "median": 1.2430419601669584,
+          "worst_10_pct": 3.9380570717295678
+        },
+        "average_precision": {
+          "mean": 0.22699835096978854,
+          "std": 0.09931586840973153,
+          "median": 0.22799034948879934,
+          "worst_10_pct": 0.10315905919428049
+        },
+        "correlation": {
+          "mean": 0.20338210941768942,
+          "std": 0.14754407291685118,
+          "median": 0.1805806033540555,
+          "worst_10_pct": 0.05905916876893513
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SSP-IR-ESMV",
+      "dataset_name": "extended_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 26.07818300368116,
+          "std": 7.416041978175882,
+          "median": 25.629653274663717,
+          "worst_10_pct": 35.96771317959765
+        },
+        "emd": {
+          "mean": 29.430783491171866,
+          "std": 9.465934976887123,
+          "median": 32.06611331087776,
+          "worst_10_pct": 40.13908183544503
+        },
+        "spatial_dispersion": {
+          "mean": 2.2105267979272525,
+          "std": 1.704323916818041,
+          "median": 1.794914877348122,
+          "worst_10_pct": 5.158899560857468
+        },
+        "average_precision": {
+          "mean": 0.2941589448203708,
+          "std": 0.11293131571520494,
+          "median": 0.29127627064219874,
+          "worst_10_pct": 0.13567773299401703
+        },
+        "correlation": {
+          "mean": 0.2554927157255256,
+          "std": 0.11488006226183435,
+          "median": 0.2386065282288177,
+          "worst_10_pct": 0.13194620893662617
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SafeFlexESMV",
+      "dataset_name": "extended_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 20.754294208234953,
+          "std": 8.338366820299921,
+          "median": 21.286003729872213,
+          "worst_10_pct": 31.30934159550124
+        },
+        "emd": {
+          "mean": 27.83981498757333,
+          "std": 7.978364120685125,
+          "median": 29.560903587562503,
+          "worst_10_pct": 37.356610736151
+        },
+        "spatial_dispersion": {
+          "mean": 3.9649784555287346,
+          "std": 3.460164813639892,
+          "median": 2.7441525009404506,
+          "worst_10_pct": 9.641229931360108
+        },
+        "average_precision": {
+          "mean": 0.5118676476580364,
+          "std": 0.1791163569685214,
+          "median": 0.5336902946078715,
+          "worst_10_pct": 0.3425222828757304
+        },
+        "correlation": {
+          "mean": 0.38893124882509533,
+          "std": 0.1375796306692491,
+          "median": 0.36801007866503543,
+          "worst_10_pct": 0.2563085944655513
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SharpFlexESMV",
+      "dataset_name": "extended_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 20.754294208234953,
+          "std": 8.338366820299921,
+          "median": 21.286003729872213,
+          "worst_10_pct": 31.30934159550124
+        },
+        "emd": {
+          "mean": 27.447986672616985,
+          "std": 8.362233240526432,
+          "median": 29.29784458746498,
+          "worst_10_pct": 37.996135392472425
+        },
+        "spatial_dispersion": {
+          "mean": 1.4541051727962888,
+          "std": 1.0022062337928008,
+          "median": 1.2998214860627577,
+          "worst_10_pct": 2.3723417714816013
+        },
+        "average_precision": {
+          "mean": 0.5118676476580364,
+          "std": 0.1791163569685214,
+          "median": 0.5336902946078715,
+          "worst_10_pct": 0.3425222828757304
+        },
+        "correlation": {
+          "mean": 0.3381796545361591,
+          "std": 0.11302853501977311,
+          "median": 0.3325939850100018,
+          "worst_10_pct": 0.22280808799127744
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SharpFlexESMV2",
+      "dataset_name": "extended_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 20.79230823188038,
+          "std": 8.266594197268901,
+          "median": 21.286003729872213,
+          "worst_10_pct": 31.30934159550124
+        },
+        "emd": {
+          "mean": 27.31686527430429,
+          "std": 8.452919995009559,
+          "median": 28.752603067928934,
+          "worst_10_pct": 38.13987753948444
+        },
+        "spatial_dispersion": {
+          "mean": 1.4067149308473188,
+          "std": 1.0271755085492564,
+          "median": 1.1981915085987056,
+          "worst_10_pct": 2.3723417714816013
+        },
+        "average_precision": {
+          "mean": 0.5001245024850572,
+          "std": 0.1764200307434746,
+          "median": 0.5182211335408239,
+          "worst_10_pct": 0.31377730804203596
+        },
+        "correlation": {
+          "mean": 0.3408760597059951,
+          "std": 0.11454274088869483,
+          "median": 0.33568648326393563,
+          "worst_10_pct": 0.2274572265966842
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "UNIG",
+      "dataset_name": "extended_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 23.286964074730076,
+          "std": 8.3158605444645,
+          "median": 20.378350027669214,
+          "worst_10_pct": 34.33900569194559
+        },
+        "emd": {
+          "mean": 44.062038220972255,
+          "std": 8.214877140269534,
+          "median": 42.21095213401722,
+          "worst_10_pct": 53.06836410172797
+        },
+        "spatial_dispersion": {
+          "mean": 21.36006942260734,
+          "std": 15.994119140928868,
+          "median": 17.92529159815222,
+          "worst_10_pct": 38.00177943997322
+        },
+        "average_precision": {
+          "mean": 0.29030351722132186,
+          "std": 0.09991031593268311,
+          "median": 0.2841839636666974,
+          "worst_10_pct": 0.19103845232302255
+        },
+        "correlation": {
+          "mean": 0.13629808629727572,
+          "std": 0.04366205076590509,
+          "median": 0.13905239436678057,
+          "worst_10_pct": 0.07466468166017466
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "WNMV",
+      "dataset_name": "extended_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 23.286964074730076,
+          "std": 8.3158605444645,
+          "median": 20.378350027669214,
+          "worst_10_pct": 34.33900569194559
+        },
+        "emd": {
+          "mean": 44.062038213650396,
+          "std": 8.214877142573648,
+          "median": 42.21095217280011,
+          "worst_10_pct": 53.06836411946398
+        },
+        "spatial_dispersion": {
+          "mean": 21.36006942260734,
+          "std": 15.994119140928868,
+          "median": 17.92529159815222,
+          "worst_10_pct": 38.00177943997322
+        },
+        "average_precision": {
+          "mean": 0.29030351722132186,
+          "std": 0.09991031593268311,
+          "median": 0.2841839636666974,
+          "worst_10_pct": 0.19103845232302255
+        },
+        "correlation": {
+          "mean": 0.13629808643317143,
+          "std": 0.04366205009745366,
+          "median": 0.13905239296028504,
+          "worst_10_pct": 0.0746646829009571
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "AdaptFlexESMV",
+      "dataset_name": "noisy",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 27.61055749265656,
+          "std": 10.656859508611056,
+          "median": 24.92784033848874,
+          "worst_10_pct": 40.222638516736204
+        },
+        "emd": {
+          "mean": 42.4479669042263,
+          "std": 15.537698512784939,
+          "median": 42.8812225840427,
+          "worst_10_pct": 62.636077960413814
+        },
+        "spatial_dispersion": {
+          "mean": 7.564259019889595,
+          "std": 6.2869178363474205,
+          "median": 4.955565332618692,
+          "worst_10_pct": 17.65681064018847
+        },
+        "average_precision": {
+          "mean": 0.38745678735957007,
+          "std": 0.3289838425720458,
+          "median": 0.2656121179860966,
+          "worst_10_pct": 0.06656619836694558
+        },
+        "correlation": {
+          "mean": 0.24517657077640195,
+          "std": 0.11882945788535926,
+          "median": 0.23883029227482186,
+          "worst_10_pct": 0.1115941514509041
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "DeblurFlexESMV",
+      "dataset_name": "noisy",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 27.478859809093272,
+          "std": 10.580476441334728,
+          "median": 24.92784033848874,
+          "worst_10_pct": 40.222638516736204
+        },
+        "emd": {
+          "mean": 42.20576382744457,
+          "std": 15.370133127708963,
+          "median": 42.62290883080959,
+          "worst_10_pct": 62.798598192329365
+        },
+        "spatial_dispersion": {
+          "mean": 7.093805034037178,
+          "std": 6.282937355037556,
+          "median": 4.470623901907869,
+          "worst_10_pct": 16.979423906585936
+        },
+        "average_precision": {
+          "mean": 0.3832031661824415,
+          "std": 0.3233724203856279,
+          "median": 0.2736262759824405,
+          "worst_10_pct": 0.0626842826716345
+        },
+        "correlation": {
+          "mean": 0.25714726172844604,
+          "std": 0.13746573271433152,
+          "median": 0.2328171308531986,
+          "worst_10_pct": 0.11333209796546796
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "ESMV",
+      "dataset_name": "noisy",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 27.473668274602286,
+          "std": 8.944902292485148,
+          "median": 29.809746540126657,
+          "worst_10_pct": 37.80218916508213
+        },
+        "emd": {
+          "mean": 35.595083587640445,
+          "std": 12.674887379010407,
+          "median": 39.6901478710821,
+          "worst_10_pct": 47.88462015544832
+        },
+        "spatial_dispersion": {
+          "mean": 5.274361269935274,
+          "std": 4.884825612183497,
+          "median": 3.139508278084035,
+          "worst_10_pct": 12.6290325949912
+        },
+        "average_precision": {
+          "mean": 0.32017901398797205,
+          "std": 0.318678592474477,
+          "median": 0.18991958836957273,
+          "worst_10_pct": 0.070128458602143
+        },
+        "correlation": {
+          "mean": 0.28166984325040195,
+          "std": 0.20320302682503744,
+          "median": 0.20509624469587331,
+          "worst_10_pct": 0.09278816907999682
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "ESMV2",
+      "dataset_name": "noisy",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 29.205797885964714,
+          "std": 11.130568710164168,
+          "median": 29.685139583848322,
+          "worst_10_pct": 43.102784672903226
+        },
+        "emd": {
+          "mean": 41.01873375698472,
+          "std": 16.125888670220846,
+          "median": 41.81156306312836,
+          "worst_10_pct": 64.5133736399002
+        },
+        "spatial_dispersion": {
+          "mean": 8.139245290014635,
+          "std": 8.016584108243173,
+          "median": 4.682811471895804,
+          "worst_10_pct": 18.9638334973392
+        },
+        "average_precision": {
+          "mean": 0.3109372690749977,
+          "std": 0.32038433445071973,
+          "median": 0.19849076552482806,
+          "worst_10_pct": 0.04985829184631425
+        },
+        "correlation": {
+          "mean": 0.21462722269554887,
+          "std": 0.15474687049350652,
+          "median": 0.1619069382187895,
+          "worst_10_pct": 0.06295453495897167
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "ESMV3",
+      "dataset_name": "noisy",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 26.945851146157338,
+          "std": 9.176100071331508,
+          "median": 29.685139583848322,
+          "worst_10_pct": 37.511313831670336
+        },
+        "emd": {
+          "mean": 38.27082254705508,
+          "std": 12.963760021823436,
+          "median": 40.84585461383435,
+          "worst_10_pct": 51.38277161700339
+        },
+        "spatial_dispersion": {
+          "mean": 5.9727552398520745,
+          "std": 5.549382869962938,
+          "median": 3.138426504204598,
+          "worst_10_pct": 14.756734264823729
+        },
+        "average_precision": {
+          "mean": 0.3226246674936004,
+          "std": 0.31673230618055637,
+          "median": 0.2028927610343775,
+          "worst_10_pct": 0.0780604866665955
+        },
+        "correlation": {
+          "mean": 0.25138579310148446,
+          "std": 0.1762967214543351,
+          "median": 0.19103637270837298,
+          "worst_10_pct": 0.08132352613992053
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "FlexESMV",
+      "dataset_name": "noisy",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 24.54374935690193,
+          "std": 13.13446865188104,
+          "median": 23.24084398037337,
+          "worst_10_pct": 40.222638516736204
+        },
+        "emd": {
+          "mean": 37.69756438517365,
+          "std": 19.246457738394913,
+          "median": 39.51556652882836,
+          "worst_10_pct": 62.29559422314051
+        },
+        "spatial_dispersion": {
+          "mean": 6.926207038263401,
+          "std": 6.639330656550247,
+          "median": 4.259722730050457,
+          "worst_10_pct": 16.979423906585936
+        },
+        "average_precision": {
+          "mean": 0.38661227122947084,
+          "std": 0.32560256099389323,
+          "median": 0.2744821273552519,
+          "worst_10_pct": 0.0626842826716345
+        },
+        "correlation": {
+          "mean": 0.33389778201302706,
+          "std": 0.2676727158951012,
+          "median": 0.23113229012542114,
+          "worst_10_pct": 0.11322157436034942
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "HOCMCMV",
+      "dataset_name": "noisy",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 37.2445348484288,
+          "std": 16.539056898610667,
+          "median": 37.99351889306425,
+          "worst_10_pct": 58.01502732077266
+        },
+        "emd": {
+          "mean": 60.60940341309184,
+          "std": 11.471049559092757,
+          "median": 58.66862426217168,
+          "worst_10_pct": 75.95848103152758
+        },
+        "spatial_dispersion": {
+          "mean": 64.42596459275899,
+          "std": 43.54666748369135,
+          "median": 52.16762886749301,
+          "worst_10_pct": 124.72329319053391
+        },
+        "average_precision": {
+          "mean": 0.26426049775575844,
+          "std": 0.32985893261534216,
+          "median": 0.14569160997732428,
+          "worst_10_pct": 0.020604975878803385
+        },
+        "correlation": {
+          "mean": 0.09287955970361386,
+          "std": 0.03710915164439339,
+          "median": 0.10425025453476634,
+          "worst_10_pct": 0.031781561041591536
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "HOCMV",
+      "dataset_name": "noisy",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 37.2445348484288,
+          "std": 16.539056898610667,
+          "median": 37.99351889306425,
+          "worst_10_pct": 58.01502732077266
+        },
+        "emd": {
+          "mean": 60.60940341309185,
+          "std": 11.471049559092753,
+          "median": 58.66862426217166,
+          "worst_10_pct": 75.9584810315276
+        },
+        "spatial_dispersion": {
+          "mean": 64.42596459275899,
+          "std": 43.54666748369135,
+          "median": 52.16762886749301,
+          "worst_10_pct": 124.72329319053391
+        },
+        "average_precision": {
+          "mean": 0.26426049775575844,
+          "std": 0.32985893261534216,
+          "median": 0.14569160997732428,
+          "worst_10_pct": 0.020604975878803385
+        },
+        "correlation": {
+          "mean": 0.09287955970361303,
+          "std": 0.03710915164439372,
+          "median": 0.10425025453475861,
+          "worst_10_pct": 0.03178156104158654
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "IR-ESMV",
+      "dataset_name": "noisy",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 27.231853312988516,
+          "std": 8.864269775514753,
+          "median": 29.685139583848322,
+          "worst_10_pct": 37.80218916508213
+        },
+        "emd": {
+          "mean": 35.24222930756429,
+          "std": 12.702275171918233,
+          "median": 39.0425219944313,
+          "worst_10_pct": 47.675732371294345
+        },
+        "spatial_dispersion": {
+          "mean": 4.9784997552965145,
+          "std": 4.625955204327707,
+          "median": 2.951262086758663,
+          "worst_10_pct": 11.998594591312324
+        },
+        "average_precision": {
+          "mean": 0.3211074457220407,
+          "std": 0.31898373256282825,
+          "median": 0.1897831881558295,
+          "worst_10_pct": 0.07034979308340111
+        },
+        "correlation": {
+          "mean": 0.2871142276125888,
+          "std": 0.2093447629003961,
+          "median": 0.2065541116059849,
+          "worst_10_pct": 0.09298761960271741
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "LCMV",
+      "dataset_name": "noisy",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 37.2445348484288,
+          "std": 16.539056898610667,
+          "median": 37.99351889306425,
+          "worst_10_pct": 58.01502732077266
+        },
+        "emd": {
+          "mean": 60.60940341309186,
+          "std": 11.47104955909275,
+          "median": 58.66862426217166,
+          "worst_10_pct": 75.95848103152757
+        },
+        "spatial_dispersion": {
+          "mean": 64.42596459275899,
+          "std": 43.54666748369135,
+          "median": 52.16762886749301,
+          "worst_10_pct": 124.72329319053391
+        },
+        "average_precision": {
+          "mean": 0.26426049775575844,
+          "std": 0.32985893261534216,
+          "median": 0.14569160997732428,
+          "worst_10_pct": 0.020604975878803385
+        },
+        "correlation": {
+          "mean": 0.09287955970361512,
+          "std": 0.037109151644394,
+          "median": 0.10425025453477205,
+          "worst_10_pct": 0.03178156104158948
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "MCMV",
+      "dataset_name": "noisy",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 41.3193371228752,
+          "std": 10.701143900686015,
+          "median": 41.44778903527567,
+          "worst_10_pct": 55.800549758694544
+        },
+        "emd": {
+          "mean": 60.82321419904147,
+          "std": 10.756380743872205,
+          "median": 58.984318953862754,
+          "worst_10_pct": 74.61410355898411
+        },
+        "spatial_dispersion": {
+          "mean": 55.35869874252736,
+          "std": 29.35728068095778,
+          "median": 47.75775506708789,
+          "worst_10_pct": 90.63693142024614
+        },
+        "average_precision": {
+          "mean": 0.14393429786830386,
+          "std": 0.20672595003931632,
+          "median": 0.06540430510931972,
+          "worst_10_pct": 0.023983268111777624
+        },
+        "correlation": {
+          "mean": 0.050862342829952195,
+          "std": 0.027779909007486718,
+          "median": 0.05555590595003773,
+          "worst_10_pct": 0.004550171863719929
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "MVAB",
+      "dataset_name": "noisy",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 36.46004714110406,
+          "std": 9.263013778639356,
+          "median": 37.588673240990694,
+          "worst_10_pct": 47.86929315762703
+        },
+        "emd": {
+          "mean": 59.23659703919463,
+          "std": 9.734136699998285,
+          "median": 58.68035454606395,
+          "worst_10_pct": 72.04591276390364
+        },
+        "spatial_dispersion": {
+          "mean": 98.98701053304835,
+          "std": 49.70450346529763,
+          "median": 82.93823368110382,
+          "worst_10_pct": 181.72574507420717
+        },
+        "average_precision": {
+          "mean": 0.2372887537919477,
+          "std": 0.2934134978956965,
+          "median": 0.09590234861658584,
+          "worst_10_pct": 0.05460100385054334
+        },
+        "correlation": {
+          "mean": 0.10975714541124945,
+          "std": 0.02817593072364552,
+          "median": 0.10859240487914903,
+          "worst_10_pct": 0.0725193468590116
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SAM",
+      "dataset_name": "noisy",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 37.2445348484288,
+          "std": 16.539056898610667,
+          "median": 37.99351889306425,
+          "worst_10_pct": 58.01502732077266
+        },
+        "emd": {
+          "mean": 60.609403414131876,
+          "std": 11.471049554647122,
+          "median": 58.668624263634385,
+          "worst_10_pct": 75.95848103236767
+        },
+        "spatial_dispersion": {
+          "mean": 64.42596459275899,
+          "std": 43.54666748369135,
+          "median": 52.16762886749301,
+          "worst_10_pct": 124.72329319053391
+        },
+        "average_precision": {
+          "mean": 0.26426049775575844,
+          "std": 0.32985893261534216,
+          "median": 0.14569160997732428,
+          "worst_10_pct": 0.020604975878803385
+        },
+        "correlation": {
+          "mean": 0.09287955874886071,
+          "std": 0.03710915174102901,
+          "median": 0.10425025126976237,
+          "worst_10_pct": 0.03178155985860499
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SMV",
+      "dataset_name": "noisy",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 37.2445348484288,
+          "std": 16.539056898610667,
+          "median": 37.99351889306425,
+          "worst_10_pct": 58.01502732077266
+        },
+        "emd": {
+          "mean": 60.60940341309186,
+          "std": 11.47104955909279,
+          "median": 58.668624262171605,
+          "worst_10_pct": 75.95848103152767
+        },
+        "spatial_dispersion": {
+          "mean": 64.42596459275899,
+          "std": 43.54666748369135,
+          "median": 52.16762886749301,
+          "worst_10_pct": 124.72329319053391
+        },
+        "average_precision": {
+          "mean": 0.26426049775575844,
+          "std": 0.32985893261534216,
+          "median": 0.14569160997732428,
+          "worst_10_pct": 0.020604975878803385
+        },
+        "correlation": {
+          "mean": 0.0928795597036141,
+          "std": 0.037109151644395925,
+          "median": 0.10425025453478481,
+          "worst_10_pct": 0.03178156104158263
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SSP-ESMV",
+      "dataset_name": "noisy",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 31.860527072776396,
+          "std": 10.900322689485353,
+          "median": 30.85413945968717,
+          "worst_10_pct": 45.9401787013218
+        },
+        "emd": {
+          "mean": 32.249766059028524,
+          "std": 12.088870829760726,
+          "median": 33.01686019452153,
+          "worst_10_pct": 44.07099884178885
+        },
+        "spatial_dispersion": {
+          "mean": 2.684962849293709,
+          "std": 2.7254552852271843,
+          "median": 1.5432096278458984,
+          "worst_10_pct": 5.085574840160026
+        },
+        "average_precision": {
+          "mean": 0.2929983923754456,
+          "std": 0.32885210846660284,
+          "median": 0.16471019436887133,
+          "worst_10_pct": 0.04242168119960836
+        },
+        "correlation": {
+          "mean": 0.31212730485562623,
+          "std": 0.2877357828529019,
+          "median": 0.2504603531073708,
+          "worst_10_pct": 0.008852440086530603
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SSP-IR-ESMV",
+      "dataset_name": "noisy",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 27.30146917938903,
+          "std": 7.584682707112562,
+          "median": 25.609927639174177,
+          "worst_10_pct": 38.98022663172067
+        },
+        "emd": {
+          "mean": 33.24494222208069,
+          "std": 11.604179065395526,
+          "median": 36.38676028369899,
+          "worst_10_pct": 45.76940776614651
+        },
+        "spatial_dispersion": {
+          "mean": 3.68539806650626,
+          "std": 3.614756322777028,
+          "median": 2.579852537353022,
+          "worst_10_pct": 6.758986014890143
+        },
+        "average_precision": {
+          "mean": 0.3187109233767255,
+          "std": 0.31910760558090584,
+          "median": 0.19008032978234904,
+          "worst_10_pct": 0.08177439714959947
+        },
+        "correlation": {
+          "mean": 0.2966786473370592,
+          "std": 0.2129701864085875,
+          "median": 0.22797356168563038,
+          "worst_10_pct": 0.10973400519083404
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SafeFlexESMV",
+      "dataset_name": "noisy",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 27.478859809093272,
+          "std": 10.580476441334728,
+          "median": 24.92784033848874,
+          "worst_10_pct": 40.222638516736204
+        },
+        "emd": {
+          "mean": 40.25426722121616,
+          "std": 16.29156111403191,
+          "median": 39.22975434935747,
+          "worst_10_pct": 62.295831998204164
+        },
+        "spatial_dispersion": {
+          "mean": 7.024315898908372,
+          "std": 6.619773909601201,
+          "median": 4.259722730050457,
+          "worst_10_pct": 16.979423906585936
+        },
+        "average_precision": {
+          "mean": 0.38661227122947084,
+          "std": 0.32560256099389323,
+          "median": 0.2744821273552519,
+          "worst_10_pct": 0.0626842826716345
+        },
+        "correlation": {
+          "mean": 0.2809915485628088,
+          "std": 0.17583258425929596,
+          "median": 0.23078172806591407,
+          "worst_10_pct": 0.11322136620488876
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SharpFlexESMV",
+      "dataset_name": "noisy",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 27.478859809093272,
+          "std": 10.580476441334728,
+          "median": 24.92784033848874,
+          "worst_10_pct": 40.222638516736204
+        },
+        "emd": {
+          "mean": 42.64470351608789,
+          "std": 15.733298455783734,
+          "median": 42.44707311190124,
+          "worst_10_pct": 63.69460572825558
+        },
+        "spatial_dispersion": {
+          "mean": 1.9640354402881062,
+          "std": 1.2003243641223542,
+          "median": 1.9102884274213188,
+          "worst_10_pct": 3.624288247550491
+        },
+        "average_precision": {
+          "mean": 0.38661227122947084,
+          "std": 0.32560256099389323,
+          "median": 0.2744821273552519,
+          "worst_10_pct": 0.0626842826716345
+        },
+        "correlation": {
+          "mean": 0.23941869961323106,
+          "std": 0.12338030088905505,
+          "median": 0.2093833719143856,
+          "worst_10_pct": 0.09934788762993234
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SharpFlexESMV2",
+      "dataset_name": "noisy",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 27.478859809093272,
+          "std": 10.580476441334728,
+          "median": 24.92784033848874,
+          "worst_10_pct": 40.222638516736204
+        },
+        "emd": {
+          "mean": 42.25964398590753,
+          "std": 15.543561455813634,
+          "median": 41.72823871829487,
+          "worst_10_pct": 62.864733578998155
+        },
+        "spatial_dispersion": {
+          "mean": 1.9921868938509613,
+          "std": 1.1457820836644315,
+          "median": 2.089703229554172,
+          "worst_10_pct": 3.624288247550491
+        },
+        "average_precision": {
+          "mean": 0.3832031661824415,
+          "std": 0.3233724203856279,
+          "median": 0.2736262759824405,
+          "worst_10_pct": 0.0626842826716345
+        },
+        "correlation": {
+          "mean": 0.2525778879175545,
+          "std": 0.14109939706586397,
+          "median": 0.2116883529216906,
+          "worst_10_pct": 0.09944513855831434
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "UNIG",
+      "dataset_name": "noisy",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 37.2445348484288,
+          "std": 16.539056898610667,
+          "median": 37.99351889306425,
+          "worst_10_pct": 58.01502732077266
+        },
+        "emd": {
+          "mean": 60.60940341413187,
+          "std": 11.47104955464703,
+          "median": 58.66862426363457,
+          "worst_10_pct": 75.9584810323674
+        },
+        "spatial_dispersion": {
+          "mean": 64.42596459275899,
+          "std": 43.54666748369135,
+          "median": 52.16762886749301,
+          "worst_10_pct": 124.72329319053391
+        },
+        "average_precision": {
+          "mean": 0.26426049775575844,
+          "std": 0.32985893261534216,
+          "median": 0.14569160997732428,
+          "worst_10_pct": 0.020604975878803385
+        },
+        "correlation": {
+          "mean": 0.09287955874886177,
+          "std": 0.03710915174103714,
+          "median": 0.10425025126975898,
+          "worst_10_pct": 0.031781559858588326
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "WNMV",
+      "dataset_name": "noisy",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 37.2445348484288,
+          "std": 16.539056898610667,
+          "median": 37.99351889306425,
+          "worst_10_pct": 58.01502732077266
+        },
+        "emd": {
+          "mean": 60.60940341309186,
+          "std": 11.471049559092778,
+          "median": 58.66862426217171,
+          "worst_10_pct": 75.95848103152768
+        },
+        "spatial_dispersion": {
+          "mean": 64.42596459275899,
+          "std": 43.54666748369135,
+          "median": 52.16762886749301,
+          "worst_10_pct": 124.72329319053391
+        },
+        "average_precision": {
+          "mean": 0.26426049775575844,
+          "std": 0.32985893261534216,
+          "median": 0.14569160997732428,
+          "worst_10_pct": 0.020604975878803385
+        },
+        "correlation": {
+          "mean": 0.09287955970361514,
+          "std": 0.0371091516443949,
+          "median": 0.10425025453478054,
+          "worst_10_pct": 0.03178156104158797
+        }
+      },
+      "samples": []
+    }
+  ]
+}

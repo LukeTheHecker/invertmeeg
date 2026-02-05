@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Benchmark Dashboard</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #f5f5f5; color: #222; padding: 1.5rem; }
+  h1 { font-size: 1.4rem; margin-bottom: 1rem; }
+  .controls { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; align-items: end; }
+  .controls label { font-size: .85rem; font-weight: 600; display: flex; flex-direction: column; gap: .2rem; }
+  .controls select { padding: .3rem .4rem; font-size: .85rem; border: 1px solid #ccc; border-radius: 4px; }
+  select[multiple] { height: 6rem; }
+  table { border-collapse: collapse; width: 100%; background: #fff; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  th, td { padding: .45rem .6rem; text-align: left; font-size: .82rem; border-bottom: 1px solid #eee; }
+  th { background: #fafafa; cursor: pointer; user-select: none; position: sticky; top: 0; white-space: nowrap; }
+  th:hover { background: #f0f0f0; }
+  th .arrow { font-size: .7rem; margin-left: .3rem; opacity: .4; }
+  th.sorted .arrow { opacity: 1; }
+  tr:hover td { background: #f8f8ff; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .cat-badge { display: inline-block; padding: .1rem .4rem; border-radius: 3px; font-size: .72rem; color: #fff; margin-right: .3rem; }
+  .bar-cell { position: relative; }
+  .bar-bg { position: absolute; left: 0; top: 2px; bottom: 2px; border-radius: 2px; opacity: .18; }
+  .summary { font-size: .8rem; color: #666; margin-bottom: .5rem; }
+  .metric-toggle { display: flex; gap: .3rem; flex-wrap: wrap; }
+  .metric-toggle button { padding: .25rem .5rem; font-size: .78rem; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; }
+  .metric-toggle button.active { background: #4a7cff; color: #fff; border-color: #4a7cff; }
+  .rank { color: #999; font-size: .75rem; }
+</style>
+</head>
+<body>
+<h1>Benchmark Results</h1>
+<div class="controls">
+  <label>Dataset<select id="dataset"></select></label>
+  <label>Category<select id="category"><option value="all">All</option></select></label>
+  <label>Metric
+    <div class="metric-toggle" id="metricBtns"></div>
+  </label>
+  <label>Sort
+    <select id="sortCol">
+      <option value="median">Median (asc)</option>
+      <option value="median-desc">Median (desc)</option>
+      <option value="mean">Mean (asc)</option>
+      <option value="mean-desc">Mean (desc)</option>
+      <option value="avg-rank">Rank (asc)</option>
+      <option value="name">Name</option>
+      <option value="category">Category</option>
+    </select>
+  </label>
+</div>
+<div class="summary" id="summary"></div>
+<table><thead><tr id="thead"></tr></thead><tbody id="tbody"></tbody></table>
+
+<script>
+const CAT_COLORS = {
+  minimum_norm:"#1f77b4", loreta:"#2ca02c", beamformer:"#d62728",
+  empirical_bayes:"#9467bd", sparse_bayesian:"#ff7f0e", music:"#8c564b",
+  matching_pursuit:"#e377c2", other:"#7f7f7f", baseline:"#bcbd22"
+};
+const METRIC_NAMES = {
+  mean_localization_error:"MLE (m)", emd:"EMD", spatial_dispersion:"Spatial Disp.", average_precision:"Avg Precision", correlation:"Correlation", dataset_rank:"Rank", global_rank:"Global Rank"
+};
+const METRIC_KEYS = Object.keys(METRIC_NAMES);
+// higher-is-better metrics (for ranking direction)
+const HIGHER_BETTER = new Set(["average_precision", "correlation"]);
+
+let DATA, CATEGORIES, solverCat = {};
+let state = { dataset: null, category: "all", metric: "mean_localization_error", sort: "median" };
+
+// const file = new URLSearchParams(location.search).get("file") || "results/benchmark_results_muse-claude.json";
+const file = new URLSearchParams(location.search).get("file") || "results/benchmark_results-lowsnr.json";
+// const file = new URLSearchParams(location.search).get("file") || "results/benchmark_results_music.json";
+fetch(file).then(r=>r.text()).then(t => JSON.parse(t.replace(/\bNaN\b/g, "null"))).then(init).catch(e => {
+  document.getElementById("summary").textContent = "Error loading data: " + e.message;
+  console.error(e);
+});
+
+function init(d) {
+  DATA = d;
+  CATEGORIES = {};
+  
+  // Build solver category mapping and category lists from JSON data
+  solverCat = {};
+  const categorySet = new Set();
+  
+  // Extract categories from results
+  DATA.results.forEach(r => {
+    const cat = r.category || "other";
+    categorySet.add(cat);
+    solverCat[r.solver_name] = cat;
+    
+    // Build category -> solvers mapping
+    if (!CATEGORIES[cat]) {
+      CATEGORIES[cat] = [];
+    }
+    if (!CATEGORIES[cat].includes(r.solver_name)) {
+      CATEGORIES[cat].push(r.solver_name);
+    }
+  });
+  
+  // Sort solvers within each category for consistency
+  Object.keys(CATEGORIES).forEach(cat => {
+    CATEGORIES[cat].sort();
+  });
+
+  // populate controls
+  const datasets = [...new Set(DATA.results.map(r=>r.dataset_name))].sort();
+  const dsSel = document.getElementById("dataset");
+  datasets.forEach(ds => { const o = document.createElement("option"); o.value=ds; o.textContent=ds; dsSel.appendChild(o); });
+  state.dataset = datasets[0];
+
+  const catSel = document.getElementById("category");
+  const sortedCategories = Array.from(categorySet).sort();
+  sortedCategories.forEach(c => { 
+    const o = document.createElement("option"); 
+    o.value=c; 
+    o.textContent=c.replace(/_/g," "); 
+    catSel.appendChild(o); 
+  });
+
+  const mb = document.getElementById("metricBtns");
+  METRIC_KEYS.forEach(m => {
+    const b = document.createElement("button");
+    b.textContent = METRIC_NAMES[m];
+    b.dataset.metric = m;
+    if (m === state.metric) b.classList.add("active");
+    b.onclick = () => { state.metric = m; mb.querySelectorAll("button").forEach(x=>x.classList.remove("active")); b.classList.add("active"); render(); };
+    mb.appendChild(b);
+  });
+
+  dsSel.onchange = () => { state.dataset = dsSel.value; render(); };
+  catSel.onchange = () => { state.category = catSel.value; render(); };
+  document.getElementById("sortCol").onchange = e => { state.sort = e.target.value; render(); };
+
+  render();
+}
+
+function render() {
+  const rows = DATA.results.filter(r => r.dataset_name === state.dataset);
+  let filtered = state.category === "all" ? rows : rows.filter(r => (r.category || solverCat[r.solver_name]) === state.category);
+
+  const m = state.metric;
+  const hb = HIGHER_BETTER.has(m);
+  const isRankMetric = m === "dataset_rank" || m === "global_rank";
+
+  const perDatasetRanks = DATA.ranks || {};
+  const globalRanks = DATA.global_ranks || DATA.average_ranks || {};
+
+  // Helper to get rank value for current dataset or global
+  const getRankValue = (r) => {
+    if (m === "global_rank") return globalRanks[r.solver_name];
+    if (m === "dataset_rank") return (perDatasetRanks[state.dataset] || {})[r.solver_name];
+    return undefined;
+  };
+
+  // Helper to get metric value (handles special case of rank metrics)
+  const getMetricValue = (r, field) => {
+    if (isRankMetric) {
+      const rank = getRankValue(r);
+      return rank !== undefined ? rank : Infinity;
+    }
+    return r.metrics[m]?.[field] ?? (hb ? -Infinity : Infinity);
+  };
+  
+  // sort
+  filtered.sort((a, b) => {
+    const am = getMetricValue(a, "mean");
+    const bm = getMetricValue(b, "mean");
+    const amed = getMetricValue(a, "median");
+    const bmed = getMetricValue(b, "median");
+    if (state.sort === "median") return hb ? bmed - amed : amed - bmed;
+    if (state.sort === "median-desc") return hb ? amed - bmed : bmed - amed;
+    if (state.sort === "mean") return hb ? bm - am : am - bm;
+    if (state.sort === "mean-desc") return hb ? am - bm : bm - am;
+    if (state.sort === "avg-rank") {
+      const arA = (perDatasetRanks[state.dataset] || {})[a.solver_name] ?? Infinity;
+      const arB = (perDatasetRanks[state.dataset] || {})[b.solver_name] ?? Infinity;
+      return arA - arB;
+    }
+    if (state.sort === "name") return a.solver_name.localeCompare(b.solver_name);
+    if (state.sort === "category") {
+      const catA = a.category || solverCat[a.solver_name] || "";
+      const catB = b.category || solverCat[b.solver_name] || "";
+      return catA.localeCompare(catB) || am - bm;
+    }
+    return 0;
+  });
+
+  // compute ranks (by best metric, on full dataset not just filtered)
+  const allForDs = DATA.results.filter(r => r.dataset_name === state.dataset);
+  allForDs.sort((a,b) => {
+    const am = getMetricValue(a, "mean");
+    const bm = getMetricValue(b, "mean");
+    return hb ? bm - am : am - bm;
+  });
+  const rankMap = {};
+  allForDs.forEach((r,i) => rankMap[r.solver_name] = i+1);
+
+  const maxVal = Math.max(...filtered.map(r => getMetricValue(r, "mean")));
+
+  document.getElementById("summary").textContent =
+    `Showing ${filtered.length} solvers on "${state.dataset}" · Metric: ${METRIC_NAMES[m]} · ${DATA.metadata?.n_samples ?? "?"} samples`;
+
+  // header
+  const thead = document.getElementById("thead");
+  thead.innerHTML = `<th>#</th><th>Solver</th><th>Category</th><th>Mean</th><th>Std</th><th>Median</th><th>Rank</th><th>Global Rank</th><th></th>`;
+
+  // body
+  const tbody = document.getElementById("tbody");
+  tbody.innerHTML = "";
+  filtered.forEach((r, i) => {
+    const met = isRankMetric ? null : (r.metrics[m] || {});
+    const cat = r.category || solverCat[r.solver_name] || "other";
+    const rankVal = getRankValue(r);
+    const meanVal = isRankMetric ? rankVal : met?.mean;
+    const pct = maxVal > 0 && meanVal !== undefined ? (meanVal / maxVal * 100) : 0;
+    const color = CAT_COLORS[cat] || "#999";
+    const rank = rankMap[r.solver_name];
+    const dsRank = (perDatasetRanks[state.dataset] || {})[r.solver_name];
+    const glRank = globalRanks[r.solver_name];
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="num">${i+1} <span class="rank">(#${rank})</span></td>
+      <td><b>${r.solver_name}</b></td>
+      <td><span class="cat-badge" style="background:${color}">${cat.replace(/_/g," ")}</span></td>
+      <td class="num">${isRankMetric ? (rankVal !== undefined ? rankVal.toFixed(2) : "—") : (met?.mean?.toFixed(4) ?? "—")}</td>
+      <td class="num">${isRankMetric ? "—" : (met?.std?.toFixed(4) ?? "—")}</td>
+      <td class="num">${isRankMetric ? (rankVal !== undefined ? rankVal.toFixed(2) : "—") : (met?.median?.toFixed(4) ?? "—")}</td>
+      <td class="num">${dsRank !== undefined ? dsRank.toFixed(2) : "—"}</td>
+      <td class="num">${glRank !== undefined ? glRank.toFixed(2) : "—"}</td>
+      <td class="bar-cell" style="width:30%"><div class="bar-bg" style="width:${pct}%;background:${color}"></div></td>`;
+    tbody.appendChild(tr);
+  });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+*.pkl
+*.pyc
+*.h5
+*.keras
+*.fif
+*.pt
+*.csv
+.pytest_cache
+.vscode
+inverse.egg-info
+sphinx
+build
+dist
+invertmeeg.egg-info
+figures
+models
+dev
+venv/
+examples/
+benchmark_results.json
+fontlist-v390.json
+.mne_config
+site/
+
+# OS files
+.DS_Store
+
+# MNE data cache
+.mne/
+
+# Experimental / deprecated code
+_old/
+.lab_journal/
+
+# MkDocs sources (track docs/, ignore Sphinx leftovers)
+docs/.doctrees/
+docs/.buildinfo
+docs/.nojekyll
+
+# Benchmark artifacts (track selected inputs for docs)
+results/*
+# !results/benchmark_results*.json
+!results/release/

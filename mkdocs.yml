@@ -1,0 +1,96 @@
+site_name: invertmeeg
+site_url: https://lukethehecker.github.io/invertmeeg/
+repo_url: https://github.com/LukeTheHecker/invertmeeg
+repo_name: LukeTheHecker/invertmeeg
+
+theme:
+  name: material
+  logo: assets/images/logo-pixelbrain.png
+  palette:
+    - scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.indexes
+    - content.code.copy
+    - toc.follow
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: numpy
+            docstring_options:
+              warnings: false
+              warn_unknown_params: false
+              warn_missing_types: false
+            show_source: true
+            show_root_heading: true
+            show_signature_annotations: true
+            separate_signature: true
+  - gen-files:
+      scripts:
+        - docs/scripts/gen_solver_catalog.py
+        - docs/scripts/gen_benchmarks_assets.py
+
+extra_css:
+  - assets/stylesheets/extra.css
+
+extra_javascript:
+  - assets/javascripts/benchmarks.js
+  - assets/javascripts/solver-id-copy.js
+
+validation:
+  nav:
+    omitted_files: ignore
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Solvers:
+    - solvers/index.md
+    - Minimum Norm: solvers/minimum-norm/index.md
+    - Bayesian: solvers/bayesian/index.md
+    - Beamformers: solvers/beamformers/index.md
+    - Subspace Methods: solvers/subspace-methods/index.md
+    - Matching Pursuit: solvers/matching-pursuit/index.md
+    - Dipole Fitting: solvers/dipole-fitting/index.md
+    - Neural Networks: solvers/neural-networks/index.md
+    - Hybrid: solvers/hybrid/index.md
+    - Baseline: solvers/baseline/index.md
+  - Modules:
+    - modules/index.md
+    - Simulation: modules/simulate.md
+    - Evaluation: modules/evaluate.md
+    - Visualization: modules/viz.md
+    - Forward Modeling: modules/forward.md
+    - Benchmarking: modules/benchmark.md
+  - Leaderboard: benchmarks.md
+  - API Reference: api.md
+  - License: license.md
