@@ -39,4 +39,3 @@ def test_exso_music_recovers_two_point_sources():
 
     assert metric_map.shape == (n,)
     assert set(selected.tolist()) == set(true_idx.tolist())
-

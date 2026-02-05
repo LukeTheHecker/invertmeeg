@@ -143,7 +143,9 @@ class SolverVBSBL(BaseSolver):
                 thr = float(pruning_thresh) * float(np.max(gammas_new))
                 gammas_new = np.where(gammas_new >= thr, gammas_new, 0.0)
 
-            rel = float(np.linalg.norm(gammas_new - gammas)) / max(float(np.linalg.norm(gammas)), 1e-15)
+            rel = float(np.linalg.norm(gammas_new - gammas)) / max(
+                float(np.linalg.norm(gammas)), 1e-15
+            )
             gammas = gammas_new
             if rel < float(conv_crit):
                 break

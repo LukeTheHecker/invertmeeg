@@ -27,18 +27,14 @@ def _rotate_points(points, azimuth, elevation):
     el = np.radians(elevation)
 
     # Rotation around Z axis (Azimuth)
-    Rz = np.array([
-        [np.cos(az), -np.sin(az), 0],
-        [np.sin(az), np.cos(az), 0],
-        [0, 0, 1]
-    ])
+    Rz = np.array(
+        [[np.cos(az), -np.sin(az), 0], [np.sin(az), np.cos(az), 0], [0, 0, 1]]
+    )
 
     # Rotation around X axis (Elevation)
-    Rx = np.array([
-        [1, 0, 0],
-        [0, np.cos(el), -np.sin(el)],
-        [0, np.sin(el), np.cos(el)]
-    ])
+    Rx = np.array(
+        [[1, 0, 0], [0, np.cos(el), -np.sin(el)], [0, np.sin(el), np.cos(el)]]
+    )
 
     # Apply rotations: R = Rx @ Rz
     # Points are (N, 3). We want (R @ P.T).T = P @ R.T
@@ -152,7 +148,7 @@ def plot_3d_glass_brain(
 
     # Let's define projection:
     x_proj = rotated_pos[:, 0]
-    y_proj = rotated_pos[:, 2] # Plot Z on vertical axis
+    y_proj = rotated_pos[:, 2]  # Plot Z on vertical axis
     depth = rotated_pos[:, 1]  # Y is depth
 
     # Active sources projection
@@ -212,10 +208,10 @@ def plot_3d_glass_brain(
             # act_depth range:
             d_min, d_max = depth.min(), depth.max()
             if d_max > d_min:
-                d_norm = (act_depth - d_min) / (d_max - d_min) # 0 to 1
+                d_norm = (act_depth - d_min) / (d_max - d_min)  # 0 to 1
                 # Scale factor: e.g. 0.5 to 2.0
                 scale = 0.5 + 2.0 * d_norm
-                sizes = marker_size * (scale ** 2) # Area scales with square
+                sizes = marker_size * (scale**2)  # Area scales with square
 
         ax.scatter(
             act_x,

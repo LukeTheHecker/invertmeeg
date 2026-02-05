@@ -6,12 +6,11 @@ This script generates:
 - solvers/{category}/{slug}.md: Individual solver pages with mkdocstrings directives
 """
 
-import os
-import tempfile
 import importlib
-import inspect
+import os
 import pkgutil
 import re
+import tempfile
 from collections import defaultdict
 from pathlib import Path
 
@@ -108,6 +107,7 @@ def get_solver_module_path(cls) -> str:
     """Get the full module path for a solver class."""
     return f"{cls.__module__}.{cls.__name__}"
 
+
 def solver_id_html(solver_id: str) -> str:
     escaped = solver_id.replace('"', "&quot;")
     return (
@@ -116,6 +116,7 @@ def solver_id_html(solver_id: str) -> str:
         f"<code>{solver_id}</code></span>"
     )
 
+
 def infer_category(cls) -> str:
     parts = cls.__module__.split(".")
     try:
@@ -123,7 +124,11 @@ def infer_category(cls) -> str:
     except ValueError:
         solvers_idx = -1
 
-    folder = parts[solvers_idx + 1] if solvers_idx >= 0 and len(parts) > solvers_idx + 1 else ""
+    folder = (
+        parts[solvers_idx + 1]
+        if solvers_idx >= 0 and len(parts) > solvers_idx + 1
+        else ""
+    )
     if folder in FOLDER_TO_CATEGORY:
         return FOLDER_TO_CATEGORY[folder]
     if folder == "random_noise" or cls.__module__.endswith(".random_noise"):
@@ -166,15 +171,12 @@ sorted_categories = [
 overview_lines = [
     "# Solvers",
     "",
-    "invertmeeg provides **{}** inverse solvers organized into **{}** categories.".format(
-        sum(len(v) for v in by_category.values()),
-        len(sorted_categories),
-    ),
+    f"invertmeeg provides **{sum(len(v) for v in by_category.values())}** inverse solvers organized into **{len(sorted_categories)}** categories.",
     "",
     "Each solver has a **full name** and a stable **solver id**. Instantiate solvers with `Solver(solver_id)`:",
     "",
     "```python",
-    'from invert import Solver',
+    "from invert import Solver",
     "",
     'solver = Solver("MNE")',
     "```",
@@ -220,23 +222,27 @@ for category in sorted_categories:
         cat_lines.append(CATEGORY_DESCRIPTIONS[category])
         cat_lines.append("")
 
-    cat_lines.extend([
-        f"This category contains **{len(entries)}** solver{'s' if len(entries) != 1 else ''}.",
-        "",
-        "## Solvers",
-        "",
-        "| Full Name | Solver ID | Description |",
-        "|----------|-----------|-------------|",
-    ])
+    cat_lines.extend(
+        [
+            f"This category contains **{len(entries)}** solver{'s' if len(entries) != 1 else ''}.",
+            "",
+            "## Solvers",
+            "",
+            "| Full Name | Solver ID | Description |",
+            "|----------|-----------|-------------|",
+        ]
+    )
 
-    for meta, cls in entries:
+    for meta, _cls in entries:
         solver_slug = meta.slug or slugify(meta.acronym or meta.full_name)
         # Escape pipe characters in description
         desc = (meta.description or "").replace("|", "\\|")
         # Truncate long descriptions for table
         if len(desc) > 120:
             desc = desc[:117] + "..."
-        cat_lines.append(f"| [{meta.full_name}]({solver_slug}.md) | {solver_id_html(meta.acronym)} | {desc} |")
+        cat_lines.append(
+            f"| [{meta.full_name}]({solver_slug}.md) | {solver_id_html(meta.acronym)} | {desc} |"
+        )
 
     cat_lines.append("")
 
@@ -287,19 +293,21 @@ for category in sorted_categories:
             solver_lines.append("")
 
         # Add API documentation via mkdocstrings
-        solver_lines.extend([
-            "## API Reference",
-            "",
-            f"::: {module_path}",
-            "    options:",
-            "      show_root_heading: false",
-            "      show_source: true",
-            "      members:",
-            "        - __init__",
-            "        - make_inverse_operator",
-            "        - apply_inverse_operator",
-            "",
-        ])
+        solver_lines.extend(
+            [
+                "## API Reference",
+                "",
+                f"::: {module_path}",
+                "    options:",
+                "      show_root_heading: false",
+                "      show_source: true",
+                "      members:",
+                "        - __init__",
+                "        - make_inverse_operator",
+                "        - apply_inverse_operator",
+                "",
+            ]
+        )
 
         with mkdocs_gen_files.open(f"solvers/{cat_slug}/{solver_slug}.md", "w") as f:
             f.write("\n".join(solver_lines))

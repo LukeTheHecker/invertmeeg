@@ -23,8 +23,14 @@ def build_adjacency(forward, verbose=0):
     return csr_matrix(adjacency)
 
 
-def build_spatial_basis(adjacency, n_dipoles, min_order, max_order,
-                        diffusion_smoothing=True, diffusion_parameter=0.1):
+def build_spatial_basis(
+    adjacency,
+    n_dipoles,
+    min_order,
+    max_order,
+    diffusion_smoothing=True,
+    diffusion_parameter=0.1,
+):
     """Build multi-order spatial basis from adjacency matrix.
 
     Parameters

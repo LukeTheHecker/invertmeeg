@@ -80,17 +80,17 @@ fetch(file).then(r=>r.text()).then(t => JSON.parse(t.replace(/\bNaN\b/g, "null")
 function init(d) {
   DATA = d;
   CATEGORIES = {};
-  
+
   // Build solver category mapping and category lists from JSON data
   solverCat = {};
   const categorySet = new Set();
-  
+
   // Extract categories from results
   DATA.results.forEach(r => {
     const cat = r.category || "other";
     categorySet.add(cat);
     solverCat[r.solver_name] = cat;
-    
+
     // Build category -> solvers mapping
     if (!CATEGORIES[cat]) {
       CATEGORIES[cat] = [];
@@ -99,7 +99,7 @@ function init(d) {
       CATEGORIES[cat].push(r.solver_name);
     }
   });
-  
+
   // Sort solvers within each category for consistency
   Object.keys(CATEGORIES).forEach(cat => {
     CATEGORIES[cat].sort();
@@ -113,11 +113,11 @@ function init(d) {
 
   const catSel = document.getElementById("category");
   const sortedCategories = Array.from(categorySet).sort();
-  sortedCategories.forEach(c => { 
-    const o = document.createElement("option"); 
-    o.value=c; 
-    o.textContent=c.replace(/_/g," "); 
-    catSel.appendChild(o); 
+  sortedCategories.forEach(c => {
+    const o = document.createElement("option");
+    o.value=c;
+    o.textContent=c.replace(/_/g," ");
+    catSel.appendChild(o);
   });
 
   const mb = document.getElementById("metricBtns");
@@ -163,7 +163,7 @@ function render() {
     }
     return r.metrics[m]?.[field] ?? (hb ? -Infinity : Infinity);
   };
-  
+
   // sort
   filtered.sort((a, b) => {
     const am = getMetricValue(a, "mean");

@@ -40,9 +40,7 @@ class SolverLAURA(BaseSolver):
         ],
     )
 
-    def __init__(
-        self, name="LAURA", depth_weight=0.5, adaptive_alpha=True, **kwargs
-    ):
+    def __init__(self, name="LAURA", depth_weight=0.5, adaptive_alpha=True, **kwargs):
         self.name = name
         self.depth_weight = depth_weight
         self.adaptive_alpha = adaptive_alpha
@@ -136,9 +134,7 @@ class SolverLAURA(BaseSolver):
                 logger.info(
                     f"LAURA: Depth weights range [{depth_weights.min():.3f}, {depth_weights.max():.3f}]"
                 )
-                logger.info(
-                    f"       Mean depth weight: {depth_weights.mean():.3f}"
-                )
+                logger.info(f"       Mean depth weight: {depth_weights.mean():.3f}")
 
             Depth = np.diag(depth_weights)
             # Incorporate depth weighting into spatial prior

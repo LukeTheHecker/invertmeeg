@@ -42,8 +42,15 @@ class SolverSSPIRESMV(BaseSolver):
         ],
     )
 
-    def __init__(self, name="SSP-IR-ESMV", reduce_rank=True, rank="auto",
-                 n_iterations=4, sparsity_exponent=0.5, **kwargs):
+    def __init__(
+        self,
+        name="SSP-IR-ESMV",
+        reduce_rank=True,
+        rank="auto",
+        n_iterations=4,
+        sparsity_exponent=0.5,
+        **kwargs,
+    ):
         self.name = name
         self.n_iterations = n_iterations
         self.sparsity_exponent = sparsity_exponent
@@ -126,7 +133,7 @@ class SolverSSPIRESMV(BaseSolver):
 
             x = W_esmv.T @ y
 
-            power = np.sqrt(np.mean(x ** 2, axis=1))
+            power = np.sqrt(np.mean(x**2, axis=1))
             power_max = power.max()
             if power_max < 1e-15:
                 break

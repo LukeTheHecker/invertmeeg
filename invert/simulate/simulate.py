@@ -193,8 +193,7 @@ class SimulationGenerator:
 
         # Sample amplitudes and timecourses
         amplitude_values = [
-            self.rng.uniform(*self.config.amplitude_range, n)
-            for n in n_sources_batch
+            self.rng.uniform(*self.config.amplitude_range, n) for n in n_sources_batch
         ]
         timecourse_choices = [
             self.rng.choice(self.config.n_timecourses, n) for n in n_sources_batch
@@ -224,8 +223,14 @@ class SimulationGenerator:
             axis=0,
         )
 
-        return (y_patches, n_sources_batch, selection, amplitude_values,
-                inter_source_correlations, noise_color_coeffs)
+        return (
+            y_patches,
+            n_sources_batch,
+            selection,
+            amplitude_values,
+            inter_source_correlations,
+            noise_color_coeffs,
+        )
 
     def _generate_background(self, batch_size, y_patches):
         """Mix background activity with patches if in mixture mode.
@@ -284,9 +289,17 @@ class SimulationGenerator:
 
         return x, snr_levels
 
-    def _build_metadata(self, batch_size, n_sources_batch, amplitude_values,
-                        snr_levels, inter_source_correlations, noise_color_coeffs,
-                        selection, alphas):
+    def _build_metadata(
+        self,
+        batch_size,
+        n_sources_batch,
+        amplitude_values,
+        snr_levels,
+        inter_source_correlations,
+        noise_color_coeffs,
+        selection,
+        alphas,
+    ):
         """Build simulation metadata DataFrame."""
         info_dict = {
             "n_sources": n_sources_batch,
@@ -335,10 +348,14 @@ class SimulationGenerator:
         while True:
             leadfield = self._setup_leadfield()
 
-            (y_patches, n_sources_batch, selection, amplitude_values,
-             inter_source_correlations, noise_color_coeffs) = self._generate_patches(
-                self.config.batch_size
-            )
+            (
+                y_patches,
+                n_sources_batch,
+                selection,
+                amplitude_values,
+                inter_source_correlations,
+                noise_color_coeffs,
+            ) = self._generate_patches(self.config.batch_size)
 
             y, alphas = self._generate_background(self.config.batch_size, y_patches)
 
@@ -350,9 +367,14 @@ class SimulationGenerator:
             )
 
             info = self._build_metadata(
-                self.config.batch_size, n_sources_batch, amplitude_values,
-                snr_levels, inter_source_correlations, noise_color_coeffs,
-                selection, alphas,
+                self.config.batch_size,
+                n_sources_batch,
+                amplitude_values,
+                snr_levels,
+                inter_source_correlations,
+                noise_color_coeffs,
+                selection,
+                alphas,
             )
 
             output = (x, y, info)
@@ -472,7 +494,9 @@ def generator(
     adjacency = build_adjacency(fwd, verbose=verbose)
 
     sources, sources_dense, gradient = build_spatial_basis(
-        adjacency, n_dipoles, 0 if not isinstance(n_orders, (tuple, list)) else n_orders[0],
+        adjacency,
+        n_dipoles,
+        0 if not isinstance(n_orders, (tuple, list)) else n_orders[0],
         n_orders if not isinstance(n_orders, (tuple, list)) else n_orders[1],
         diffusion_smoothing=diffusion_smoothing,
         diffusion_parameter=diffusion_parameter,

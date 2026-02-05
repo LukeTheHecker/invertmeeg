@@ -192,7 +192,9 @@ def _exso_music(Y, L, A=None, P=None, num_sources=1, max_disk_size=500):
         # Recompute subspace after deflation (k>0)
         if k > 0:
             E4 = _signal_subspace(C4_work, num_sources=max(1, num_sources - k))
-            metric_map, best_disks = _compute_metric_map(E4, L_r, disks, excluded=excluded)
+            metric_map, best_disks = _compute_metric_map(
+                E4, L_r, disks, excluded=excluded
+            )
 
         candidates = np.where(~excluded)[0]
         if candidates.size == 0:

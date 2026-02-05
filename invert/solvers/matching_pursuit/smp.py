@@ -31,7 +31,7 @@ class SolverSMP(BaseSolver):
     4053-4085.
 
 
-"""
+    """
 
     meta = SolverMeta(
         acronym="SMP",

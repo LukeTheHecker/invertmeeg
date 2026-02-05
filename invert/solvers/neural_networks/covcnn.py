@@ -91,9 +91,7 @@ class _CovCNNNet(nn.Module):
 
 
 class SolverCovCNN(BaseSolver):
-    """Class for the Covariance-based Convolutional Neural Network (CovCNN) for EEG inverse solutions.
-
-"""
+    """Class for the Covariance-based Convolutional Neural Network (CovCNN) for EEG inverse solutions."""
 
     meta = SolverMeta(
         acronym="CovCNN",

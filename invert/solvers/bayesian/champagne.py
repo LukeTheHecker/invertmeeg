@@ -164,7 +164,9 @@ class SolverChampagne(BaseSolver):
         inverse_operators = []
         for alpha in self.alphas:
             inverse_operator = self.make_champagne(
-                data, float(alpha) * float(self.alpha_scaler), pruning_thresh=pruning_thresh
+                data,
+                float(alpha) * float(self.alpha_scaler),
+                pruning_thresh=pruning_thresh,
             )
             inverse_operators.append(inverse_operator)
         self.inverse_operators = [

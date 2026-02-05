@@ -116,9 +116,9 @@ class SolverBasisFunctions(BaseSolver):
         max_eig_penalty = float(np.linalg.svd(Sigma_inv, compute_uv=False).max())
         scale = max_eig_LTL / max(max_eig_penalty, 1e-15)
 
-        return lambda alpha: np.linalg.inv(
-            LTL + (float(alpha) * scale) * Sigma_inv
-        ) @ L.T
+        return lambda alpha: (
+            np.linalg.inv(LTL + (float(alpha) * scale) * Sigma_inv) @ L.T
+        )
 
     @staticmethod
     def cotangent_weight(v1, v2, v3):

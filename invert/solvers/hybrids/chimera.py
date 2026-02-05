@@ -69,7 +69,9 @@ class SolverChimera(BaseSolver):
         ],
     )
 
-    def __init__(self, name: str = "Chimera", params: ChimeraParams | None = None, **kwargs):
+    def __init__(
+        self, name: str = "Chimera", params: ChimeraParams | None = None, **kwargs
+    ):
         self.name = name
         self._p = params or ChimeraParams()
         super().__init__(**kwargs)
@@ -90,7 +92,11 @@ class SolverChimera(BaseSolver):
         S = csr_matrix(I - self._p.diffusion_parameter * LL)
 
         # Detection dictionary: orders 0..2 (order-0 is raw leadfield).
-        self._detect_leadfields = [self.leadfield, self.leadfield @ S, self.leadfield @ (S**2)]
+        self._detect_leadfields = [
+            self.leadfield,
+            self.leadfield @ S,
+            self.leadfield @ (S**2),
+        ]
         return self
 
     def apply_inverse_operator(self, mne_obj):  # type: ignore[override]

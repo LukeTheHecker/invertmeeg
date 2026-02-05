@@ -16,9 +16,7 @@ def test_dics_scales_alpha_to_csd(forward_model, simulated_evoked):
         forward_model, simulated_evoked, alpha=0.1, fmin=8.0, fmax=12.0
     )
     assert solver.csd is not None
-    expected_max_eig = float(
-        np.linalg.svd(np.real(solver.csd), compute_uv=False).max()
-    )
+    expected_max_eig = float(np.linalg.svd(np.real(solver.csd), compute_uv=False).max())
     assert np.isclose(float(solver.max_eig), expected_max_eig)
 
 
@@ -44,4 +42,3 @@ def test_recipsiicos_alpha_is_dimensionless(forward_model, simulated_evoked):
     solver = Solver("ReciPSIICOS")
     solver.make_inverse_operator(forward_model, simulated_evoked, alpha=0.1)
     assert np.allclose(np.asarray(solver.alphas, dtype=float), [0.1])
-

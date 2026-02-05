@@ -220,7 +220,9 @@ class SolverSubspaceSBL(BaseSolver):
                 for qq in range(n_comp):
                     A_temp = np.delete(A_q_j, qq, axis=0)
                     qq_temp = np.delete(S_SSM_2, qq, axis=0)
-                    P_A = self._compute_projection_matrix(A_temp, lambda_reg=lambda_reg2)
+                    P_A = self._compute_projection_matrix(
+                        A_temp, lambda_reg=lambda_reg2
+                    )
                     S_SSM_2[qq] = self._get_source_ssm(
                         C, P_A, leadfields, qq_temp, lambda_reg=lambda_reg3
                     )
@@ -272,7 +274,9 @@ class SolverSubspaceSBL(BaseSolver):
     # Stage 2: NLChampagne amplitude refinement
     # ================================================================
 
-    def _nlc_refine(self, Y, candidates, max_iter=500, pruning_thresh=1e-3, conv_crit=1e-8):
+    def _nlc_refine(
+        self, Y, candidates, max_iter=500, pruning_thresh=1e-3, conv_crit=1e-8
+    ):
         """Run NLChampagne on detected sources to refine amplitudes.
 
         Parameters
@@ -334,13 +338,18 @@ class SolverSubspaceSBL(BaseSolver):
                 sign, log_det = np.linalg.slogdet(Sigma_y)
             if sign <= 0:
                 log_det = -np.inf
-            summation = np.sum(
-                np.einsum("ti,ij,tj->t", Y_scaled.T, Sigma_y_inv, Y_scaled.T)
-            ) / n_times
+            summation = (
+                np.sum(np.einsum("ti,ij,tj->t", Y_scaled.T, Sigma_y_inv, Y_scaled.T))
+                / n_times
+            )
             loss = float(log_det + summation)
             loss_list.append(loss)
 
-            if loss == float("-inf") or loss == float("inf") or np.linalg.norm(alpha) == 0:
+            if (
+                loss == float("-inf")
+                or loss == float("inf")
+                or np.linalg.norm(alpha) == 0
+            ):
                 alpha = prev_alpha
                 break
 
@@ -381,7 +390,11 @@ class SolverSubspaceSBL(BaseSolver):
 
         # Stage 2: NLChampagne refinement
         gamma, llambda = self._nlc_refine(
-            Y, candidates, max_iter=max_iter_nlc, pruning_thresh=pruning_thresh, conv_crit=conv_crit
+            Y,
+            candidates,
+            max_iter=max_iter_nlc,
+            pruning_thresh=pruning_thresh,
+            conv_crit=conv_crit,
         )
 
         # Build final inverse operator
@@ -545,7 +558,9 @@ class SolverSubspaceSBLPlus(SolverSubspaceSBL):
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
-    def _expand_candidates(self, base_candidates: list[tuple[int, int]]) -> list[tuple[int, int]]:
+    def _expand_candidates(
+        self, base_candidates: list[tuple[int, int]]
+    ) -> list[tuple[int, int]]:
         """Expand (order, dipole) candidates by including local neighbors."""
         base = [(int(o), int(d)) for (o, d) in base_candidates]
         if self.neighbor_hops <= 0 or len(base) <= 1:
@@ -555,7 +570,9 @@ class SolverSubspaceSBLPlus(SolverSubspaceSBL):
             expanded.update(base)
             return sorted(expanded, key=lambda x: (x[0], x[1]))
 
-        adjacency = csr_matrix(mne.spatial_src_adjacency(self.forward["src"], verbose=0))
+        adjacency = csr_matrix(
+            mne.spatial_src_adjacency(self.forward["src"], verbose=0)
+        )
         n_orders = len(self.leadfields)
 
         def hop_neighbors(seed: int) -> set[int]:

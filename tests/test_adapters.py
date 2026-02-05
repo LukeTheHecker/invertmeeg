@@ -60,7 +60,9 @@ class TestSmooth:
 
 
 class TestOtherAdapters:
-    def test_s_focuss_runs_and_is_finite(self, forward_model, simulated_evoked, simulated_stc):
+    def test_s_focuss_runs_and_is_finite(
+        self, forward_model, simulated_evoked, simulated_stc
+    ):
         from invert.adapters.focuss import s_focuss
 
         stc_out = s_focuss(
@@ -74,7 +76,9 @@ class TestOtherAdapters:
         assert stc_out.data.shape == simulated_stc.data.shape
         assert np.all(np.isfinite(stc_out.data))
 
-    def test_stampc_does_not_mutate_forward(self, forward_model, simulated_evoked, simulated_stc):
+    def test_stampc_does_not_mutate_forward(
+        self, forward_model, simulated_evoked, simulated_stc
+    ):
         from invert.adapters.stamp import stampc
 
         leadfield_before = forward_model["sol"]["data"].copy()
@@ -86,7 +90,9 @@ class TestOtherAdapters:
             K=1,
             n_orders=0,
         )
-        np.testing.assert_allclose(forward_model["sol"]["data"], leadfield_before, atol=0.0)
+        np.testing.assert_allclose(
+            forward_model["sol"]["data"], leadfield_before, atol=0.0
+        )
 
     def test_stampc_runs_with_orders_and_zero_seed(
         self, forward_model, simulated_evoked, simulated_stc

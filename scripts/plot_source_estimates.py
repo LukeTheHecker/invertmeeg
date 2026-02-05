@@ -2,12 +2,10 @@
 """Simulate one sample per benchmark dataset, invert with OmniChampagne,
 and save glass-brain and surface plots to figures/."""
 
-import os
 import sys
 from pathlib import Path
 
 import mne
-import numpy as np
 
 # Ensure the project root is importable
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -27,16 +25,16 @@ def main():
 
     # Create custom info with desired channel layout
     info = get_info(kind="biosemi32")
-    
+
     # Create forward model once (ico3 for speed) using our custom info
     print("Creating forward model …")
     fwd = create_forward_model(sampling="ico3", info=info)
     src = fwd["src"]
 
     for ds_name, ds_cfg in BENCHMARK_DATASETS.items():
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Dataset: {ds_name}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         # Simulate a single sample
         sim_config = SimulationConfig(
@@ -74,6 +72,7 @@ def main():
         fig.savefig(path, dpi=150, bbox_inches="tight")
         print(f"Saved {path}")
         import matplotlib.pyplot as plt
+
         plt.close(fig)
 
         # --- Surface plot (PyVista) ---

@@ -12,7 +12,10 @@ logger = logging.getLogger(__name__)
 
 class Parcellator:
     def __init__(
-        self, forward: mne.Forward, adjacency: coo_matrix, subjects_dir: Optional[str] = None
+        self,
+        forward: mne.Forward,
+        adjacency: coo_matrix,
+        subjects_dir: Optional[str] = None,
     ):
         """
         Initialize the Parcellator.
@@ -43,7 +46,9 @@ class Parcellator:
         self.src = self.forward["src"]
         self.vertices = [self.src[0]["vertno"], self.src[1]["vertno"]]
 
-    def parcellate(self, parcellation: str = "aparc.a2009s", subject: Optional[str] = None):
+    def parcellate(
+        self, parcellation: str = "aparc.a2009s", subject: Optional[str] = None
+    ):
         """
         Parcellate the leadfield using the given parcellation scheme.
 

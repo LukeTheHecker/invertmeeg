@@ -9,6 +9,7 @@ repos:
     rev: v1.19.1
     hooks:
       - id: mypy
+        exclude: ^scripts/old/
         additional_dependencies: [numpy, scipy, mne, pydantic]
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0

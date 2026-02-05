@@ -111,7 +111,7 @@ warn_return_any = false
 warn_unused_configs = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
-exclude = ["_old/"]
+exclude = ["_old/", "scripts/old/"]
 
 [dependency-groups]
 dev = [

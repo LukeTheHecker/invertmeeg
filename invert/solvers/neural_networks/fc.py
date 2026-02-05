@@ -61,9 +61,9 @@ class _FCNet(nn.Module):
 
 class SolverFC(BaseSolver):
     """Class for the Fully-Connected Neural Network (FC) for
-        EEG inverse solutions.
+    EEG inverse solutions.
 
-"""
+    """
 
     meta = SolverMeta(
         acronym="FC",

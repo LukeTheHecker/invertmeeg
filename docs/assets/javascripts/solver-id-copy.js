@@ -43,4 +43,3 @@ function attachSolverIdCopyHandlers() {
 
 document.addEventListener("DOMContentLoaded", attachSolverIdCopyHandlers);
 document.addEventListener("readystatechange", attachSolverIdCopyHandlers);
-

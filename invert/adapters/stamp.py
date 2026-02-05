@@ -165,7 +165,9 @@ def stampc(
         # Calculate leadfield components of the dominant residual subspace.
         sigma_R = R @ R.T
         U, s, _ = np.linalg.svd(sigma_R, full_matrices=False)
-        n_components = _select_residual_components(s, max_components=5, energy_threshold=0.9)
+        n_components = _select_residual_components(
+            s, max_components=5, energy_threshold=0.9
+        )
         n_components = min(n_components, U.shape[1])
         U_r = U[:, :n_components]
 

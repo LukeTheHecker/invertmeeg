@@ -58,7 +58,11 @@ class SolverECD(BaseSolver):
         sfreq = float(self.obj_info["sfreq"])
         if tmin is not None or tmax is not None:
             start = 0 if tmin is None else int(round((tmin - self.tmin) * sfreq))
-            stop = data.shape[1] if tmax is None else int(round((tmax - self.tmin) * sfreq))
+            stop = (
+                data.shape[1]
+                if tmax is None
+                else int(round((tmax - self.tmin) * sfreq))
+            )
             start = int(np.clip(start, 0, data.shape[1]))
             stop = int(np.clip(stop, start + 1, data.shape[1]))
             data = data[:, start:stop]

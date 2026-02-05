@@ -44,7 +44,7 @@ print(evaluation.results)      # Detailed results
 
 ### 🎯 **Prior-Based Testing**
 - **Dipole**: Focal point sources (sparse, localized activity)
-- **Patch**: Moderately distributed sources 
+- **Patch**: Moderately distributed sources
 - **Broad**: Widespread, diffuse activity
 - **No Prior**: General case without assumptions
 
@@ -76,7 +76,7 @@ The evaluation system supports all solvers that inherit from `BaseSolver`:
 - **Characteristics**: 1-5 point sources, highly localized
 - **Simulation**: Low spatial order (0), moderate SNR
 
-### Patch Sources  
+### Patch Sources
 - **Best for**: Cortical patches, moderate spread
 - **Characteristics**: 1-10 sources with spatial extent
 - **Simulation**: Medium spatial order (1-2), varied amplitudes

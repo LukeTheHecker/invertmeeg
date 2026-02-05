@@ -46,13 +46,13 @@ if _TORCH_IMPORT_ERROR is not None:  # pragma: no cover
         def make_inverse_operator(self, *args, **kwargs):
             raise ImportError(
                 "SolverCNN requires PyTorch. "
-                'Install it via `pip install \"invertmeeg[ann]\"` (or install `torch` directly).'
+                'Install it via `pip install "invertmeeg[ann]"` (or install `torch` directly).'
             ) from _TORCH_IMPORT_ERROR
 
         def apply_inverse_operator(self, *args, **kwargs):
             raise ImportError(
                 "SolverCNN requires PyTorch. "
-                'Install it via `pip install \"invertmeeg[ann]\"` (or install `torch` directly).'
+                'Install it via `pip install "invertmeeg[ann]"` (or install `torch` directly).'
             ) from _TORCH_IMPORT_ERROR
 
 else:
@@ -94,9 +94,7 @@ else:
             return self.out_activation(self.out(features))
 
     class SolverCNN(BaseSolver):  # type: ignore[no-redef]
-        """Class for the Convolutional Neural Network (CNN) for EEG inverse solutions.
-
-"""
+        """Class for the Convolutional Neural Network (CNN) for EEG inverse solutions."""
 
         meta = _META
 
@@ -243,7 +241,9 @@ else:
         device = self.device or get_torch_device()
         with torch.no_grad():
             gammas = (
-                self.model(torch.as_tensor(y[..., 0], dtype=torch.float32, device=device))
+                self.model(
+                    torch.as_tensor(y[..., 0], dtype=torch.float32, device=device)
+                )
                 .detach()
                 .cpu()
                 .numpy()[0]

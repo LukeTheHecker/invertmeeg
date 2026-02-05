@@ -128,9 +128,11 @@ def _compute_all_dataset_rows(data: dict[str, Any]) -> None:
 
     all_rows: list[dict[str, Any]] = []
     for (solver, category, metric_name), stats_list in acc.items():
-        means = [s.get("mean") for s in stats_list if isinstance(s.get("mean"), (int, float))]
-        medians = [
-            s.get("median") for s in stats_list if isinstance(s.get("median"), (int, float))
+        means: list[float] = [
+            v for s in stats_list if isinstance((v := s.get("mean")), (int, float))
+        ]
+        medians: list[float] = [
+            v for s in stats_list if isinstance((v := s.get("median")), (int, float))
         ]
         if not means and not medians:
             continue
@@ -177,6 +179,7 @@ def _compute_all_dataset_rows(data: dict[str, Any]) -> None:
     if isinstance(ranks, dict) and isinstance(global_ranks, dict):
         ranks.setdefault("all", global_ranks)
 
+
 def _ensure_dataset_configs(data: dict[str, Any]) -> None:
     """Backfill dataset configs for older benchmark_results*.json files."""
     existing = data.get("datasets")
@@ -185,7 +188,9 @@ def _ensure_dataset_configs(data: dict[str, Any]) -> None:
     try:
         repo_root = Path(__file__).resolve().parents[2]
         ds_path = repo_root / "invert" / "benchmark" / "datasets.py"
-        spec = importlib.util.spec_from_file_location("invert.benchmark._datasets", str(ds_path))
+        spec = importlib.util.spec_from_file_location(
+            "invert.benchmark._datasets", str(ds_path)
+        )
         if spec is None or spec.loader is None:
             return
         mod = importlib.util.module_from_spec(spec)
@@ -200,7 +205,13 @@ def _ensure_dataset_configs(data: dict[str, Any]) -> None:
 
 def _extract_run_info(run_id: str, data: dict[str, Any], source_path: Path) -> RunInfo:
     results = data.get("results") or []
-    datasets = sorted({r.get("dataset_name") for r in results if isinstance(r, dict) and r.get("dataset_name")})
+    datasets: list[str] = sorted(
+        {
+            name
+            for r in results
+            if isinstance(r, dict) and isinstance((name := r.get("dataset_name")), str)
+        }
+    )
     if "all" not in datasets:
         datasets.append("all")
     metrics = sorted(
@@ -227,6 +238,7 @@ def _extract_run_info(run_id: str, data: dict[str, Any], source_path: Path) -> R
         name=run_name if isinstance(run_name, str) else None,
         description=run_description if isinstance(run_description, str) else None,
     )
+
 
 def _slugify(value: str) -> str:
     value = value.strip().lower()

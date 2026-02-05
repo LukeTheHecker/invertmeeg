@@ -4,6 +4,7 @@ import argparse
 import os
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 
 def _set_default_env() -> None:
@@ -29,9 +30,9 @@ def _set_default_env() -> None:
 
 _set_default_env()
 
-from invert.forward import create_forward_model, get_info  # noqa: E402
 from invert.benchmark import BenchmarkRunner  # noqa: E402
 from invert.benchmark.datasets import BENCHMARK_DATASETS  # noqa: E402
+from invert.forward import create_forward_model, get_info  # noqa: E402
 
 
 def _csv_list(value: str | None) -> list[str] | None:
@@ -42,16 +43,32 @@ def _csv_list(value: str | None) -> list[str] | None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run benchmark tiers quickly (offline-safe).")
+    parser = argparse.ArgumentParser(
+        description="Run benchmark tiers quickly (offline-safe)."
+    )
     parser.add_argument("--tier", choices=["A", "B", "C"], default="A")
     parser.add_argument("--n-samples", type=int, default=None)
     parser.add_argument("--random-seed", type=int, default=None)
-    parser.add_argument("--datasets", type=str, default=None, help="Comma-separated dataset names.")
-    parser.add_argument("--solvers", type=str, default=None, help="Comma-separated solver names.")
-    parser.add_argument("--categories", type=str, default=None, help="Comma-separated category names.")
+    parser.add_argument(
+        "--datasets", type=str, default=None, help="Comma-separated dataset names."
+    )
+    parser.add_argument(
+        "--solvers", type=str, default=None, help="Comma-separated solver names."
+    )
+    parser.add_argument(
+        "--categories", type=str, default=None, help="Comma-separated category names."
+    )
     parser.add_argument("--out", type=str, default=None)
-    parser.add_argument("--compact", action="store_true", help="Save compact output (no per-sample metrics).")
-    parser.add_argument("--full", action="store_true", help="Save full output (includes per-sample metrics).")
+    parser.add_argument(
+        "--compact",
+        action="store_true",
+        help="Save compact output (no per-sample metrics).",
+    )
+    parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Save full output (includes per-sample metrics).",
+    )
     parser.add_argument("--n-jobs", type=int, default=-1)
     parser.add_argument("--sampling", type=str, default="ico2")
     parser.add_argument("--info-kind", type=str, default="biosemi32")
@@ -120,16 +137,20 @@ def main() -> None:
         },
     }
 
-    defaults = dict(tier_defaults[str(args.tier)])
+    defaults: dict[str, Any] = dict(tier_defaults[str(args.tier)])
 
-    n_samples = int(args.n_samples) if args.n_samples is not None else int(defaults["n_samples"])
+    n_samples = (
+        int(args.n_samples)
+        if args.n_samples is not None
+        else int(defaults["n_samples"])
+    )
     datasets_arg = _csv_list(args.datasets)
     solvers_arg = _csv_list(args.solvers)
     categories_arg = _csv_list(args.categories)
 
-    datasets = datasets_arg or defaults.get("datasets")
-    solvers = solvers_arg or defaults.get("solvers")
-    categories = categories_arg or defaults.get("categories")
+    datasets: list[str] | None = datasets_arg or defaults.get("datasets")
+    solvers: list[str] | None = solvers_arg or defaults.get("solvers")
+    categories: list[str] | None = categories_arg or defaults.get("categories")
 
     if args.compact and args.full:
         raise SystemExit("Choose only one of --compact or --full.")
@@ -150,13 +171,15 @@ def main() -> None:
     if datasets is not None:
         missing = sorted(set(datasets) - set(ds_dict))
         if missing:
-            raise SystemExit(f"Unknown datasets: {missing}. Available: {sorted(ds_dict)}")
+            raise SystemExit(
+                f"Unknown datasets: {missing}. Available: {sorted(ds_dict)}"
+            )
         ds_dict = {k: ds_dict[k] for k in datasets}
 
     # Optional ANN training overrides
-    solver_params = {}
+    solver_params: dict[str, dict[str, int]] = {}
     if args.ann_epochs is not None or args.ann_patience is not None:
-        for name in (solvers or []):
+        for name in solvers or []:
             if not isinstance(name, str):
                 continue
             if name.startswith("CovCNN"):

@@ -213,7 +213,9 @@ def smooth(D_FOCUSS_t, adjacency, percentile=0.01):
     is_column_vector = D_FOCUSS_t.ndim == 2 and D_FOCUSS_t.shape[1] == 1
     x = D_FOCUSS_t[:, 0] if is_column_vector else D_FOCUSS_t.reshape(-1)
 
-    adjacency = adjacency.toarray() if hasattr(adjacency, "toarray") else np.asarray(adjacency)
+    adjacency = (
+        adjacency.toarray() if hasattr(adjacency, "toarray") else np.asarray(adjacency)
+    )
     n_dipoles = adjacency.shape[0]
     if x.shape[0] != n_dipoles:
         raise ValueError(

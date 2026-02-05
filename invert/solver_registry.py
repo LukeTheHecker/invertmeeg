@@ -30,7 +30,9 @@ class SolverSpec:
     solver_id: str  # The canonical solver id (which is used to get the solver via Solver(solver_id))
     module_path: str  # The import path of the solver class
     class_name: str  # The name of the solver class
-    default_kwargs: Mapping[str, Any] = field(default_factory=dict)  # Default keyword arguments for the solver
+    default_kwargs: Mapping[str, Any] = field(
+        default_factory=dict
+    )  # Default keyword arguments for the solver
     aliases: tuple[str, ...] = ()  # Aliases for the solver
     display_name: str | None = None  # The display name of the solver
     requires: tuple[str, ...] = ()  # Optional requirements for the solver

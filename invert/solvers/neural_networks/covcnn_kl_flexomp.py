@@ -147,27 +147,39 @@ class SolverCovCNNKLFlexOMP(SolverCovCNNKL):
         # Build candidate basis and sensor-space atoms consistent with the simulator config.
         n_dipoles = int(self.leadfield.shape[1])
         min_order, max_order = _parse_orders(getattr(simulation_config, "n_orders", 0))
-        adjacency = build_adjacency(forward, verbose=getattr(simulation_config, "verbose", 0))
+        adjacency = build_adjacency(
+            forward, verbose=getattr(simulation_config, "verbose", 0)
+        )
         _sources_sparse, sources_dense, _gradient = build_spatial_basis(
             adjacency,
             n_dipoles,
             min_order,
             max_order,
-            diffusion_smoothing=bool(getattr(simulation_config, "diffusion_smoothing", True)),
-            diffusion_parameter=float(getattr(simulation_config, "diffusion_parameter", 0.1)),
+            diffusion_smoothing=bool(
+                getattr(simulation_config, "diffusion_smoothing", True)
+            ),
+            diffusion_parameter=float(
+                getattr(simulation_config, "diffusion_parameter", 0.1)
+            ),
         )
 
         self._adjacency = adjacency
-        self._basis_dense = sources_dense.astype(np.float32, copy=False)  # (n_candidates, n_dipoles)
+        self._basis_dense = sources_dense.astype(
+            np.float32, copy=False
+        )  # (n_candidates, n_dipoles)
         self._n_dipoles = int(n_dipoles)
         self._n_orders_included = int(self._basis_dense.shape[0] // n_dipoles)
         self._min_order = int(min_order)
 
         # Sensor-space atoms A = L @ B^T (n_channels, n_candidates).
-        self._atoms = (self.leadfield @ self._basis_dense.T).astype(np.float64, copy=False)
+        self._atoms = (self.leadfield @ self._basis_dense.T).astype(
+            np.float64, copy=False
+        )
         return self
 
-    def _predict_center_scores(self, Y: np.ndarray, *, prior: np.ndarray | None) -> np.ndarray:
+    def _predict_center_scores(
+        self, Y: np.ndarray, *, prior: np.ndarray | None
+    ) -> np.ndarray:
         """Return per-dipole center scores from CovCNN-KL on covariance(Y)."""
         if _TORCH_IMPORT_ERROR is not None:  # pragma: no cover
             raise ImportError(
@@ -188,14 +200,18 @@ class SolverCovCNNKLFlexOMP(SolverCovCNNKL):
         device = self.device or get_torch_device()
         self.model.eval()
         with torch.no_grad():
-            logits = self.model(torch.as_tensor(C, dtype=torch.float32, device=device)) / float(self.temperature)
+            logits = self.model(
+                torch.as_tensor(C, dtype=torch.float32, device=device)
+            ) / float(self.temperature)
             probs = torch.softmax(logits, dim=-1).detach().cpu().numpy()[0]
 
         scores = probs.astype(np.float64, copy=False)
         if prior is not None:
             prior = np.asarray(prior, dtype=np.float64)
             if prior.shape != scores.shape:
-                raise ValueError(f"prior shape {prior.shape} does not match scores shape {scores.shape}")
+                raise ValueError(
+                    f"prior shape {prior.shape} does not match scores shape {scores.shape}"
+                )
             prior_max = float(np.max(prior))
             if np.isfinite(prior_max) and prior_max > 0:
                 scores = scores * (prior / prior_max)
@@ -232,17 +248,23 @@ class SolverCovCNNKLFlexOMP(SolverCovCNNKL):
         n_dipoles = getattr(self, "_n_dipoles", None)
         n_orders_included = getattr(self, "_n_orders_included", None)
         if n_dipoles is None or n_orders_included is None:
-            raise RuntimeError("Dictionary not initialized; call make_inverse_operator() first.")
+            raise RuntimeError(
+                "Dictionary not initialized; call make_inverse_operator() first."
+            )
         n = int(n_dipoles)
         return [int(o * n + center) for o in range(int(n_orders_included))]
 
-    def _fit_support(self, Y: np.ndarray, support: list[int]) -> tuple[np.ndarray, np.ndarray, float]:
+    def _fit_support(
+        self, Y: np.ndarray, support: list[int]
+    ) -> tuple[np.ndarray, np.ndarray, float]:
         if len(support) == 0:
             R = Y
             return np.zeros((0, Y.shape[1]), dtype=np.float64), R, float(np.sum(R * R))
         atoms = getattr(self, "_atoms", None)
         if atoms is None:
-            raise RuntimeError("Dictionary not initialized; call make_inverse_operator() first.")
+            raise RuntimeError(
+                "Dictionary not initialized; call make_inverse_operator() first."
+            )
         A = atoms[:, support]
         S = _ridge_fit(A, Y, ridge=self.ridge)
         R = Y - (A @ S)
@@ -291,7 +313,9 @@ class SolverCovCNNKLFlexOMP(SolverCovCNNKL):
                     best_cand = int(cand)
         return best_cand, best_norm
 
-    def _refine_support(self, Y: np.ndarray, support: list[int], *, prior: np.ndarray | None) -> list[int]:
+    def _refine_support(
+        self, Y: np.ndarray, support: list[int], *, prior: np.ndarray | None
+    ) -> list[int]:
         if len(support) <= 1:
             return support
 
@@ -304,7 +328,9 @@ class SolverCovCNNKLFlexOMP(SolverCovCNNKL):
 
                 n_dipoles = getattr(self, "_n_dipoles", None)
                 if n_dipoles is None:
-                    raise RuntimeError("Dictionary not initialized; call make_inverse_operator() first.")
+                    raise RuntimeError(
+                        "Dictionary not initialized; call make_inverse_operator() first."
+                    )
                 other_centers = {int(c % int(n_dipoles)) for c in keep}
                 banned = self._forbidden_from_centers(other_centers)
                 cand, _cand_norm = self._choose_next_candidate(
@@ -324,10 +350,16 @@ class SolverCovCNNKLFlexOMP(SolverCovCNNKL):
         basis_dense = getattr(self, "_basis_dense", None)
         n_dipoles = getattr(self, "_n_dipoles", None)
         if basis_dense is None or n_dipoles is None:
-            raise RuntimeError("Dictionary not initialized; call make_inverse_operator() first.")
+            raise RuntimeError(
+                "Dictionary not initialized; call make_inverse_operator() first."
+            )
         if len(support) == 0:
             return np.zeros((int(n_dipoles),), dtype=np.float64)
-        prior_vec = basis_dense[np.asarray(support, dtype=int)].sum(axis=0).astype(np.float64, copy=False)
+        prior_vec = (
+            basis_dense[np.asarray(support, dtype=int)]
+            .sum(axis=0)
+            .astype(np.float64, copy=False)
+        )
         if getattr(self, "prior_power", 1.0) != 1.0:
             prior_vec = prior_vec ** float(self.prior_power)
         max_val = float(np.max(prior_vec))
@@ -345,14 +377,18 @@ class SolverCovCNNKLFlexOMP(SolverCovCNNKL):
         basis_dense = getattr(self, "_basis_dense", None)
         n_dipoles = getattr(self, "_n_dipoles", None)
         if atoms is None or basis_dense is None or n_dipoles is None:
-            raise RuntimeError("Dictionary not initialized; call make_inverse_operator() first.")
+            raise RuntimeError(
+                "Dictionary not initialized; call make_inverse_operator() first."
+            )
 
         Y = deepcopy(data).astype(np.float64, copy=False)
         Y = Y - Y.mean(axis=1, keepdims=True)
 
         support: list[int] = []
         _S, R, prev_norm2 = self._fit_support(Y, support)
-        base_norm2 = float(prev_norm2) if np.isfinite(prev_norm2) and prev_norm2 > 0 else 1.0
+        base_norm2 = (
+            float(prev_norm2) if np.isfinite(prev_norm2) and prev_norm2 > 0 else 1.0
+        )
 
         max_iter = max(1, int(self.max_iter))
         for _it in range(max_iter):
@@ -365,8 +401,12 @@ class SolverCovCNNKLFlexOMP(SolverCovCNNKL):
             if cand is None:
                 break
 
-            rel_impr = (prev_norm2 - cand_norm2) / float(prev_norm2 if prev_norm2 > 0 else base_norm2)
-            if not np.isfinite(rel_impr) or rel_impr < float(self.min_relative_improvement):
+            rel_impr = (prev_norm2 - cand_norm2) / float(
+                prev_norm2 if prev_norm2 > 0 else base_norm2
+            )
+            if not np.isfinite(rel_impr) or rel_impr < float(
+                self.min_relative_improvement
+            ):
                 break
 
             support.append(int(cand))
@@ -386,13 +426,17 @@ class SolverCovCNNKLFlexOMP(SolverCovCNNKL):
     def apply_model(self, data: np.ndarray, prior=None) -> np.ndarray:  # type: ignore[override]
         n_dipoles = getattr(self, "_n_dipoles", None)
         if n_dipoles is None:
-            raise RuntimeError("Dictionary not initialized; call make_inverse_operator() first.")
+            raise RuntimeError(
+                "Dictionary not initialized; call make_inverse_operator() first."
+            )
 
         prior_arr = None
         if prior is not None:
             prior_arr = np.asarray(prior, dtype=np.float64).ravel()
             if prior_arr.shape[0] != int(n_dipoles):
-                raise ValueError(f"prior must have shape ({int(n_dipoles)},), got {prior_arr.shape}")
+                raise ValueError(
+                    f"prior must have shape ({int(n_dipoles)},), got {prior_arr.shape}"
+                )
 
         X_flex, support = self._apply_flexomp_only(data, prior_arr=prior_arr)
         if not getattr(self, "blend_with_kl", True):

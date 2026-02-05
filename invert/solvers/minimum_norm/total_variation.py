@@ -75,7 +75,11 @@ class SolverTotalVariation(BaseSolver):
         n_time = Y.shape[1]
 
         if ridge is None:
-            ridge = float(self.alphas[0]) if hasattr(self, "alphas") and self.alphas else 1e-6
+            ridge = (
+                float(self.alphas[0])
+                if hasattr(self, "alphas") and self.alphas
+                else 1e-6
+            )
         ridge = max(float(ridge), 1e-15)
         lam = max(float(tv_weight), 0.0)
 
@@ -92,7 +96,9 @@ class SolverTotalVariation(BaseSolver):
             rows = np.concatenate([edges_i, edges_j, edges_i, edges_j])
             cols = np.concatenate([edges_i, edges_j, edges_j, edges_i])
             vals = np.concatenate([weights, weights, -weights, -weights])
-            return coo_matrix((vals, (rows, cols)), shape=(n_sources, n_sources)).tocsr()
+            return coo_matrix(
+                (vals, (rows, cols)), shape=(n_sources, n_sources)
+            ).tocsr()
 
         for _it in range(int(n_irls)):
             diff = X[edges_i] - X[edges_j]
@@ -119,7 +125,9 @@ class SolverTotalVariation(BaseSolver):
                     logger.debug("CG did not fully converge at t=%s (info=%s)", t, info)
                 X_new[:, t] = x_t
 
-            rel = float(np.linalg.norm(X_new - X)) / max(float(np.linalg.norm(X)), 1e-15)
+            rel = float(np.linalg.norm(X_new - X)) / max(
+                float(np.linalg.norm(X)), 1e-15
+            )
             X = X_new
             if rel < 1e-3:
                 break

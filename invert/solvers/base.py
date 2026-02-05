@@ -396,7 +396,9 @@ class BaseSolver:
         return alphas
 
     @staticmethod
-    def data_covariance(Y: npt.NDArray[np.floating], *, center: bool = True, ddof: int = 1):
+    def data_covariance(
+        Y: npt.NDArray[np.floating], *, center: bool = True, ddof: int = 1
+    ):
         """Compute normalized sensor-space covariance.
 
         Parameters

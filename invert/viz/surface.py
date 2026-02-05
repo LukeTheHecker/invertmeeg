@@ -173,7 +173,7 @@ def plot_surface(
                     clim=clim,
                     show_scalar_bar=False,
                     smooth_shading=True,
-                    opacity="linear", # Fades out low values
+                    opacity="linear",  # Fades out low values
                 )
 
         # Add a final scalar bar to the last subplot
@@ -193,7 +193,7 @@ def plot_surface(
             view_name.capitalize(),
             font_size=12,
             position="upper_left",
-            color="black" if background == "white" else "white"
+            color="black" if background == "white" else "white",
         )
 
     if title:

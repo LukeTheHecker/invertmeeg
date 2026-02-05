@@ -34,6 +34,7 @@ from .utils import rescale_sources
 
 logger = logging.getLogger(__name__)
 
+
 class _LSTMNet(nn.Module):
     def __init__(
         self,
@@ -68,9 +69,9 @@ class _LSTMNet(nn.Module):
 
 class SolverLSTM(BaseSolver):
     """Class for the Long-Short Term Memory Neural Network (LSTM) for
-        EEG inverse solutions.
+    EEG inverse solutions.
 
-"""
+    """
 
     meta = SolverMeta(
         acronym="LSTM",

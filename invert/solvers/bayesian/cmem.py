@@ -392,17 +392,11 @@ def _compute_sources_batch(lambda_batch, parcel_params, precomputed, n):
 
         xi_k_batch = L_k.T @ lambda_batch  # (parcel_size, batch_size)
 
-        xi_Sigma_xi_batch = np.sum(
-            xi_k_batch * (Sigma_k @ xi_k_batch), axis=0
-        )
-        F_nu_k_batch = 0.5 * (
-            mu_Sigma_inv_mu + xi_Sigma_xi_batch + Sigma_k_logdet
-        )
+        xi_Sigma_xi_batch = np.sum(xi_k_batch * (Sigma_k @ xi_k_batch), axis=0)
+        F_nu_k_batch = 0.5 * (mu_Sigma_inv_mu + xi_Sigma_xi_batch + Sigma_k_logdet)
 
         exp_neg_F = np.exp(-F_nu_k_batch)
-        alpha_k_updated_batch = alpha_k / (
-            alpha_k + (1 - alpha_k) * exp_neg_F
-        )
+        alpha_k_updated_batch = alpha_k / (alpha_k + (1 - alpha_k) * exp_neg_F)
 
         Sigma_xi_batch = Sigma_k @ xi_k_batch
         mu_expanded = mu_k.reshape(-1, 1)

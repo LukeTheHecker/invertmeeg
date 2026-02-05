@@ -151,7 +151,7 @@ class SolverCovCNNKL(BaseSolver):
         if _TORCH_IMPORT_ERROR is not None:  # pragma: no cover
             raise ImportError(
                 "PyTorch is required for neural-network solvers. "
-                'Install it via `pip install \"invertmeeg[ann]\"` (or install `torch` directly).'
+                'Install it via `pip install "invertmeeg[ann]"` (or install `torch` directly).'
             ) from _TORCH_IMPORT_ERROR
 
         self.device = get_torch_device()
@@ -162,7 +162,9 @@ class SolverCovCNNKL(BaseSolver):
             activation_function=str(self.activation_function),
             output_activation=str(self.output_activation),
         ).to(self.device)
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=float(self.learning_rate))
+        self.optimizer = torch.optim.Adam(
+            self.model.parameters(), lr=float(self.learning_rate)
+        )
         logger.info(
             "Total number of trainable parameters: %d",
             count_trainable_parameters(self.model),
@@ -205,7 +207,9 @@ class SolverCovCNNKL(BaseSolver):
             with torch.no_grad():
                 v_logits = self.model(x_val_t) / float(self.temperature)
                 v_log_probs = F.log_softmax(v_logits, dim=-1)
-                val_loss = float(F.kl_div(v_log_probs, y_val_t, reduction="batchmean").cpu().item())
+                val_loss = float(
+                    F.kl_div(v_log_probs, y_val_t, reduction="batchmean").cpu().item()
+                )
 
             if val_loss < best_val:
                 best_val = val_loss
@@ -257,7 +261,9 @@ class SolverCovCNNKL(BaseSolver):
         self.model.eval()
         device = self.device or get_torch_device()
         with torch.no_grad():
-            logits = (self.model(torch.as_tensor(C, dtype=torch.float32, device=device)) / float(self.temperature))
+            logits = self.model(
+                torch.as_tensor(C, dtype=torch.float32, device=device)
+            ) / float(self.temperature)
             probs = torch.softmax(logits, dim=-1).detach().cpu().numpy()[0]
 
         max_p = float(np.max(probs))

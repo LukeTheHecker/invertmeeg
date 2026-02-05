@@ -44,13 +44,25 @@ _SOLVER_REGISTRY: dict[str, tuple[str, str]] = {
     "WMNE": ("invert.solvers.minimum_norm.wmne", "SolverWMNE"),
     "dSPM": ("invert.solvers.minimum_norm.dspm", "SolverDSPM"),
     "MCE": ("invert.solvers.minimum_norm.minimum_l1_norm", "SolverMinimumL1Norm"),
-    "GFTMCE": ("invert.solvers.minimum_norm.gft_minimum_l1_norm", "SolverGFTMinimumL1Norm"),
-    "MCE-GPT": ("invert.solvers.minimum_norm.minimum_l1_norm_gpt", "SolverMinimumL1NormGPT"),
-    "MCE-L1L2": ("invert.solvers.minimum_norm.minimum_l1_l2_norm", "SolverMinimumL1L2Norm"),
+    "GFTMCE": (
+        "invert.solvers.minimum_norm.gft_minimum_l1_norm",
+        "SolverGFTMinimumL1Norm",
+    ),
+    "MCE-GPT": (
+        "invert.solvers.minimum_norm.minimum_l1_norm_gpt",
+        "SolverMinimumL1NormGPT",
+    ),
+    "MCE-L1L2": (
+        "invert.solvers.minimum_norm.minimum_l1_l2_norm",
+        "SolverMinimumL1L2Norm",
+    ),
     "SSLOFO": ("invert.solvers.minimum_norm.sslofo", "SolverSSLOFO"),
     "SMAP": ("invert.solvers.minimum_norm.smap", "SolverSMAP"),
     "EPIFOCUS": ("invert.solvers.minimum_norm.epifocus", "SolverEPIFOCUS"),
-    "BasisFunctions": ("invert.solvers.minimum_norm.basis_functions", "SolverBasisFunctions"),
+    "BasisFunctions": (
+        "invert.solvers.minimum_norm.basis_functions",
+        "SolverBasisFunctions",
+    ),
     # "BackusGilbert": ("invert.solvers.minimum_norm.backus_gilbert", "SolverBackusGilbert"),
     "LAURA": ("invert.solvers.minimum_norm.laura", "SolverLAURA"),
     "TV": ("invert.solvers.minimum_norm.total_variation", "SolverTotalVariation"),
@@ -76,12 +88,24 @@ _SOLVER_REGISTRY: dict[str, tuple[str, str]] = {
     "ESMV": ("invert.solvers.beamformers.esmv", "SolverESMV"),
     "ESMV2": ("invert.solvers.beamformers.esmv2", "SolverESMV2"),
     "ESMV3": ("invert.solvers.beamformers.esmv3", "SolverESMV3"),
-    "DeblurFlexESMV": ("invert.solvers.beamformers.deblur_flex_esmv", "SolverDeblurFlexESMV"),
+    "DeblurFlexESMV": (
+        "invert.solvers.beamformers.deblur_flex_esmv",
+        "SolverDeblurFlexESMV",
+    ),
     "FlexESMV": ("invert.solvers.beamformers.flex_esmv", "SolverFlexESMV"),
     "SafeFlexESMV": ("invert.solvers.beamformers.safe_flex_esmv", "SolverSafeFlexESMV"),
-    "SharpFlexESMV": ("invert.solvers.beamformers.sharp_flex_esmv", "SolverSharpFlexESMV"),
-    "SharpFlexESMV2": ("invert.solvers.beamformers.sharp_flex_esmv2", "SolverSharpFlexESMV2"),
-    "AdaptFlexESMV": ("invert.solvers.beamformers.adapt_flex_esmv", "SolverAdaptFlexESMV"),
+    "SharpFlexESMV": (
+        "invert.solvers.beamformers.sharp_flex_esmv",
+        "SolverSharpFlexESMV",
+    ),
+    "SharpFlexESMV2": (
+        "invert.solvers.beamformers.sharp_flex_esmv2",
+        "SolverSharpFlexESMV2",
+    ),
+    "AdaptFlexESMV": (
+        "invert.solvers.beamformers.adapt_flex_esmv",
+        "SolverAdaptFlexESMV",
+    ),
     "SSP-ESMV": ("invert.solvers.beamformers.ssp_esmv", "SolverSSPESMV"),
     "IR-ESMV": ("invert.solvers.beamformers.iresmv", "SolverIRESMV"),
     "SSP-IR-ESMV": ("invert.solvers.beamformers.ssp_iresmv", "SolverSSPIRESMV"),
@@ -97,7 +121,10 @@ _SOLVER_REGISTRY: dict[str, tuple[str, str]] = {
     "Champagne": ("invert.solvers.bayesian.champagne", "SolverChampagne"),
     "NLChampagne": ("invert.solvers.bayesian.nl_champagne", "SolverNLChampagne"),
     "FlexChampagne": ("invert.solvers.bayesian.flex_champagne", "SolverFlexChampagne"),
-    "FlexNLChampagne": ("invert.solvers.bayesian.flex_nl_champagne", "SolverFlexNLChampagne"),
+    "FlexNLChampagne": (
+        "invert.solvers.bayesian.flex_nl_champagne",
+        "SolverFlexNLChampagne",
+    ),
     "OmniChampagne": ("invert.solvers.bayesian.omni_champagne", "SolverOmniChampagne"),
     # Sparse Bayesian
     "MSP": ("invert.solvers.bayesian.msp", "SolverMSP"),
@@ -108,7 +135,10 @@ _SOLVER_REGISTRY: dict[str, tuple[str, str]] = {
     "SourceMAPMSP": ("invert.solvers.bayesian.source_map_msp", "SolverSourceMAPMSP"),
     # "CMEM": ("invert.solvers.bayesian.cmem", "SolverCMEM"),
     "SubspaceSBL": ("invert.solvers.bayesian.subspace_sbl", "SolverSubspaceSBL"),
-    "SubspaceSBLPlus": ("invert.solvers.bayesian.subspace_sbl", "SolverSubspaceSBLPlus"),
+    "SubspaceSBLPlus": (
+        "invert.solvers.bayesian.subspace_sbl",
+        "SolverSubspaceSBLPlus",
+    ),
     "VBSBL": ("invert.solvers.bayesian.vb_sbl", "SolverVBSBL"),
     # MUSIC / subspace
     "MUSIC": ("invert.solvers.music", "SolverMUSIC"),
@@ -141,15 +171,24 @@ _SOLVER_REGISTRY: dict[str, tuple[str, str]] = {
     # Neural Networks (optional torch)
     "FC": ("invert.solvers.neural_networks.fc", "SolverFC"),
     "CovCNN": ("invert.solvers.neural_networks.covcnn", "SolverCovCNN"),
-    "CovCNN-Centers": ("invert.solvers.neural_networks.covcnn_centers", "SolverCovCNNCenters"),
+    "CovCNN-Centers": (
+        "invert.solvers.neural_networks.covcnn_centers",
+        "SolverCovCNNCenters",
+    ),
     "CovCNN-Mask": ("invert.solvers.neural_networks.covcnn_mask", "SolverCovCNNMask"),
     "CovCNN-KL": ("invert.solvers.neural_networks.covcnn_kl", "SolverCovCNNKL"),
     "CovCNN-KL-FLEXOMP": (
         "invert.solvers.neural_networks.covcnn_kl_flexomp",
         "SolverCovCNNKLFlexOMP",
     ),
-    "CovCNN-KL-Diff": ("invert.solvers.neural_networks.covcnn_kl_diff", "SolverCovCNNKLDiff"),
-    "CovCNN-KL-Adapt": ("invert.solvers.neural_networks.covcnn_kl_adapt", "SolverCovCNNKLAdapt"),
+    "CovCNN-KL-Diff": (
+        "invert.solvers.neural_networks.covcnn_kl_diff",
+        "SolverCovCNNKLDiff",
+    ),
+    "CovCNN-KL-Adapt": (
+        "invert.solvers.neural_networks.covcnn_kl_adapt",
+        "SolverCovCNNKLAdapt",
+    ),
     "CovCNN-StructKL-Diff": (
         "invert.solvers.neural_networks.covcnn_structkl_diff",
         "SolverCovCNNStructKLDiff",
@@ -257,7 +296,9 @@ def _generate_solver_categories() -> dict[str, list[str]]:
             category = "other"
         elif directory == "neural_networks":
             category = "neural_networks"
-        elif directory == "random_noise" or module_path == "invert.solvers.random_noise":
+        elif (
+            directory == "random_noise" or module_path == "invert.solvers.random_noise"
+        ):
             category = "other"
         else:
             # Unknown directory, put in other
@@ -889,7 +930,9 @@ class BenchmarkRunner:
 
         return best_solvers
 
-    def _compute_average_ranks(self) -> tuple[dict[str, dict[str, float]], dict[str, float]]:
+    def _compute_average_ranks(
+        self,
+    ) -> tuple[dict[str, dict[str, float]], dict[str, float]]:
         """Compute per-dataset and global average ranks for each solver.
 
         For each (dataset, metric) pair, solvers are ranked 1..N (best=1).
@@ -914,9 +957,7 @@ class BenchmarkRunner:
         dataset_solver_ranks: dict[str, dict[str, list[float]]] = {}
 
         for dataset in datasets:
-            dataset_results = [
-                r for r in self._results if r.dataset_name == dataset
-            ]
+            dataset_results = [r for r in self._results if r.dataset_name == dataset]
             dataset_solver_ranks[dataset] = {}
             for metric in all_metrics:
                 # Gather (solver, value) pairs, skip NaN
@@ -939,7 +980,9 @@ class BenchmarkRunner:
                 for i, (solver_name, val) in enumerate(solver_values):
                     if i > 0 and val != solver_values[i - 1][1]:
                         rank = i + 1
-                    dataset_solver_ranks[dataset].setdefault(solver_name, []).append(rank)
+                    dataset_solver_ranks[dataset].setdefault(solver_name, []).append(
+                        rank
+                    )
 
         # Per-dataset ranks: average across metrics for each dataset
         per_dataset_ranks: dict[str, dict[str, float]] = {}
@@ -1008,7 +1051,9 @@ class BenchmarkRunner:
                 src = self.forward.get("src")  # type: ignore[call-arg]
                 if isinstance(src, (list, tuple)):
                     n_sources_space = int(
-                        sum(len(s.get("vertno", [])) for s in src if isinstance(s, dict))
+                        sum(
+                            len(s.get("vertno", [])) for s in src if isinstance(s, dict)
+                        )
                     )
             except Exception:
                 n_sources_space = None

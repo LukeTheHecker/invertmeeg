@@ -70,6 +70,7 @@ class _ContextLSTMNet(nn.Module):
         last = out[:, -1, :]
         return self.out(last)
 
+
 if TYPE_CHECKING:  # pragma: no cover
     import torch as _torch
 
@@ -531,7 +532,9 @@ def rectify_norm(x):
 
 def prepare_training_data(stc, lstm_look_back=20):
     if len(stc.shape) != 3:
-        raise ValueError("stc must be a 3D numpy.ndarray of shape (epochs, dipoles, time)")
+        raise ValueError(
+            "stc must be a 3D numpy.ndarray of shape (epochs, dipoles, time)"
+        )
     n_samples, _, n_time = stc.shape
     if n_time <= int(lstm_look_back):
         raise ValueError(

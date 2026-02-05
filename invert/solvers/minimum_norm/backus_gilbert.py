@@ -10,9 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class SolverBackusGilbert(BaseSolver):
-    """Class for the Backus Gilbert inverse solution.
-
-"""
+    """Class for the Backus Gilbert inverse solution."""
 
     meta = SolverMeta(
         acronym="BG",

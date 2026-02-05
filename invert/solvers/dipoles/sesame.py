@@ -78,7 +78,9 @@ class SolverSESAME(BaseSolver):
         force_n = n is not None or n_dipoles is not None
         if n_dipoles is None:
             n_dipoles = n
-        if n_dipoles is None or (isinstance(n_dipoles, str) and n_dipoles.lower() == "auto"):
+        if n_dipoles is None or (
+            isinstance(n_dipoles, str) and n_dipoles.lower() == "auto"
+        ):
             # Conservative default for benchmarks: estimate and cap.
             n_est = int(self.estimate_n_sources(data, method="enhanced"))
             n_dipoles_int = int(np.clip(n_est, 1, int(max_dipoles)))
@@ -161,7 +163,9 @@ class SolverSESAME(BaseSolver):
             # Convert RSS to stable log-weights (scale-free).
             rss_sorted = np.sort(rss_list)
             rss_med = float(rss_sorted[len(rss_sorted) // 2])
-            temp = max(rss_med - rss_min, noise_var_val * n_chans * data.shape[1] * 1e-6, 1e-12)
+            temp = max(
+                rss_med - rss_min, noise_var_val * n_chans * data.shape[1] * 1e-6, 1e-12
+            )
             loglikes = -(rss_list - rss_min) / temp
 
             logw = np.log(weights + 1e-300) + loglikes
@@ -173,10 +177,14 @@ class SolverSESAME(BaseSolver):
 
             ess = 1.0 / float(np.sum(weights * weights))
             if ess < float(resample_threshold) * len(particles):
-                idx = rng.choice(np.arange(len(particles)), size=len(particles), p=weights)
+                idx = rng.choice(
+                    np.arange(len(particles)), size=len(particles), p=weights
+                )
                 particles = [particles[int(j)].copy() for j in idx]
                 residuals = [residuals[int(j)].copy() for j in idx]
-                weights = np.full(len(particles), 1.0 / len(particles), dtype=np.float64)
+                weights = np.full(
+                    len(particles), 1.0 / len(particles), dtype=np.float64
+                )
 
             best_idx = int(np.argmin(rss_list))
             residual_best = residuals[best_idx]

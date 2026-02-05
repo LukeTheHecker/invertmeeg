@@ -80,7 +80,9 @@ def add_white_noise(
         type_indices = np.where(channel_types == ch_type)[0]
         X_clean_type = X_clean[type_indices, :]
         X_noise_type = X_noise[type_indices, :]
-        if isinstance(noise_color_coeff, str) and isinstance(correlation_mode, np.ndarray):
+        if isinstance(noise_color_coeff, str) and isinstance(
+            correlation_mode, np.ndarray
+        ):
             # Real Noise Covariance
             X_noise_type = (
                 np.linalg.cholesky(correlation_mode[type_indices][:, type_indices])
