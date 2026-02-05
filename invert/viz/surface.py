@@ -4,6 +4,8 @@ Renders source activations on the FreeSurfer cortical mesh for
 publication-ready 3D figures.
 """
 
+from __future__ import annotations
+
 import numpy as np
 
 

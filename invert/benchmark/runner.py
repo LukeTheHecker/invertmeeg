@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import importlib.util as _ilu
 import json
 import logging

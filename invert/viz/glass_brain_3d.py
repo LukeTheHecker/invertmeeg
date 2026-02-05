@@ -4,6 +4,8 @@ Simulates a 3D view of the brain by projecting sources to 2D and scaling
 markers based on their depth (distance to viewer).
 """
 
+from __future__ import annotations
+
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import Normalize

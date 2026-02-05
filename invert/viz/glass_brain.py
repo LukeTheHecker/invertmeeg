@@ -4,6 +4,8 @@ Projects source activations onto three orthogonal planes (sagittal, coronal,
 axial) as scatter plots, giving a "see through the brain" view.
 """
 
+from __future__ import annotations
+
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import Normalize
