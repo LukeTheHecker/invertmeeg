@@ -7,8 +7,9 @@ def main() -> None:
             [
                 "invertmeeg (invert) — M/EEG inverse solvers",
                 "",
-                "License: CC BY-NC 4.0 (non-commercial use with attribution).",
-                "Commercial use (including monetization) requires a separate license/permission.",
+                "License: GPLv3 (open source).",
+                "If you want to use/ship this in a proprietary product without GPL obligations,",
+                "a separate commercial license is available.",
                 "Contact: lukas.hecker.job@gmail.com",
                 "",
                 "Docs: https://lukethehecker.github.io/invertmeeg/",

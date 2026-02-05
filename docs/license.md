@@ -1,12 +1,12 @@
 # License
 
-`invertmeeg` is licensed under **CC BY-NC 4.0** (Creative Commons Attribution–NonCommercial 4.0).
+`invertmeeg` is licensed under **GPLv3** (GNU General Public License, version 3).
 
 ## What this means in practice
 
-- **Scientists, students, educators, and tinkerers:** you can use it for free in research, education, and other **non-commercial** projects.
-- **Attribution required:** if you publish work using `invertmeeg`, please credit the project (and ideally cite the repository).
-- **No commercial use without permission:** if you’re a company, you’re building/embedding this into a product or service, or you’re **monetizing it in any way**, you need commercial permission/a **commercial license**.
+- **Researchers & open-source users:** you can use, modify, and share it under the terms of GPLv3.
+- **If you distribute software that includes/links this library:** you must comply with GPLv3 (including providing the corresponding source under GPLv3).
+- **Commercial licensing option:** if you want to use `invertmeeg` in a proprietary/closed-source product without GPLv3 obligations, you can obtain a separate commercial license.
 
 ## Commercial licensing
 

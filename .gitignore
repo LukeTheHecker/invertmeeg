@@ -28,6 +28,9 @@ site/
 # MNE data cache
 .mne/
 
+# Paper figure generation scripts (untracked by design)
+scripts/generate_paper_figures.py
+
 # Experimental / deprecated code
 _old/
 .lab_journal/

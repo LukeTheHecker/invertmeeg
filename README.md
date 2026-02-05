@@ -6,7 +6,7 @@
 
 [![PyPI version](https://badge.fury.io/py/invertmeeg.svg)](https://pypi.org/project/invertmeeg/)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
-[![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 This package provides **96 inverse solvers** for M/EEG source imaging, integrating
 with the [mne-python](https://mne.tools) framework. It covers minimum norm
@@ -256,23 +256,23 @@ stc.plot()
 
 This project is **dual-licensed**:
 
-- **Non-commercial use:** CC BY-NC 4.0 (free with attribution).
-- **Commercial use:** requires a separate commercial license/permission (contact below).
+- **Open source:** GPLv3.
+- **Commercial alternative:** if you want to use `invertmeeg` in a proprietary/closed-source product without GPLv3 obligations, a separate commercial license is available (contact below).
 
-### For Researchers & Educators (Non-Commercial)
+### For Researchers & Open Source Users (GPLv3)
 We love science. This library is free to use for research, education, thesis
-projects, and tinkering as long as your use is **non-commercial**.
+projects, and open source projects under the terms of GPLv3.
 
 * **Attribution required:** please credit `invertmeeg` (and ideally cite this
   repository) in any publications, reports, or released artifacts that use it.
-* **Non-commercial only:** if your usage is connected to a product/service, or
-  you monetize it in any way, you need a commercial license.
+* **Distribution note:** if you distribute software that includes/links this
+  library, you need to comply with GPLv3 (including providing corresponding
+  source under GPLv3).
 
 ### For Industry & Commercial Entities
 If you are a company, a startup, or an individual intending to use this library
-in a product/service (including internal tooling) or any other **commercial**
-context, CC BY-NC 4.0 does **not** grant you that right. Please contact me to
-obtain commercial permission/a commercial license.
+in a proprietary/closed-source product, please contact me to obtain a separate
+commercial license.
 
 **Contact:** `lukas.hecker.job@gmail.com`
 
