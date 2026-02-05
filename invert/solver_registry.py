@@ -611,13 +611,6 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         aliases=("basisfunctions", "basis-functions"),
         display_name="GBF",
     ),
-    # -- State-space --------------------------------------------------------
-    SolverSpec(
-        solver_id="kalman",
-        module_path="invert.solvers._old.kalman",
-        class_name="SolverKalman",
-        aliases=("kf", "stkf"),
-    ),
     # -- Other --------------------------------------------------------------
     SolverSpec(
         solver_id="epifocus",

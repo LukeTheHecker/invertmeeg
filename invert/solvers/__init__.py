@@ -1,5 +1,4 @@
 from . import hybrids
-from ._old.kalman import SolverKalman
 from .base import *
 from .bayesian import *
 from .beamformers import *
@@ -107,8 +106,6 @@ __all__ = [
     "SolverExSoMUSIC",
     # Basis Functions
     "SolverBasisFunctions",
-    # State-space
-    "SolverKalman",
     # Other
     "SolverEPIFOCUS",
     # Hybrids

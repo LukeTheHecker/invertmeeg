@@ -132,7 +132,6 @@ _SOLVER_REGISTRY: dict[str, tuple[str, str]] = {
     # Other
     "APSE": ("invert.solvers.hybrids.apse", "SolverAPSE"),
     "Chimera": ("invert.solvers.hybrids.chimera", "SolverChimera"),
-    "Kalman": ("invert.solvers._old.kalman", "SolverKalman"),
     "ECD": ("invert.solvers.dipoles", "SolverECD"),
     "SESAME": ("invert.solvers.dipoles", "SolverSESAME"),
     # Baseline
