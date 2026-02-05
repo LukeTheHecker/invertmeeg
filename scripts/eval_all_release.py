@@ -26,11 +26,14 @@ if __name__ == "__main__":
             "matching_pursuit",
             "other",
         ],
-        solvers=[
-            "CovCNN",
-            "CovCNN-KL",
-            "CovCNN-KL-FLEXOMP",
+        exclude_solvers=[
+            "SESAME",
         ],
+        # solvers=[
+        #     "CovCNN",
+        #     "CovCNN-KL",
+        #     "CovCNN-KL-FLEXOMP",
+        # ],
         n_jobs=-1,
     )
     runner.run()

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import warnings
 from copy import deepcopy
-from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -26,7 +25,7 @@ class SimulationGenerator:
     during initialization for faster batch generation.
     """
 
-    def __init__(self, fwd, config: Optional[SimulationConfig] = None, **kwargs):
+    def __init__(self, fwd, config: SimulationConfig | None = None, **kwargs):
         """Initialize the simulation generator.
 
         Parameters:

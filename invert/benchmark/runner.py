@@ -8,7 +8,7 @@ import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any
 
 import mne
 import numpy as np
@@ -308,8 +308,9 @@ def get_solver_category(solver_name: str) -> str:
 
 
 def resolve_solvers(
-    solvers: Optional[list[str]] = None,
-    categories: Optional[list[str]] = None,
+    solvers: list[str] | None = None,
+    categories: list[str] | None = None,
+    exclude: list[str] | None = None,
 ) -> list[str]:
     """Resolve a list of solver names from explicit names and/or categories.
 
@@ -320,6 +321,8 @@ def resolve_solvers(
     categories : list of str, optional
         Category names to include (e.g. ``["beamformer", "loreta"]``).
         Use ``"all"`` to include every registered (non-neural-net) solver.
+    exclude : list of str, optional
+        Solver names to exclude from the result.
 
     Returns
     -------
@@ -328,6 +331,7 @@ def resolve_solvers(
     """
     result: list[str] = []
     seen: set[str] = set()
+    exclude_set = set(exclude) if exclude else set()
 
     if categories:
         for cat in categories:
@@ -341,7 +345,7 @@ def resolve_solvers(
                     f"Available: {sorted(SOLVER_CATEGORIES)} or 'all'"
                 )
             for n in names:
-                if n not in seen:
+                if n not in seen and n not in exclude_set:
                     seen.add(n)
                     result.append(n)
 
@@ -351,7 +355,7 @@ def resolve_solvers(
                 raise ValueError(
                     f"Unknown solver {n!r}. Available: {sorted(_SOLVER_REGISTRY)}"
                 )
-            if n not in seen:
+            if n not in seen and n not in exclude_set:
                 seen.add(n)
                 result.append(n)
 
@@ -436,7 +440,7 @@ class AggregateStats(BaseModel):
 class BenchmarkResult(BaseModel):
     solver_name: str
     dataset_name: str
-    category: Optional[str] = None
+    category: str | None = None
     metrics: dict[str, AggregateStats]
     samples: list[SampleMetrics]
 
@@ -446,20 +450,25 @@ class BenchmarkRunner:
         self,
         forward: mne.Forward,
         info: mne.Info,
-        solvers: Optional[list[str]] = None,
-        categories: Optional[list[str]] = None,
-        datasets: Optional[dict[str, DatasetConfig]] = None,
+        solvers: list[str] | None = None,
+        categories: list[str] | None = None,
+        exclude_solvers: list[str] | None = None,
+        datasets: dict[str, DatasetConfig] | None = None,
         n_samples: int = 50,
-        n_jobs: Optional[int] = None,
-        random_seed: Optional[int] = None,
-        solver_params: Optional[dict[str, dict[str, Any]]] = None,
+        n_jobs: int | None = None,
+        random_seed: int | None = None,
+        solver_params: dict[str, dict[str, Any]] | None = None,
     ):
         self.forward = forward
         self.info = info
         if solvers is None and categories is None:
-            self.solvers = list(_DEFAULT_SOLVERS)
+            self.solvers = [
+                s for s in _DEFAULT_SOLVERS if s not in set(exclude_solvers or [])
+            ]
         else:
-            self.solvers = resolve_solvers(solvers=solvers, categories=categories)
+            self.solvers = resolve_solvers(
+                solvers=solvers, categories=categories, exclude=exclude_solvers
+            )
         self.datasets = datasets or dict(BENCHMARK_DATASETS)
         self.n_samples = n_samples
         self.random_seed = random_seed
@@ -566,26 +575,43 @@ class BenchmarkRunner:
                             )
                         else:
                             solver.make_inverse_operator(self.forward, alpha="auto")
-                        # Select optimal regularization via L-curve/GCV
-                        if len(solver.inverse_operators) > 1:  # type: ignore[attr-defined]
-                            _, optimal_idx = solver.regularise_gcv(x_batch[0])  # type: ignore[attr-defined]
+
+                        # Check if solver has inverse_operators attribute
+                        # Some solvers (e.g., SolverRandomNoise) don't create inverse operators
+                        if not hasattr(solver, "inverse_operators"):
+                            # Fall back to direct application for each sample
+                            sample_metrics = []
+                            for i in range(len(x_batch)):
+                                evoked = mne.EvokedArray(
+                                    x_batch[i], self.info, tmin=0.0, verbose=0
+                                )
+                                stc = solver.apply_inverse_operator(evoked)
+                                y_pred = stc.data
+                                metrics = evaluate_all(
+                                    y_batch[i], y_pred, adjacency, adjacency, pos, pos
+                                )
+                                sample_metrics.append(self._metrics_from_dict(metrics))
                         else:
-                            optimal_idx = 0
-                        inv_op = solver.inverse_operators[optimal_idx]  # type: ignore[attr-defined]
+                            # Select optimal regularization via L-curve/GCV
+                            if len(solver.inverse_operators) > 1:  # type: ignore[attr-defined]
+                                _, optimal_idx = solver.regularise_gcv(x_batch[0])  # type: ignore[attr-defined]
+                            else:
+                                optimal_idx = 0
+                            inv_op = solver.inverse_operators[optimal_idx]  # type: ignore[attr-defined]
 
-                        # Extract the inverse operator matrix (numpy array)
-                        inv_op_matrix = inv_op.data[0]
+                            # Extract the inverse operator matrix (numpy array)
+                            inv_op_matrix = inv_op.data[0]
 
-                        # Parallel application
-                        sample_metrics = self._run_parallel_apply(
-                            inv_op_matrix,
-                            x_batch,
-                            y_batch,
-                            adjacency,
-                            pos,
-                            ds_name,
-                            solver_name,
-                        )
+                            # Parallel application
+                            sample_metrics = self._run_parallel_apply(
+                                inv_op_matrix,
+                                x_batch,
+                                y_batch,
+                                adjacency,
+                                pos,
+                                ds_name,
+                                solver_name,
+                            )
                     else:
                         # Parallelize full computation (require_recompute=True)
                         module_path, class_name = _SOLVER_REGISTRY[solver_name]
@@ -943,11 +969,11 @@ class BenchmarkRunner:
 
     def save(
         self,
-        path: Union[str, Path],
+        path: str | Path,
         *,
         compact: bool = False,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
+        name: str | None = None,
+        description: str | None = None,
     ) -> None:
         path = Path(path)
 
@@ -1075,7 +1101,7 @@ class BenchmarkRunner:
         logger.info("Results saved to %s", path)
 
     @classmethod
-    def load(cls, path: Union[str, Path]) -> list[BenchmarkResult]:
+    def load(cls, path: str | Path) -> list[BenchmarkResult]:
         path = Path(path)
         data = json.loads(path.read_text())
         results = []
@@ -1091,7 +1117,7 @@ class BenchmarkRunner:
         return results
 
     @classmethod
-    def update_summary_statistics(cls, path: Union[str, Path]) -> None:
+    def update_summary_statistics(cls, path: str | Path) -> None:
         """Update summary statistics (including best_solvers) for an existing results file.
 
         This is useful when you want to regenerate the summary from existing results
