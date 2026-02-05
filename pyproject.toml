@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "invertmeeg"
-version = "0.1.0"
+version = "1.0.0"
 description = "A high-level M/EEG Python library for EEG inverse solutions"
 readme = "README.md"
 license = {text = "Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)"}

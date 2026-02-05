@@ -8,7 +8,7 @@
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
 
-This package provides **82 inverse solvers** for M/EEG source imaging, integrating
+This package provides **96 inverse solvers** for M/EEG source imaging, integrating
 with the [mne-python](https://mne.tools) framework. It covers minimum norm
 methods, beamformers, Bayesian approaches, sparse recovery, subspace methods,
 and deep learning models in a unified API.
@@ -55,18 +55,6 @@ uv sync --extra viz --extra docs --group dev
 - `make check`: Run all linting and tests.
 - `make clean`: Remove temporary cache files (__pycache__, .mypy_cache, etc.).
 
-### Benchmark Dashboard
-
-Host dashboard locally:
-```bash
-uv run python3 -m http.server 8001
-```
-
-Visit site:
-```
-http://localhost:8001/dashboard.html
-```
-
 ## Quick Start
 
 ```python
@@ -83,7 +71,7 @@ stc.plot()
 
 ## Features
 
-- **82 inverse solvers** accessible through a single `Solver("solver_id")` interface
+- **96 inverse solvers** accessible through a single `Solver("solver_id")` interface
 - Automatic regularization (GCV, L-curve, product methods)
 - Returns standard `mne.SourceEstimate` objects
 - Simulation utilities for benchmarking
@@ -92,18 +80,18 @@ stc.plot()
 
 | Category | Count | Examples |
 |----------|-------|---------|
-| Minimum Norm | 7 | MNE, wMNE, dSPM, FISTA, L1L2 |
-| LORETA | 3 | LORETA, sLORETA, eLORETA |
-| Other Minimum-Norm-like | 4 | LAURA, Backus-Gilbert, S-MAP |
-| Bayesian | 13 | Champagne variants, Gamma-MAP, Source-MAP, VB-SBL |
-| Beamformers | 12 | LCMV, DICS, MVAB, SAM, ReciPSIICOS, EBB |
+| Minimum Norm | 9 | MNE, wMNE, dSPM, FISTA, GFT-MNE |
+| LORETA | 4 | LORETA, sLORETA, eLORETA, SSLOFO |
+| Other Minimum-Norm-like | 3 | LAURA, Backus-Gilbert, S-MAP |
+| Bayesian | 21 | Champagne variants, Gamma-MAP, MSP, CMEM, VB-SBL |
+| Beamformers | 26 | LCMV, DICS, ESMV, SAM, Flex-ESMV, ReciPSIICOS |
 | Dipole Fitting | 2 | ECD, SESAME |
 | Structured Sparsity | 1 | Total Variation |
 | Neural Networks | 4 | FC/ESInet, CovCNN, LSTM, CNN |
 | Matching Pursuit | 11 | OMP, COSAMP, SOMP, BCS, Subspace Pursuit |
-| MUSIC/Subspace | 8 | MUSIC, RAP-MUSIC, TRAP-MUSIC, FLEX-MUSIC |
+| MUSIC/Subspace | 11 | MUSIC, RAP-MUSIC, FLEX-MUSIC, Adaptive-AP |
 | Basis Functions | 1 | GBF |
-| Other | 1 | EPIFOCUS |
+| Other | 3 | EPIFOCUS, APSE, Random-Noise |
 
 ## Full Algorithm List
 
@@ -118,41 +106,50 @@ stc.plot()
 | Minimum Current Estimate | "l1", "fista", "mce" |
 | Minimum L1 Norm GPT | "gpt", "l1-gpt" |
 | Minimum L1L2 Norm | "l1l2" |
+| GFT Minimum L1 Norm | "gft-l1" |
+| Self-Regularized eLORETA | "sr-eloreta", "self-regularized-eloreta" |
 
 ### LORETA
 
 | Full Solver Name | Abbreviation |
 |------------------|--------------|
-| LORETA | "lor" |
-| sLORETA | "slor" |
-| eLORETA | "elor" |
+| LORETA | "loreta", "lor" |
+| sLORETA | "sloreta", "slor" |
+| eLORETA | "eloreta", "elor" |
+| SSLOFO | "sslofo" |
 
 ### Other Minimum-Norm-like Algorithms
 
 | Full Solver Name | Abbreviation |
 |------------------|--------------|
 | LAURA | "laura", "laur" |
-| LAURA (Improved) | "laura-improved", "laur2", "lauraimproved" |
-| Backus-Gilbert | "b-g", "bg" |
-| S-MAP | "smap" |
+| Backus-Gilbert | "backus-gilbert", "b-g", "bg" |
+| S-MAP | "s-map", "smap" |
 
 ### Bayesian
 
 | Full Solver Name | Abbreviation |
 |------------------|--------------|
-| Champagne | "champ" |
-| Low SNR Champagne | "lsc", "lowsnr-champagne" |
-| MacKay Champagne | "mcc", "mackay-champagne" |
-| Convexity Champagne | "coc", "convexity-champagne" |
-| Noise Learning Champagne | "nl-champagne" |
-| Expectation Maximization Champagne | "emc" |
-| Majorization Maximization Champagne | "mmc" |
-| Full-Structure Noise | "fun" |
-| Heteroscedastic Champagne | "hsc" |
-| Gamma-MAP | "gamma-map" |
+| Champagne | "champagne", "champ" |
+| EM Champagne | "em-champagne", "emc" |
+| Convexity Champagne | "convexity-champagne", "coc", "mm-champagne" |
+| MacKay Champagne | "mackay-champagne", "mcc" |
+| TEM Champagne | "tem-champagne", "temc" |
+| AR-EM Champagne | "arem-champagne", "aremc" |
+| Low SNR Champagne | "low-snr-champagne", "lsc" |
+| Adaptive Champagne | "adaptive-champagne", "ac" |
+| Noise Learning Champagne | "nl-champagne", "nlc" |
+| Omni Champagne | "omni-champagne", "oc" |
+| Flex Champagne | "flex-champagne", "fc-champ" |
+| Flex NL Champagne | "flex-nl-champagne", "fnlc" |
+| Gamma-MAP | "gamma-map", "gmap" |
 | Source-MAP | "source-map" |
 | Gamma-MAP-MSP | "gamma-map-msp" |
 | Source-MAP-MSP | "source-map-msp" |
+| Multiple Sparse Priors | "msp" |
+| cMEM | "cmem" |
+| Subspace SBL | "subspace-sbl" |
+| Subspace SBL+ | "subspace-sbl-plus" |
 | Variational Bayes SBL | "vb-sbl" |
 
 ### Beamformers
@@ -166,11 +163,25 @@ stc.plot()
 | Weight-Normalized Minimum Variance | "wnmv" |
 | Higher-Order Covariance Minimum Variance | "hocmv" |
 | Eigenspace Scalar Minimum Variance | "esmv" |
+| Eigenspace Scalar Minimum Variance 2 | "esmv2" |
+| Eigenspace Scalar Minimum Variance 3 | "esmv3" |
 | Multiple Constraint Minimum Variance | "mcmv" |
-| Higher-Order Covariance Multiple Constraint Minimum Variance | "hocmcmv" |
-| Reciprocal PSIICOS | "recipsiicos" |
+| Higher-Order Covariance MCMV | "hocmcmv" |
+| Reciprocal PSIICOS (Plain) | "recipsiicos" |
+| Reciprocal PSIICOS (Whitened) | "recipsiicos-whitened" |
 | Synthetic Aperture Magnetometry | "sam" |
 | Empirical Bayesian Beamformer | "ebb" |
+| Adaptive Flexible ESMV | "adapt-flex-esmv" |
+| Flexible ESMV | "flex-esmv" |
+| Flexible ESMV 2 | "flex-esmv2" |
+| Deblurring Flexible ESMV | "deblur-flex-esmv" |
+| Safe Flexible ESMV | "safe-flex-esmv" |
+| Sharp Flexible ESMV | "sharp-flex-esmv" |
+| Sharp Flexible ESMV 2 | "sharp-flex-esmv2" |
+| Signal Subspace Projection ESMV | "ssp-esmv" |
+| Iteratively Reweighted ESMV | "ir-esmv" |
+| SSP Iteratively Reweighted ESMV | "ssp-ir-esmv" |
+| Unit Noise Gain | "unit-noise-gain", "ung" |
 
 ### Dipole Fitting
 
@@ -183,7 +194,7 @@ stc.plot()
 
 | Full Solver Name | Abbreviation |
 |------------------|--------------|
-| Total Variation | "tv" |
+| Total Variation | "tv", "total-variation", "graph-tv" |
 
 ### Artificial Neural Networks
 
@@ -218,10 +229,13 @@ stc.plot()
 | Recursively Applied and Projected MUSIC | "rap-music", "rap" |
 | Truncated Recursively Applied and Projected MUSIC | "trap-music", "trap" |
 | Flexible RAP-MUSIC | "flex-music", "flex" |
+| Flexible RAP-MUSIC 2 | "flex-music-2" |
 | Flexible Signal Subspace Matching | "flex-ssm" |
 | Signal Subspace Matching | "ssm" |
 | Flexible Alternating Projections | "flex-ap" |
 | Alternating Projections | "ap" |
+| Adaptive Alternating Projections | "adaptive-ap", "aap" |
+| Generalized Iterative | "generalized-iterative", "gi" |
 
 ### Basis Functions
 
@@ -234,6 +248,8 @@ stc.plot()
 | Full Solver Name | Abbreviation |
 |------------------|--------------|
 | EPIFOCUS | "epifocus" |
+| APSE | "apse" |
+| Random Noise (Baseline) | "random-noise", "random" |
 
 ## Licensing
 
