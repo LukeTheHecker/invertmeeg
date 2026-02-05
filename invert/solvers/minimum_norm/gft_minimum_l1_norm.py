@@ -73,7 +73,7 @@ class SolverGFTMinimumL1Norm(BaseSolver):
             noise_cov = np.identity(n_chans)
 
         adjacency = mne.spatial_src_adjacency(forward["src"], verbose=0)
-        lap = laplacian(adjacency)
+        lap = laplacian(adjacency).astype(float)
         num_eigenvalues = lap.shape[0]
         cutoff_index = int(num_eigenvalues * 0.3)  # 30% cutoff
         eigenvalues, U = eigsh(lap, k=cutoff_index, which="SM")

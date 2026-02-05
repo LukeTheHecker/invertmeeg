@@ -72,7 +72,7 @@ class SolverGFTMNE(BaseSolver):
         # Get Adjacency matrix
 
         adjacency = mne.spatial_src_adjacency(forward["src"], verbose=0)
-        lap = laplacian(adjacency)
+        lap = laplacian(adjacency).astype(float)
 
         num_eigenvalues = lap.shape[0]
         cutoff_index = int(num_eigenvalues * cutoff)
