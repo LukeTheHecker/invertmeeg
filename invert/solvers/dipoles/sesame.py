@@ -47,7 +47,7 @@ class SolverSESAME(BaseSolver):
         proj = leadfield.T @ data
         return np.sum(proj * proj, axis=1) / norms
 
-    def make_inverse_operator(
+    def make_inverse_operator(  # type: ignore[override]
         self,
         forward,
         mne_obj,

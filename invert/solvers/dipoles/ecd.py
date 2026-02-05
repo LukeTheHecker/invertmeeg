@@ -40,7 +40,7 @@ class SolverECD(BaseSolver):
         self.gof: float | None = None
         super().__init__(**kwargs)
 
-    def make_inverse_operator(
+    def make_inverse_operator(  # type: ignore[override]
         self,
         forward,
         mne_obj,

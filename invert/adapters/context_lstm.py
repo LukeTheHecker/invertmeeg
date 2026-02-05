@@ -26,8 +26,8 @@ except ModuleNotFoundError as exc:  # pragma: no cover
 
     nn = _NN()  # type: ignore[assignment]
     F = None  # type: ignore[assignment]
-    DataLoader = None  # type: ignore[assignment]
-    TensorDataset = None  # type: ignore[assignment]
+    DataLoader = None  # type: ignore[misc,assignment]
+    TensorDataset = None  # type: ignore[misc,assignment]
     _TORCH_IMPORT_ERROR = exc
 
 logger = logging.getLogger(__name__)

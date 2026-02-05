@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 from copy import deepcopy
+from typing import Any
 
 import numpy as np
 
@@ -90,12 +91,12 @@ class SolverCovCNNKLFlexOMP(SolverCovCNNKL):
             use_shrinkage=use_shrinkage,
             **kwargs,
         )
-        self._adjacency = None
-        self._basis_dense = None
-        self._atoms = None
-        self._n_dipoles = None
-        self._n_orders_included = None
-        self._min_order = None
+        self._adjacency: Any = None
+        self._basis_dense: Any = None
+        self._atoms: Any = None
+        self._n_dipoles: int | None = None
+        self._n_orders_included: int | None = None
+        self._min_order: int | None = None
 
     def make_inverse_operator(  # type: ignore[override]
         self,

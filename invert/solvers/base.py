@@ -1228,7 +1228,9 @@ class BaseSolver:
 
             # Try to import and register CustomConv2D if it exists
             try:
-                from .neural_networks.utils import CustomConv2D
+                from .neural_networks.utils import (  # type: ignore[attr-defined]
+                    CustomConv2D,
+                )
 
                 custom_objects["CustomConv2D"] = CustomConv2D
             except (ImportError, AttributeError):

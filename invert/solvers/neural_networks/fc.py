@@ -5,6 +5,7 @@ from copy import deepcopy
 
 import mne
 import numpy as np
+
 _TORCH_IMPORT_ERROR: ModuleNotFoundError | None = None
 try:
     import torch  # type: ignore[import-not-found]

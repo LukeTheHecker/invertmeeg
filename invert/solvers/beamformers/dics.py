@@ -67,7 +67,10 @@ class SolverDICS(BaseSolver):
             return np.eye(n_chans)
 
         if n_fft is None:
-            n_fft = int(2 ** int(np.ceil(np.log2(n_times))))
+            # Ensure at least one FFT bin falls in [fmin, fmax] by requiring
+            # frequency resolution <= (fmax - fmin), i.e. n_fft >= sfreq / (fmax - fmin).
+            min_nfft_for_band = int(np.ceil(sfreq / max(fmax - fmin, 1e-10)))
+            n_fft = int(2 ** int(np.ceil(np.log2(max(n_times, min_nfft_for_band)))))
         n_fft = max(int(n_fft), int(n_times))
 
         x = data - data.mean(axis=1, keepdims=True)
@@ -95,7 +98,7 @@ class SolverDICS(BaseSolver):
         csd /= float(band.size)
         return csd
 
-    def make_inverse_operator(
+    def make_inverse_operator(  # type: ignore[override]
         self,
         forward,
         mne_obj,

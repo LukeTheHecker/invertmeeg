@@ -8,8 +8,7 @@ import numpy as np
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import laplacian
 
-from ..base import BaseSolver
-from ..base import SolverMeta
+from ..base import BaseSolver, SolverMeta
 from ..beamformers.flex_esmv import SolverFlexESMV
 from ..music.signal_subspace_matching import SolverSignalSubspaceMatching
 

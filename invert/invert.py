@@ -163,10 +163,10 @@ def _build_registry() -> dict[str, Any]:
 
     # -- Artificial Neural Networks (optional torch) ------------------------
     try:
-        _add(["fully-connected", "fc", "fullyconnected", "esinet"], solvers.SolverFC)
-        _add(["covcnn", "cov-cnn", "covnet"], solvers.SolverCovCNN)
-        _add("lstm", solvers.SolverLSTM)
-        _add("cnn", solvers.SolverCNN)
+        _add(["fully-connected", "fc", "fullyconnected", "esinet"], solvers.SolverFC)  # type: ignore[attr-defined]
+        _add(["covcnn", "cov-cnn", "covnet"], solvers.SolverCovCNN)  # type: ignore[attr-defined]
+        _add("lstm", solvers.SolverLSTM)  # type: ignore[attr-defined]
+        _add("cnn", solvers.SolverCNN)  # type: ignore[attr-defined]
     except AttributeError:
         logger.debug("ANN solvers not available (torch not installed)")
 

@@ -10,8 +10,9 @@ from __future__ import annotations
 import importlib
 import importlib.util
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Mapping
+from typing import Any
 
 
 def normalize_solver_name(name: str) -> str:

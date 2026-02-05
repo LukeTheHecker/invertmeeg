@@ -2,8 +2,7 @@ import logging
 
 import numpy as np
 
-from ..base import BaseSolver, InverseOperator
-from ..base import SolverMeta
+from ..base import BaseSolver, InverseOperator, SolverMeta
 
 logger = logging.getLogger(__name__)
 

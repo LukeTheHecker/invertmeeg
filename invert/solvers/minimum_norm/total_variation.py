@@ -117,7 +117,7 @@ class SolverTotalVariation(BaseSolver):
                     logger.debug("CG did not fully converge at t=%s (info=%s)", t, info)
                 X_new[:, t] = x_t
 
-            rel = np.linalg.norm(X_new - X) / max(np.linalg.norm(X), 1e-15)
+            rel = float(np.linalg.norm(X_new - X)) / max(float(np.linalg.norm(X)), 1e-15)
             X = X_new
             if rel < 1e-3:
                 break

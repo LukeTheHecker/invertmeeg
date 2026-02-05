@@ -1,6 +1,6 @@
 import numpy as np
 
-from .base import BaseSolver, InverseOperator, SolverMeta
+from .base import BaseSolver, SolverMeta
 
 
 class SolverRandomNoise(BaseSolver):
@@ -27,20 +27,11 @@ class SolverRandomNoise(BaseSolver):
         super().make_inverse_operator(
             forward, *args, reference=None, alpha=alpha, **kwargs
         )
-        n_sources = self.leadfield.shape[1]
-        self.n_sources = n_sources
-        # Store a single dummy inverse operator so the benchmark runner can call .apply()
-        self.inverse_operators = [
-            InverseOperator(self._RandomOperator(n_sources), self.name)
-        ]
+        self.n_sources = self.leadfield.shape[1]
         return self
 
-    class _RandomOperator:
-        """Thin wrapper that returns random noise with the correct number of source rows."""
-
-        def __init__(self, n_sources):
-            self.n_sources = n_sources
-
-        def __matmul__(self, M):
-            n_time = M.shape[1] if M.ndim > 1 else 1
-            return np.random.randn(self.n_sources, n_time)
+    def apply_inverse_operator(self, mne_obj):
+        data = self.unpack_data_obj(mne_obj)
+        n_time = data.shape[1] if data.ndim > 1 else 1
+        source_mat = np.random.randn(self.n_sources, n_time)
+        return self.source_to_object(source_mat)

@@ -54,7 +54,7 @@ class SolverSMAP(BaseSolver):
 
         adjacency = mne.spatial_src_adjacency(self.forward["src"], verbose=0)
         gradient = laplacian(adjacency)
-        GTG = gradient.T @ gradient
+        GTG = (gradient.T @ gradient).toarray()
 
         if alpha == "auto":
             r_grid = np.asarray(self.r_values, dtype=float)

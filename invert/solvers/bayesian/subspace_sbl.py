@@ -575,7 +575,7 @@ class SolverSubspaceSBLPlus(SolverSubspaceSBL):
                     break
             return visited
 
-        expanded: set[tuple[int, int]] = set()
+        expanded: set[tuple[int, int]] = set()  # type: ignore[no-redef]
         for order, dipole in base:
             order_i = int(order)
             if order_i < 0 or order_i >= n_orders:

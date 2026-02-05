@@ -47,7 +47,7 @@ class SolverVBSBL(BaseSolver):
         self.b0 = float(b0)
         super().__init__(**kwargs)
 
-    def make_inverse_operator(
+    def make_inverse_operator(  # type: ignore[override]
         self,
         forward,
         mne_obj,
@@ -141,7 +141,7 @@ class SolverVBSBL(BaseSolver):
                 thr = float(pruning_thresh) * float(np.max(gammas_new))
                 gammas_new = np.where(gammas_new >= thr, gammas_new, 0.0)
 
-            rel = np.linalg.norm(gammas_new - gammas) / max(np.linalg.norm(gammas), 1e-15)
+            rel = float(np.linalg.norm(gammas_new - gammas)) / max(float(np.linalg.norm(gammas)), 1e-15)
             gammas = gammas_new
             if rel < float(conv_crit):
                 break

@@ -1,14 +1,14 @@
+from . import hybrids
+from ._old.kalman import SolverKalman
 from .base import *
 from .bayesian import *
 from .beamformers import *
 from .dipoles import *
-from . import hybrids
 from .hybrids import *
 from .matching_pursuit import *
 from .minimum_norm import *
 from .music import *
 from .random_noise import *
-from ._old.kalman import SolverKalman
 
 # ANN solvers — require torch (optional dependency)
 try:

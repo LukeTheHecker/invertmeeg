@@ -3,6 +3,7 @@ from copy import deepcopy
 
 import mne
 import numpy as np
+
 _TORCH_IMPORT_ERROR: ModuleNotFoundError | None = None
 try:
     import torch  # type: ignore[import-not-found]
@@ -90,7 +91,7 @@ else:
             features = torch.cat([h_fwd, h_bwd], dim=1)
             return self.out_activation(self.out(features))
 
-    class SolverCNN(BaseSolver):
+    class SolverCNN(BaseSolver):  # type: ignore[no-redef]
         """Class for the Convolutional Neural Network (CNN) for EEG inverse solutions.
 
 """

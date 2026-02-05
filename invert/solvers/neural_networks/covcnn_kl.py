@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from copy import deepcopy
+from typing import Any
 
 import mne
 import numpy as np
@@ -55,12 +56,13 @@ class SolverCovCNNKL(BaseSolver):
     ) -> None:
         self.name = name
         self.use_shrinkage = bool(use_shrinkage)
-        self.model = None
-        self.optimizer = None
-        self.device = None
+        self.model: Any = None
+        self.optimizer: Any = None
+        self.device: Any = None
+        self.generator: Any = None
         return super().__init__(reduce_rank=reduce_rank, **kwargs)
 
-    def make_inverse_operator(
+    def make_inverse_operator(  # type: ignore[override]
         self,
         forward,
         simulation_config,
@@ -101,7 +103,7 @@ class SolverCovCNNKL(BaseSolver):
         logger.info("Train model…")
         self.train_model()
 
-        self.inverse_operators = []
+        self.inverse_operators: list = []
         return self
 
     def apply_inverse_operator(self, mne_obj, prior=None) -> mne.SourceEstimate:
