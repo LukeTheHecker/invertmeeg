@@ -224,9 +224,6 @@ def _build_registry() -> dict[str, Any]:
     # -- Basis Functions ----------------------------------------------------
     _add("gbf", solvers.SolverBasisFunctions)
 
-    # -- State-space --------------------------------------------------------
-    _add(["kalman", "kf", "stkf"], solvers.SolverKalman)
-
     # -- Other --------------------------------------------------------------
     _add("epifocus", solvers.SolverEPIFOCUS)
     _add("apse", solvers.hybrids.SolverAPSE)
