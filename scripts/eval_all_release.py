@@ -16,21 +16,21 @@ if __name__ == "__main__":
     runner = BenchmarkRunner(
         fwd,
         info,
-        n_samples=25,  # should be 50 for the full leaderboard
+        n_samples=50,  # should be 50 for the full leaderboard
         categories=[
             "beamformer",
-            # "bayesian",
-            # "minimum_norm",
-            # "loreta",
-            # "music",
-            # "matching_pursuit",
-            # "other",
+            "bayesian",
+            "minimum_norm",
+            "loreta",
+            "music",
+            "matching_pursuit",
+            "other",
         ],
-        # solvers=[
-        #     "CovCNN",
-        #     "CovCNN-KL",
-        #     "CovCNN-KL-FLEXOMP",
-        # ],
+        solvers=[
+            "CovCNN",
+            "CovCNN-KL",
+            "CovCNN-KL-FLEXOMP",
+        ],
         n_jobs=-1,
     )
     runner.run()
