@@ -1,4 +1,4 @@
-# invertmeeg - A high-level M/EEG Python library for EEG inverse solutions
+# invertmeeg - A high-level Python library for M/EEG inverse solutions
 
 <p>
   <img src="docs/assets/images/logo-pixelbrain.png" alt="invertmeeg logo" width="120" />
@@ -283,7 +283,7 @@ If you use this package and publish results, please cite as:
 ```
 @Misc{invertmeeg2022,
   author =   {{Lukas Hecker}},
-  title =    {{invertmeeg}: A high-level M/EEG Python library for EEG inverse solutions.},
+  title =    {{invertmeeg}: A high-level Python library for M/EEG inverse solutions.},
   howpublished = {\url{https://github.com/LukeTheHecker/invertmeeg}},
   year = {since 2022}
 }

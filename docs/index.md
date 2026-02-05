@@ -1,6 +1,6 @@
 # invertmeeg
 
-A high-level M/EEG Python library for EEG inverse solutions.
+A high-level Python library for M/EEG inverse solutions.
 
 This package provides **82 inverse solvers** for M/EEG source imaging, integrating
 with the [mne-python](https://mne.tools) framework. It covers minimum norm
