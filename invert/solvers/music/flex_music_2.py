@@ -190,11 +190,8 @@ class SolverFLEXMUSIC_2(BaseSolver):
                         axis=1,
                     )
 
-                # b /= np.linalg.norm(b, axis=0)
-                # norm_1 = np.linalg.norm(Ps @ Q @ b, axis=0)
-                # norm_2 = np.linalg.norm(Q @ b, axis=0)
-                norm_1 = np.linalg.norm(abs(Ps) @ abs(Q) @ abs(b), axis=0)
-                norm_2 = np.linalg.norm(abs(Q) @ abs(b), axis=0)
+                norm_1 = np.linalg.norm(Ps @ Q @ b, axis=0)
+                norm_2 = np.linalg.norm(Q @ b, axis=0)
 
                 mu_b = norm_1 / norm_2
                 max_mu_b = np.max(mu_b)
