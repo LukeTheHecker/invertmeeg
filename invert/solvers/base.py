@@ -128,6 +128,7 @@ class BaseSolver:
         regularisation_method: str = "GCV",
         n_reg_params: int = 10,
         prep_leadfield: bool = True,
+        use_depth_weighting: bool = False,
         use_last_alpha: bool = False,
         rank: str | int = "enhanced",
         depth_weighting: float = 0.5,
@@ -146,10 +147,12 @@ class BaseSolver:
         self.n_reg_params = n_reg_params
         self.regularisation_method = regularisation_method
         self.prep_leadfield = prep_leadfield
+        self.use_depth_weighting = use_depth_weighting
         self.use_last_alpha = use_last_alpha
         self.last_reg_idx = None
         self.rank = rank
         self.depth_weighting = depth_weighting
+        self.depth_weights = None
         self.reduce_rank = reduce_rank
         self.plot_reg = plot_reg
         self.made_inverse_operator = False
@@ -908,10 +911,13 @@ class BaseSolver:
             H = np.eye(n) - np.ones((n, n)) / n
             self.leadfield = H @ self.leadfield
 
-        if self.prep_leadfield:
+        # Depth weighting is now opt-in per solver instead of globally applied.
+        if self.prep_leadfield and self.use_depth_weighting:
             self.leadfield, self.depth_weights = self.depth_weight_fixed(
                 self.leadfield, degree=self.depth_weighting
             )
+        else:
+            self.depth_weights = None
 
     @staticmethod
     def depth_weight_fixed(L, degree=0.8, ref="median", eps=1e-12):
@@ -921,6 +927,16 @@ class BaseSolver:
         """
         norms = np.linalg.norm(L, axis=0) ** degree
         return L / norms, norms
+
+    def apply_depth_weighting_to_leadfield(
+        self, leadfield: np.ndarray | None = None, degree: float | None = None
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Return a depth-weighted copy of the leadfield and the weights."""
+        if leadfield is None:
+            leadfield = self.leadfield
+        if degree is None:
+            degree = self.depth_weighting
+        return self.depth_weight_fixed(leadfield, degree=degree)
 
     @staticmethod
     def euclidean_distance(A, B):
@@ -1105,8 +1121,13 @@ class BaseSolver:
         stc : mne.SourceEstimate
 
         """
-        # Undo depth weighting to recover physical amplitudes
-        if self.prep_leadfield and hasattr(self, "depth_weights"):
+        # Undo depth weighting only for solvers that explicitly use it.
+        if (
+            self.prep_leadfield
+            and self.use_depth_weighting
+            and hasattr(self, "depth_weights")
+            and self.depth_weights is not None
+        ):
             source_mat = (
                 source_mat / self.depth_weights[:, np.newaxis]
                 if source_mat.ndim > 1
