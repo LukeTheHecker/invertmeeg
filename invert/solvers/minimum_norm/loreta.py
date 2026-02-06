@@ -53,7 +53,6 @@ class SolverLORETA(BaseSolver):
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
         leadfield = self.leadfield
         LTL = leadfield.T @ leadfield
-        # B = np.diag(np.linalg.norm(leadfield, axis=0))
         B = np.eye(leadfield.shape[1])
         adjacency = mne.spatial_src_adjacency(
             forward["src"], verbose=self.verbose

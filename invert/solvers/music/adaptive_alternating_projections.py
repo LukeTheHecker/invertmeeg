@@ -266,7 +266,6 @@ class SolverAdaptiveAlternatingProjections(BaseSolver):
                 break
 
         S_AP.append(cluster_indices)
-        # print("S_AP: ", np.concatenate(S_AP))
         for ii in range(1, n_comp):
             A = np.stack(
                 [leadfields[0][:, dipole] for dipole in np.concatenate(S_AP)], axis=1

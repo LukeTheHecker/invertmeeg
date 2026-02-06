@@ -44,3 +44,4 @@ docs/.nojekyll
 results/*
 # !results/benchmark_results*.json
 !results/release/
+scripts/quick_eval.py
