@@ -74,9 +74,11 @@ class SolverSLORETA(BaseSolver):
 
         mne_operators = []
         sloreta_operators = []
+        eps = 1e-12
         for alpha in self.alphas:
             K_MNE = leadfield.T @ np.linalg.pinv(LLT + alpha * I)
-            W_diag = np.sqrt(np.diag(K_MNE @ leadfield))
+            resolution_diag = np.maximum(np.diag(K_MNE @ leadfield), eps)
+            W_diag = np.sqrt(resolution_diag)
             W_slor = (K_MNE.T / W_diag).T
 
             mne_operators.append(K_MNE)

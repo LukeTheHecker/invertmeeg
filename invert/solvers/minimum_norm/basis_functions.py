@@ -1,7 +1,7 @@
+import mne
 import numpy as np
-from scipy.sparse import coo_matrix
+from scipy.sparse.csgraph import laplacian
 
-from ...util import pos_from_forward
 from ..base import BaseSolver, InverseOperator, SolverMeta
 
 
@@ -36,10 +36,21 @@ class SolverBasisFunctions(BaseSolver):
 
     def __init__(self, name="Minimum Norm Estimate with Basis Functions", **kwargs):
         self.name = name
-        return super().__init__(**kwargs)
+        super().__init__(**kwargs)
+        self.require_recompute = False
+        self.require_data = False
+        return None
 
     def make_inverse_operator(
-        self, forward, *args, function="GBF", alpha="auto", verbose=0, **kwargs
+        self,
+        forward,
+        *args,
+        function="GBF",
+        alpha="auto",
+        n_basis=None,
+        prior_shift=0.1,
+        verbose=0,
+        **kwargs,
     ):
         """Calculate inverse operator.
 
@@ -55,109 +66,68 @@ class SolverBasisFunctions(BaseSolver):
         self : object returns itself for convenience
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
-        # n_chans, _ = leadfield.shape
-
-        self.get_inverse_operator = self.create_basis_function(function)
-
-        if alpha == "auto":
-            r_grid = np.asarray(self.r_values, dtype=float)
-        else:
-            r_grid = np.asarray([float(alpha)], dtype=float)
-
-        # No regularization leads to weird results with this approach
-        if 0 in r_grid and len(r_grid) > 1:
-            r_grid = r_grid[r_grid != 0]
-        elif 0 in r_grid and len(r_grid) == 1:
-            r_grid = np.asarray([0.01], dtype=float)
-        self.alphas = list(r_grid)
-
-        inverse_operators = []
-        for alpha in self.alphas:
-            inverse_operator = self.get_inverse_operator(alpha)
-            inverse_operators.append(inverse_operator)
-
-        self.inverse_operators = [
-            InverseOperator(inverse_operator, self.name)
-            for inverse_operator in inverse_operators
-        ]
+        gbf_builder = self.create_basis_function(
+            function=function, n_basis=n_basis, prior_shift=prior_shift
+        )
+        inverse_operators = [InverseOperator(gbf_builder(a), self.name) for a in self.alphas]
+        self.inverse_operators = inverse_operators
         return self
 
-    def create_basis_function(self, function="GBF"):
+    def create_basis_function(self, function="GBF", n_basis=None, prior_shift=0.1):
         if function.lower() == "gbf":
-            return self.create_gbf()
-        else:
-            raise ValueError(f"Function {function} not implemented.")
-
-    def create_gbf(self):
-        """Create geometric informed basis functions."""
-        n_vertices_left = self.forward["src"][0]["nuse"]
-        self.faces = np.concatenate(
-            [
-                self.forward["src"][0]["use_tris"],
-                n_vertices_left + self.forward["src"][1]["use_tris"],
-            ],
-            axis=0,
-        )
-
-        # self.pos = np.concatenate([
-        #     self.forward['src'][0]['rr'],
-        #     self.forward['src'][1]['rr'],
-        # ], axis=0)
-        self.pos = pos_from_forward(self.forward)
-
-        A = self.compute_laplace_beltrami(self.pos.T, self.faces)
-        _, eigenvalues, _ = np.linalg.svd(A.toarray(), full_matrices=False)
-        Sigma = np.diag(1 / (eigenvalues + 0.1 * np.mean(eigenvalues)))
-        Sigma_inv = np.linalg.inv(Sigma)
-        L = self.leadfield @ A
-
-        LTL = L.T @ L
-        max_eig_LTL = float(np.linalg.svd(LTL, compute_uv=False).max())
-        max_eig_penalty = float(np.linalg.svd(Sigma_inv, compute_uv=False).max())
-        scale = max_eig_LTL / max(max_eig_penalty, 1e-15)
-
-        return lambda alpha: (
-            np.linalg.inv(LTL + (float(alpha) * scale) * Sigma_inv) @ L.T
-        )
+            return self.create_gbf(n_basis=n_basis, prior_shift=prior_shift)
+        raise ValueError(f"Function {function} not implemented.")
 
     @staticmethod
-    def cotangent_weight(v1, v2, v3):
-        # Compute the cotangent weight of the edge opposite to v1
-        edge1 = v2 - v1
-        edge2 = v3 - v1
-        cotangent = np.dot(edge1, edge2) / np.linalg.norm(np.cross(edge1, edge2))
-        return cotangent
+    def _resolve_n_basis(n_vertices: int, n_basis):
+        if n_basis is None:
+            return n_vertices
+        if isinstance(n_basis, float):
+            if not 0 < n_basis <= 1:
+                raise ValueError(
+                    f"n_basis as float must be in (0, 1], got {n_basis}"
+                )
+            return max(2, int(np.ceil(n_basis * n_vertices)))
+        n_basis_int = int(n_basis)
+        if n_basis_int < 2:
+            raise ValueError(f"n_basis must be >= 2, got {n_basis_int}")
+        return min(n_vertices, n_basis_int)
 
-    def compute_laplace_beltrami(self, pos, faces):
-        n = pos.shape[1]  # Number of vertices
-        I = []
-        J = []
-        V = []
+    def create_gbf(self, n_basis=None, prior_shift=0.1):
+        """Create GBF inverse operators using graph-Laplacian eigenmodes.
 
-        for face in faces:
-            for i in range(3):
-                j = (i + 1) % 3
-                k = (i + 2) % 3
+        Source activity is represented as X = Phi * B where Phi are Laplacian
+        eigenmodes and B are coefficients. MAP inference in basis space yields:
+        B_hat = Sigma_b G^T (G Sigma_b G^T + alpha I)^-1 Y, with G = L Phi.
+        """
+        adjacency = mne.spatial_src_adjacency(self.forward["src"], verbose=0)
+        graph_laplacian = laplacian(adjacency, normed=False).astype(float).toarray()
 
-                vi = pos[:, face[i]]
-                vj = pos[:, face[j]]
-                vk = pos[:, face[k]]
+        eigenvalues, eigenvectors = np.linalg.eigh(graph_laplacian)
+        n_vertices = eigenvectors.shape[0]
+        n_basis_use = self._resolve_n_basis(n_vertices, n_basis)
+        phi = eigenvectors[:, :n_basis_use]
+        lam = eigenvalues[:n_basis_use]
 
-                # Compute cotangent weights for edges (vi, vj) and (vi, vk)
-                cot_jk = self.cotangent_weight(vi, vj, vk)
-                cot_kj = self.cotangent_weight(vi, vk, vj)
+        positive_eigs = lam[lam > 1e-12]
+        eig_scale = float(np.median(positive_eigs)) if len(positive_eigs) else 1.0
+        shift = max(float(prior_shift) * eig_scale, 1e-12)
+        sigma_b_diag = 1.0 / (lam + shift)
+        sigma_b = np.diag(sigma_b_diag)
 
-                # Update the entries for the Laplacian matrix
-                I.append(face[i])
-                J.append(face[j])
-                V.append(-0.5 * (cot_jk + cot_kj))
+        g_basis = self.leadfield @ phi
+        n_chans = g_basis.shape[0]
+        identity = np.eye(n_chans)
 
-                # Add the contribution to the diagonal element
-                I.append(face[i])
-                J.append(face[i])
-                V.append(0.5 * (cot_jk + cot_kj))
+        self.phi = phi
+        self.graph_laplacian = graph_laplacian
+        self.eigenvalues = lam
+        self.sigma_b_diag = sigma_b_diag
 
-        # Create the sparse Laplacian matrix
-        L = coo_matrix((V, (I, J)), shape=(n, n))
+        def make_operator(alpha_value: float):
+            alpha_safe = max(float(alpha_value), 1e-12)
+            sensor_cov = g_basis @ sigma_b @ g_basis.T + alpha_safe * identity
+            coef_operator = sigma_b @ g_basis.T @ np.linalg.inv(sensor_cov)
+            return phi @ coef_operator
 
-        return L
+        return make_operator

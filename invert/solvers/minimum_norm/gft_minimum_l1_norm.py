@@ -4,7 +4,6 @@ from copy import deepcopy
 import mne
 import numpy as np
 from scipy.sparse.csgraph import laplacian
-from scipy.sparse.linalg import eigsh
 
 from ..base import BaseSolver, SolverMeta
 from .utils import soft_threshold
@@ -48,6 +47,9 @@ class SolverGFTMinimumL1Norm(BaseSolver):
         forward,
         *args,
         alpha="auto",
+        n_modes=None,
+        mode_fraction=1.0,
+        high_freq_penalty=0.0,
         max_iter=1000,
         noise_cov=None,
         verbose=0,
@@ -73,18 +75,46 @@ class SolverGFTMinimumL1Norm(BaseSolver):
             noise_cov = np.identity(n_chans)
 
         adjacency = mne.spatial_src_adjacency(forward["src"], verbose=0)
-        lap = laplacian(adjacency).astype(float)
-        num_eigenvalues = lap.shape[0]
-        cutoff_index = int(num_eigenvalues * 0.3)  # 30% cutoff
-        eigenvalues, U = eigsh(lap, k=cutoff_index, which="SM")
-        self.U = np.real(U)
+        graph_laplacian = laplacian(adjacency, normed=False).astype(float).toarray()
+        eigenvalues, eigenvectors = np.linalg.eigh(graph_laplacian)
+
+        n_vertices = eigenvectors.shape[0]
+        n_modes_use = self._resolve_n_modes(
+            n_vertices=n_vertices, n_modes=n_modes, mode_fraction=mode_fraction
+        )
+        self.U = np.real(eigenvectors[:, :n_modes_use])
+        self.graph_laplacian_eigenvalues = np.real(eigenvalues[:n_modes_use])
+
+        max_eig = float(np.max(self.graph_laplacian_eigenvalues))
+        if max_eig <= 0:
+            normalized = np.zeros_like(self.graph_laplacian_eigenvalues)
+        else:
+            normalized = self.graph_laplacian_eigenvalues / max_eig
+        self.mode_weights = 1.0 + float(high_freq_penalty) * normalized
 
         self.noise_cov = noise_cov
         self.inverse_operators = []
         return self
 
+    @staticmethod
+    def _resolve_n_modes(n_vertices: int, n_modes, mode_fraction: float) -> int:
+        if n_modes is not None:
+            n_modes_use = int(n_modes)
+        else:
+            n_modes_use = int(np.ceil(float(mode_fraction) * n_vertices))
+        n_modes_use = max(2, n_modes_use)
+        n_modes_use = min(n_vertices, n_modes_use)
+        return n_modes_use
+
     def apply_inverse_operator(
-        self, mne_obj, max_iter=1000, l1_reg=1e-3, l2_reg=0, tol=1e-2
+        self,
+        mne_obj,
+        max_iter=1000,
+        l1_reg=1e-2,
+        l2_reg=0,
+        tol=1e-4,
+        center_data=True,
+        scale_l1_by_lmax=True,
     ) -> mne.SourceEstimate:
         """Apply the inverse operator.
 
@@ -100,6 +130,10 @@ class SolverGFTMinimumL1Norm(BaseSolver):
             Controls the spatial L2 regularization
         tol : float
             Tolerance at which convergence is met.
+        center_data : bool
+            If True, subtract the per-timepoint channel mean from data.
+        scale_l1_by_lmax : bool
+            If True, interpret ``l1_reg`` as a fraction of lambda_max.
 
         Return
         ------
@@ -108,20 +142,47 @@ class SolverGFTMinimumL1Norm(BaseSolver):
         """
         data = self.unpack_data_obj(mne_obj)
         source_mat = self.fista_wrap(
-            data, max_iter=max_iter, l1_reg=l1_reg, l2_reg=l2_reg, tol=tol
+            data,
+            max_iter=max_iter,
+            l1_reg=l1_reg,
+            l2_reg=l2_reg,
+            tol=tol,
+            center_data=center_data,
+            scale_l1_by_lmax=scale_l1_by_lmax,
         )
         stc = self.source_to_object(source_mat)
         return stc
 
-    def fista_wrap(self, y_mat, max_iter=1000, l1_reg=1e-3, l2_reg=0, tol=1e-2):
-        srcs = []
-        for y in y_mat.T:
-            srcs.append(
-                self.fista(y, max_iter=max_iter, l1_reg=l1_reg, l2_reg=l2_reg, tol=tol)
-            )
-        return np.stack(srcs, axis=1)
+    def fista_wrap(
+        self,
+        y_mat,
+        max_iter=1000,
+        l1_reg=1e-2,
+        l2_reg=0,
+        tol=1e-4,
+        center_data=True,
+        scale_l1_by_lmax=True,
+    ):
+        return self.fista(
+            y_mat,
+            max_iter=max_iter,
+            l1_reg=l1_reg,
+            l2_reg=l2_reg,
+            tol=tol,
+            center_data=center_data,
+            scale_l1_by_lmax=scale_l1_by_lmax,
+        )
 
-    def fista(self, y, l1_reg=1e-3, l2_reg=0, max_iter=1000, tol=1e-2):
+    def fista(
+        self,
+        y,
+        l1_reg=1e-2,
+        l2_reg=0,
+        max_iter=1000,
+        tol=1e-4,
+        center_data=True,
+        scale_l1_by_lmax=True,
+    ):
         """
         Solves the EEG inverse problem:
             min_x ||y - Ax||_2^2 + l1_reg * ||x||_1 + l2_reg * ||x||_2^2
@@ -129,8 +190,8 @@ class SolverGFTMinimumL1Norm(BaseSolver):
 
         Parameters
         ----------
-        y : ndarray, shape (m,)
-            EEG measurements.
+        y : ndarray, shape (m, t)
+            EEG measurements over time.
         A : ndarray, shape (m, n)
             Forward model.
         x0 : ndarray, shape (n,)
@@ -146,31 +207,36 @@ class SolverGFTMinimumL1Norm(BaseSolver):
 
         Returns
         -------
-        x : ndarray, shape (n,)
+        x : ndarray, shape (n, t)
             Estimated CSDs.
         """
 
         A = deepcopy(self.leadfield) @ self.U
 
-        y_scaled = y.copy()
-        # Rereference
-        y_scaled -= y_scaled.mean()
-        # Scale to unit norm
-        norm_y = np.linalg.norm(y_scaled)
-        y_scaled /= norm_y
+        y_mat = np.asarray(y, dtype=float)
+        if y_mat.ndim == 1:
+            y_mat = y_mat[:, np.newaxis]
+        Y = y_mat.copy()
+        if center_data:
+            Y -= Y.mean(axis=0, keepdims=True)
+        if np.allclose(Y, 0):
+            return np.zeros((self.U.shape[1], Y.shape[1]), dtype=float)
 
         # Compute step size from Lipschitz constant
         L = np.linalg.norm(A, ord=2) ** 2 + l2_reg
+        L = max(float(L), 1e-12)
         lr = 1.0 / L
 
-        def grad_f(x):
-            """Gradient of the smooth part: A.T @ (A @ x - y) + l2_reg * x"""
-            return A.T @ (A @ x - y_scaled) + l2_reg * x
+        if scale_l1_by_lmax:
+            weighted_proj = np.abs(A.T @ Y) / self.mode_weights[:, np.newaxis]
+            lambda_max = float(np.max(weighted_proj))
+            lambda_eff = float(l1_reg) * lambda_max
+        else:
+            lambda_eff = float(l1_reg)
+        lambda_eff = max(lambda_eff, 0.0)
 
         # Calculate initial guess
-        x0 = np.linalg.pinv(A) @ y_scaled
-        # Scale to unit norm
-        x0 /= np.linalg.norm(x0)
+        x0 = np.linalg.pinv(A) @ Y
 
         x = x0.copy()
         z = x0.copy()
@@ -179,23 +245,23 @@ class SolverGFTMinimumL1Norm(BaseSolver):
         for _i in range(max_iter):
             x_prev = x.copy()
             # Gradient descent step on momentum variable
-            x = z - lr * grad_f(z)
+            grad = A.T @ (A @ z - Y) + l2_reg * z
+            x = z - lr * grad
             # Soft thresholding step (proximal for L1)
-            x = soft_threshold(x, l1_reg * lr)
+            thresholds = (lambda_eff * lr) * self.mode_weights[:, np.newaxis]
+            x = soft_threshold(x, thresholds)
             # Update z and t (FISTA momentum)
             t_prev = t
             t = (1 + (1 + 4 * t**2) ** 0.5) / 2
             z = x + (t_prev - 1) / t * (x - x_prev)
 
-            if np.linalg.norm(z) == 0:
+            if np.linalg.norm(z) == 0 or np.isnan(z).any():
                 logger.warning("norm is zero")
                 x = x_prev
                 break
             # Check stopping criteria
-            if np.linalg.norm(x - x_prev) < tol:
+            denom = max(np.linalg.norm(x_prev), 1e-12)
+            if np.linalg.norm(x - x_prev) / denom < tol:
                 logger.debug("criterion met")
                 break
-        # Rescale source
-        x = x * norm_y
-
         return self.U @ x

@@ -76,10 +76,12 @@ class SolverMinimumL1Norm(BaseSolver):
         self,
         mne_obj,
         max_iter=1000,
-        l1_reg=1e-3,
+        l1_reg=5e-2,
         l2_reg=0,
-        tol=1e-2,
-        depth_weighting=0.5,
+        tol=1e-4,
+        depth_weighting=0.0,
+        center_data=True,
+        scale_l1_by_lmax=True,
     ) -> mne.SourceEstimate:
         """Apply the inverse operator.
 
@@ -97,7 +99,12 @@ class SolverMinimumL1Norm(BaseSolver):
             Tolerance at which convergence is met.
         depth_weighting : float
             Exponent for depth weighting compensation (0 = no weighting, 1 = full compensation).
-            Default 0.5 balances depth bias reduction with noise sensitivity.
+            Default 0.0 disables depth weighting.
+        center_data : bool
+            If True, subtract the per-timepoint channel mean from data.
+        scale_l1_by_lmax : bool
+            If True, interpret ``l1_reg`` as a fraction of the data-dependent
+            maximum L1 penalty (lambda_max = max(abs(A.T @ Y))).
 
         Return
         ------
@@ -112,86 +119,109 @@ class SolverMinimumL1Norm(BaseSolver):
             l2_reg=l2_reg,
             tol=tol,
             depth_weighting=depth_weighting,
+            center_data=center_data,
+            scale_l1_by_lmax=scale_l1_by_lmax,
         )
         stc = self.source_to_object(source_mat)
         return stc
 
     def fista_wrap(
-        self, y_mat, max_iter=1000, l1_reg=1e-3, l2_reg=0, tol=1e-2, depth_weighting=0.5
+        self,
+        y_mat,
+        max_iter=1000,
+        l1_reg=5e-2,
+        l2_reg=0,
+        tol=1e-4,
+        depth_weighting=0.0,
+        center_data=True,
+        scale_l1_by_lmax=True,
     ):
-        srcs = []
-        for y in y_mat.T:
-            srcs.append(
-                self.fista(
-                    y,
-                    max_iter=max_iter,
-                    l1_reg=l1_reg,
-                    l2_reg=l2_reg,
-                    tol=tol,
-                    depth_weighting=depth_weighting,
-                )
-            )
-        return np.stack(srcs, axis=1)
+        return self.fista(
+            y_mat,
+            max_iter=max_iter,
+            l1_reg=l1_reg,
+            l2_reg=l2_reg,
+            tol=tol,
+            depth_weighting=depth_weighting,
+            center_data=center_data,
+            scale_l1_by_lmax=scale_l1_by_lmax,
+        )
 
     def fista(
-        self, y, l1_reg=1e-3, l2_reg=0, max_iter=1000, tol=1e-2, depth_weighting=0.5
+        self,
+        y,
+        l1_reg=5e-2,
+        l2_reg=0,
+        max_iter=1000,
+        tol=1e-4,
+        depth_weighting=0.0,
+        center_data=True,
+        scale_l1_by_lmax=True,
     ):
         """
         Solves the EEG inverse problem:
-            min_x ||y - Ax||_2^2 + l1_reg * ||x||_1 + l2_reg * ||x||_2^2
-        using the FISTA algorithm.
+            min_X 0.5 * ||Y - A X||_F^2 + lambda * ||X||_1 + 0.5 * l2_reg * ||X||_F^2
+        using FISTA over all timepoints jointly.
 
         Parameters
         ----------
-        y : ndarray, shape (m,)
-            EEG measurements.
+        y : ndarray, shape (m, t)
+            EEG measurements over time.
         A : ndarray, shape (m, n)
             Forward model.
-        x0 : ndarray, shape (n,)
-            Initial guess for the CSDs.
+        x0 : ndarray, shape (n, t)
+            Initial guess for source currents.
         l1_reg : float, optional (default: 1e-3)
-            L1 regularization strength.
+            L1 regularization strength. If ``scale_l1_by_lmax=True``, this is
+            interpreted as a fraction of lambda_max.
         l2_reg : float, optional (default: 0)
             L2 regularization strength.
         max_iter : int, optional (default: 1000)
             Maximum number of iterations to run.
         tol : float, optional (default: 1e-6)
             Tolerance for the stopping criteria.
-        depth_weighting : float, optional (default: 0.5)
+        depth_weighting : float, optional (default: 0.0)
             Exponent for depth weighting to compensate for superficial source bias.
+            This is applied only if the base class did not already prepare/depth-weight
+            the leadfield.
 
         Returns
         -------
-        x : ndarray, shape (n,)
-            Estimated CSDs.
+        x : ndarray, shape (n, t)
+            Estimated CSDs for all timepoints.
         """
+        y_mat = np.asarray(y, dtype=float)
+        if y_mat.ndim == 1:
+            y_mat = y_mat[:, np.newaxis]
 
         A = deepcopy(self.leadfield)
-        leadfield_norms = np.linalg.norm(A, axis=0)
-        depth_weights = leadfield_norms**depth_weighting
-        A /= leadfield_norms
-        A *= depth_weights
+        if not self.prep_leadfield and depth_weighting > 0:
+            leadfield_norms = np.linalg.norm(A, axis=0)
+            leadfield_norms = np.maximum(leadfield_norms, 1e-12)
+            depth_weights = leadfield_norms**depth_weighting
+            A /= leadfield_norms
+            A *= depth_weights
 
-        y_scaled = y.copy()
-        # Rereference
-        y_scaled -= y_scaled.mean()
-        # Scale to unit norm
-        norm_y = np.linalg.norm(y_scaled)
-        y_scaled /= norm_y
+        Y = y_mat.copy()
+        if center_data:
+            Y -= Y.mean(axis=0, keepdims=True)
+        if np.allclose(Y, 0):
+            return np.zeros((A.shape[1], Y.shape[1]), dtype=float)
 
         # Compute step size from Lipschitz constant
         L = np.linalg.norm(A, ord=2) ** 2 + l2_reg
+        L = max(float(L), 1e-12)
         lr = 1.0 / L
 
-        def grad_f(x):
-            """Gradient of the smooth part: A.T @ (A @ x - y) + l2_reg * x"""
-            return A.T @ (A @ x - y_scaled) + l2_reg * x
+        if scale_l1_by_lmax:
+            lambda_max = float(np.max(np.abs(A.T @ Y)))
+            lambda_eff = float(l1_reg) * lambda_max
+        else:
+            lambda_eff = float(l1_reg)
+        lambda_eff = max(lambda_eff, 0.0)
 
-        # Calculate initial guess
-        x0 = np.linalg.pinv(A) @ y_scaled
-        # Scale to unit norm
-        x0 /= np.linalg.norm(x0)
-
+        # Least-squares warm start keeps early iterations stable.
+        x0 = np.linalg.pinv(A) @ Y
         x = x0.copy()
         z = x0.copy()
 
@@ -199,20 +229,20 @@ class SolverMinimumL1Norm(BaseSolver):
         for _i in range(max_iter):
             x_prev = x.copy()
             # Gradient descent step on momentum variable
-            x = z - lr * grad_f(z)
+            grad = A.T @ (A @ z - Y) + l2_reg * z
+            x = z - lr * grad
             # Soft thresholding step (proximal for L1)
-            x = soft_threshold(x, l1_reg * lr)
+            x = soft_threshold(x, lambda_eff * lr)
             # Update z and t (FISTA momentum)
             t_prev = t
             t = (1 + (1 + 4 * t**2) ** 0.5) / 2
             z = x + (t_prev - 1) / t * (x - x_prev)
 
-            if np.linalg.norm(z) == 0:
+            if np.linalg.norm(z) == 0 or np.isnan(z).any():
                 break
             # Check stopping criteria
-            if np.linalg.norm(x - x_prev) < tol:
+            denom = max(np.linalg.norm(x_prev), 1e-12)
+            if np.linalg.norm(x - x_prev) / denom < tol:
                 break
-        # Rescale source
-        x = x * norm_y
 
         return x

@@ -58,11 +58,13 @@ class SolverMinimumL1L2Norm(BaseSolver):
         self,
         mne_obj,
         alpha="auto",
-        max_iter=100,
-        l1_spatial=1e-3,
-        l2_temporal=1e-3,
-        tol=1e-6,
-        depth_weighting=0.5,
+        max_iter=1000,
+        l1_spatial=5e-2,
+        l2_temporal=0,
+        tol=1e-4,
+        depth_weighting=0.0,
+        center_data=True,
+        scale_l1_by_lmax=True,
     ) -> mne.SourceEstimate:
         """Apply the inverse operator.
 
@@ -75,13 +77,18 @@ class SolverMinimumL1L2Norm(BaseSolver):
         l1_spatial : float
             Controls the spatial L1 regularization
         l2_temporal : float
-            Controls the temporal L2 regularization
+            Controls additional temporal ridge regularization.
         tol : float
             Tolerance at which convergence is met.
         depth_weighting : float
             Exponent for depth weighting compensation (0 = no weighting, 1 = full compensation).
-            Default 0.5 balances depth bias reduction with noise sensitivity.
+            Default 0.0 disables depth weighting.
             Use 0 to disable depth weighting entirely.
+        center_data : bool
+            If True, subtract the per-timepoint channel mean from data.
+        scale_l1_by_lmax : bool
+            If True, interpret ``l1_spatial`` as a fraction of
+            ``lambda_max = max_i ||(A^T Y)_i||_2``.
 
         Return
         ------
@@ -99,109 +106,98 @@ class SolverMinimumL1L2Norm(BaseSolver):
             l1_spatial=l1_spatial,
             l2_temporal=l2_temporal,
             depth_weighting=depth_weighting,
+            center_data=center_data,
+            scale_l1_by_lmax=scale_l1_by_lmax,
         )
         stc = self.source_to_object(source_mat)
         return stc
+
+    @staticmethod
+    def _group_soft_threshold(X, threshold):
+        """Row-wise proximal operator for the L21 norm."""
+        row_norms = np.linalg.norm(X, axis=1, keepdims=True)
+        row_norms = np.maximum(row_norms, 1e-12)
+        scale = np.maximum(1.0 - threshold / row_norms, 0.0)
+        return X * scale
 
     def fista_eeg(
         self,
         y,
         alpha="auto",
-        l1_spatial=1e-3,
-        l2_temporal=1e-3,
+        l1_spatial=5e-2,
+        l2_temporal=0,
         max_iter=1000,
-        tol=1e-6,
-        depth_weighting=0.5,
+        tol=1e-4,
+        depth_weighting=0.0,
+        center_data=True,
+        scale_l1_by_lmax=True,
     ):
         """
-        Solves the EEG inverse problem using FISTA with L1 regularization on the spatial
-        dimension and L2 regularization on the temporal dimension.
+        Solve a mixed-norm inverse problem over all timepoints jointly:
+            min_X 0.5 ||Y - A X||_F^2 + lambda * sum_i ||X_i||_2
+                  + 0.5 * l2_temporal * ||X||_F^2
 
         Parameters:
         - A: array of shape (n_sensors, n_sources)
         - y: array of shape (n_sensors, n_timepoints)
-        - l1_spatial: float, strength of L1 regularization on the spatial dimension
-        - l2_temporal: float, strength of L2 regularization on the temporal dimension
+        - l1_spatial: float, mixed-norm regularization strength
+        - l2_temporal: float, additional ridge regularization on X
         - max_iter: int, maximum number of iterations
         - tol: float, tolerance for convergence
         - depth_weighting: float, exponent for depth weighting (0=no weighting, 1=full compensation)
-                          Default 0.5 provides a balance between depth bias and noise sensitivity
+                          Default 0.0 disables depth weighting
 
         Returns:
         - x: array of shape (n_sources, n_timepoints), the solution to the EEG inverse problem
         """
+        y_mat = np.asarray(y, dtype=float)
+        if y_mat.ndim == 1:
+            y_mat = y_mat[:, np.newaxis]
+
         A = self.leadfield.copy()
+        if not self.prep_leadfield and depth_weighting > 0:
+            leadfield_norms = np.linalg.norm(A, axis=0)
+            leadfield_norms = np.maximum(leadfield_norms, 1e-12)
+            depth_weights = leadfield_norms**depth_weighting
+            A /= leadfield_norms
+            A *= depth_weights
 
-        # Compute depth weights to compensate for superficial bias
-        # Larger column norms = superficial sources
-        leadfield_norms = np.linalg.norm(A, axis=0)
-        depth_weights = leadfield_norms**depth_weighting
+        Y = y_mat.copy()
+        if center_data:
+            Y -= Y.mean(axis=0, keepdims=True)
+        if np.allclose(Y, 0):
+            return np.zeros((A.shape[1], Y.shape[1]), dtype=float)
 
-        # Normalize leadfield columns
-        A /= leadfield_norms
+        if alpha != "auto":
+            l1_spatial = float(alpha)
 
-        # Apply depth weighting to compensate for the bias
-        A *= depth_weights
+        if scale_l1_by_lmax:
+            gram_proj = A.T @ Y
+            lambda_max = float(np.max(np.linalg.norm(gram_proj, axis=1)))
+            lambda_eff = float(l1_spatial) * lambda_max
+        else:
+            lambda_eff = float(l1_spatial)
+        lambda_eff = max(lambda_eff, 0.0)
 
-        norm_y = np.linalg.norm(y)
-        y -= y.mean(axis=0)
-        y_scaled = y / norm_y
+        L = np.linalg.norm(A, ord=2) ** 2 + float(l2_temporal)
+        L = max(float(L), 1e-12)
 
-        # Regularization
-        if alpha == "auto":
-            alpha = l1_spatial
-
-        # Initialize x and z to be the same, and set t to 1
-        W = np.diag(np.linalg.norm(A, axis=0))
-        WTW = np.linalg.inv(W.T @ W)
-        LWTWL = A @ WTW @ A.T
-        inverse_operator = (
-            WTW @ A.T @ np.linalg.inv(LWTWL + alpha * np.identity(A.shape[0]))
-        )
-        x = z = inverse_operator @ y_scaled
-
-        # x = z = np.linalg.pinv(A) @ y_scaled
-
-        x /= np.linalg.norm(x)
-
-        t = 1
-
-        # Compute the Lipschitz constant
-        L = np.linalg.norm(A, ord=2) ** 2
+        x = np.linalg.pinv(A) @ Y
+        z = x.copy()
+        t = 1.0
 
         for _i in range(max_iter):
-            # Compute the gradient of the smooth part using momentum variable z
-            grad = A.T @ (A @ z - y_scaled)
-
-            # Compute the proximal operator of the L1 regularization
-            x_new = np.sign(z - grad / L) * np.maximum(
-                np.abs(z - grad / L) - l1_spatial / L, 0
-            )
-
-            # Compute the proximal operator of the L2 temporal regularization (per-source temporal norm)
-            norm_x = np.linalg.norm(x_new, ord=2, axis=1)
-            # Avoid division by zero
-            norm_x = np.maximum(norm_x, 1e-10)
-            scale = np.maximum(norm_x - l2_temporal / L, 0) / norm_x
-            x_new = x_new * scale[:, np.newaxis]
-
-            # Update t and z
+            grad = A.T @ (A @ z - Y) + float(l2_temporal) * z
+            v = z - grad / L
+            x_new = self._group_soft_threshold(v, lambda_eff / L)
             t_new = (1 + np.sqrt(1 + 4 * t**2)) / 2
             z_new = x_new + (t - 1) / t_new * (x_new - x)
-
-            # Check for convergence
-            diff = np.linalg.norm(x_new - x)
-            logger.debug(diff)
-            if diff < tol or np.any(abs(x).max(axis=0) < 1e-10):
+            denom = max(np.linalg.norm(x), 1e-12)
+            if np.linalg.norm(x_new - x) / denom < tol:
                 break
-
-            # Update x, t, and z
             x = x_new
             t = t_new
             z = z_new
-        logger.info("convergence after %d", _i)
-        # Rescale Sources
-        x = x * norm_y
 
         return x
 

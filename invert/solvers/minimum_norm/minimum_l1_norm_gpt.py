@@ -61,7 +61,7 @@ class SolverMinimumL1NormGPT(BaseSolver):
         return self
 
     def apply_inverse_operator(
-        self, mne_obj, max_iter=1000, l1_reg=1e-3, tol=1e-2, depth_weighting=0.5
+        self, mne_obj, max_iter=1000, l1_reg=1e-3, tol=1e-2, depth_weighting=0.0
     ) -> mne.SourceEstimate:
         """Apply the inverse operator.
 
@@ -77,7 +77,7 @@ class SolverMinimumL1NormGPT(BaseSolver):
             Tolerance at which convergence is met.
         depth_weighting : float
             Exponent for depth weighting compensation (0 = no weighting, 1 = full compensation).
-            Default 0.5 balances depth bias reduction with noise sensitivity.
+            Default 0.0 disables depth weighting.
 
         Return
         ------
@@ -97,7 +97,7 @@ class SolverMinimumL1NormGPT(BaseSolver):
         return stc
 
     def solver_wrap(
-        self, y_mat, max_iter=1000, l1_reg=1e-3, tol=1e-2, depth_weighting=0.5
+        self, y_mat, max_iter=1000, l1_reg=1e-3, tol=1e-2, depth_weighting=0.0
     ):
         srcs = []
         for y in y_mat.T:
@@ -112,7 +112,7 @@ class SolverMinimumL1NormGPT(BaseSolver):
             )
         return np.stack(srcs, axis=1)
 
-    def solve(self, y, l1_reg=1e-3, max_iter=1000, tol=1e-2, depth_weighting=0.5):
+    def solve(self, y, l1_reg=1e-3, max_iter=1000, tol=1e-2, depth_weighting=0.0):
         """
         Solves the EEG inverse problem:
             min_x ||y - Ax||_2^2 + l1_reg * ||x||_1 + l2_reg * ||x||_2^2
@@ -128,7 +128,7 @@ class SolverMinimumL1NormGPT(BaseSolver):
             Maximum number of iterations to run.
         tol : float, optional (default: 1e-6)
             Tolerance for the stopping criteria.
-        depth_weighting : float, optional (default: 0.5)
+        depth_weighting : float, optional (default: 0.0)
             Exponent for depth weighting to compensate for superficial source bias.
 
         Returns
@@ -138,10 +138,12 @@ class SolverMinimumL1NormGPT(BaseSolver):
         """
 
         A = deepcopy(self.leadfield)
-        leadfield_norms = np.linalg.norm(A, axis=0)
-        depth_weights = leadfield_norms**depth_weighting
-        A /= leadfield_norms
-        A *= depth_weights
+        if not self.prep_leadfield and depth_weighting > 0:
+            leadfield_norms = np.linalg.norm(A, axis=0)
+            leadfield_norms = np.maximum(leadfield_norms, 1e-12)
+            depth_weights = leadfield_norms**depth_weighting
+            A /= leadfield_norms
+            A *= depth_weights
 
         y_scaled = y.copy()
         # Rereference
