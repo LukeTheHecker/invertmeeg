@@ -6,6 +6,7 @@ import numpy as np
 from scipy.sparse.csgraph import laplacian
 
 from ...util import (
+    best_index_residual,
     calc_residual_variance,
     thresholding,
 )
@@ -101,14 +102,21 @@ class SolverISubSMP(BaseSolver):
         stc = self.source_to_object(source_mat)
         return stc
 
-    def calc_subsmp_solution(self, y, include_singletons=True, var_thresh=0.1):
-        """Calculate the Subspace Smooth Matching Pursuit (SubSMP) solution."""
+    def calc_subsmp_solution(self, y, include_singletons=True, var_thresh=5.0):
+        """Calculate the Subspace Smooth Matching Pursuit (SubSMP) solution.
+
+        Parameters
+        ----------
+        var_thresh : float
+            Residual-variance threshold in percent. Iteration stops once the
+            unexplained variance drops below this value.
+        """
         x_hat = self.calc_isubsmp_solution(
             y, include_singletons=include_singletons, var_thresh=var_thresh
         )
         return x_hat
 
-    def calc_isubsmp_solution(self, y, include_singletons=True, var_thresh=1):
+    def calc_isubsmp_solution(self, y, include_singletons=True, var_thresh=5.0):
         """Calculates the Iterative Subspace Smooth Matching Pursuit inverse solution.
 
         Parameters
@@ -172,7 +180,7 @@ class SolverISubSMP(BaseSolver):
                 unexplained_variance, calc_residual_variance(y_hat, y)
             )
             x_hats.append(deepcopy(x_hat))
-            if residuals[-1] > residuals[-2] or unexplained_variance[-1] < var_thresh:
+            if residuals[-1] > residuals[-2] or unexplained_variance[-1] <= var_thresh:
                 break
 
-        return x_hat
+        return best_index_residual(unexplained_variance, x_hats, plot=False)
