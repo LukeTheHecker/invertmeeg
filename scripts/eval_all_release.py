@@ -29,11 +29,11 @@ if __name__ == "__main__":
         exclude_solvers=[
             "SESAME",
         ],
-        # solvers=[
-        #     "CovCNN",
-        #     "CovCNN-KL",
-        #     "CovCNN-KL-FLEXOMP",
-        # ],
+        solvers=[
+            "CovCNN",
+            "CovCNN-KL",
+            "CovCNN-KL-FLEXOMP",
+        ],
         n_jobs=-1,
     )
     runner.run()
