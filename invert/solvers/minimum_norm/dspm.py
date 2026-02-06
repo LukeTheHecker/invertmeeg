@@ -50,7 +50,7 @@ class SolverDSPM(BaseSolver):
         self,
         forward,
         *args,
-        alpha=0.01,
+        alpha="auto",
         noise_cov=None,
         source_cov=None,
         verbose=0,
