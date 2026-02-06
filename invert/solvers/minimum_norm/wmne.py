@@ -35,6 +35,7 @@ class SolverWMNE(BaseSolver):
 
     def __init__(self, name="Weighted Minimum Norm Estimate", **kwargs):
         self.name = name
+        kwargs.setdefault("depth_weighting", 0.5)
         return super().__init__(**kwargs)
 
     def make_inverse_operator(self, forward, *args, alpha="auto", verbose=0, **kwargs):
@@ -52,8 +53,10 @@ class SolverWMNE(BaseSolver):
         self : object returns itself for convenience
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
-        W = np.diag(np.linalg.norm(self.leadfield, axis=0))
-        WTW = np.linalg.inv(W.T @ W)
+        eps = 1e-12
+        col_norms = np.linalg.norm(self.leadfield, axis=0) ** float(self.depth_weighting)
+        col_norms = np.maximum(col_norms, eps)
+        WTW = np.diag(1.0 / (col_norms**2))
         LWTWL = self.leadfield @ WTW @ self.leadfield.T
         n_chans, _ = self.leadfield.shape
 

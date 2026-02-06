@@ -44,6 +44,8 @@ class SolverDSPM(BaseSolver):
 
     def __init__(self, name="Dynamic Statistical Parametric Mapping", **kwargs):
         self.name = name
+        kwargs.setdefault("use_depth_weighting", True)
+        kwargs.setdefault("depth_weighting", 0.1)
         return super().__init__(**kwargs)
 
     def make_inverse_operator(
