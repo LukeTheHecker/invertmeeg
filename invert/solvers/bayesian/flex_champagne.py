@@ -131,23 +131,16 @@ class SolverFlexChampagne(BaseSolver):
         n_orders = len(self.leadfields)
 
         # Build extended leadfield: (n_chans, n_orders * n_dipoles)
-        # Column-normalise each order's leadfield for stable convergence
-        L_blocks = []
-        for lf in self.leadfields:
-            lf_norm = lf / (np.linalg.norm(lf, axis=0, keepdims=True) + 1e-12)
-            L_blocks.append(lf_norm)
-        L_ext = np.hstack(L_blocks)  # (n_chans, n_orders * n_dipoles)
+        L_ext = np.hstack(self.leadfields)  # (n_chans, n_orders * n_dipoles)
         n_ext = L_ext.shape[1]
 
-        # Scale data for numerical stability (does not affect spatial metrics)
-        scale = float(np.mean(np.abs(Y))) + 1e-12
-        Y_scaled = Y / scale
-
-        # Noise estimate
-        C_y = self.data_covariance(Y_scaled, center=True, ddof=1)
-        alpha_noise = float(np.trace(C_y) / (n_chans * 100))
+        # Noise estimate from data covariance
+        C_y = self.data_covariance(Y, center=True, ddof=1)
+        alpha_noise = float(np.trace(C_y) / n_chans)
         I_c = np.identity(n_chans)
         noise_cov = alpha_noise * I_c
+
+        Y_scaled = Y
 
         # Gammas: one per extended-dictionary atom
         gammas = np.ones(n_ext)

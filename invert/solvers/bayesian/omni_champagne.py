@@ -109,12 +109,11 @@ class SolverOmniChampagne(BaseSolver):
     def _fit_and_build_inverse_operator(self, Y: np.ndarray) -> np.ndarray:
         n_chans, n_dipoles = self.leadfield.shape
 
-        # Shared noise estimate (scale-invariant)
-        scale = float(np.mean(np.abs(Y))) + 1e-12
-        Y_scaled = Y / scale
-        C_y = self.data_covariance(Y_scaled, center=True, ddof=1)
-        alpha_noise = float(np.trace(C_y) / (n_chans * 100))
+        # Noise estimate from data covariance
+        C_y = self.data_covariance(Y, center=True, ddof=1)
+        alpha_noise = float(np.trace(C_y) / n_chans)
         noise_cov = alpha_noise * np.eye(n_chans)
+        Y_scaled = Y
 
         # Model A: dipole-only dictionary
         L_dip = self.leadfield
@@ -212,8 +211,7 @@ class SolverOmniChampagne(BaseSolver):
         n_chans, n_atoms = L_orig.shape
         n_times = Y_scaled.shape[1]
 
-        # Column-normalize for numerical stability (like existing Champagne/Flex)
-        L = L_orig / (np.linalg.norm(L_orig, axis=0, keepdims=True) + 1e-12)
+        L = L_orig
 
         gammas = np.ones(n_atoms)
         active_set = np.arange(n_atoms)

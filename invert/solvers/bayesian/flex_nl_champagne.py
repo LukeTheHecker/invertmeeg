@@ -194,21 +194,15 @@ class SolverFlexNLChampagne(BaseSolver):
         n_orders = len(self.leadfields)
 
         # Build extended leadfield
-        L_blocks = []
-        for lf in self.leadfields:
-            lf_norm = lf / (np.linalg.norm(lf, axis=0, keepdims=True) + 1e-12)
-            L_blocks.append(lf_norm)
-        L_ext = np.hstack(L_blocks)
+        L_ext = np.hstack(self.leadfields)
         n_ext = L_ext.shape[1]
 
-        # Scale data
-        scale = float(np.mean(np.abs(Y))) + 1e-12
-        Y_scaled = Y / scale
-
-        # Noise estimate
-        C_y = self.data_covariance(Y_scaled, center=True, ddof=1)
-        alpha_noise = float(np.trace(C_y) / (n_chans * 100))
+        # Noise estimate from data covariance
+        C_y = self.data_covariance(Y, center=True, ddof=1)
+        alpha_noise = float(np.trace(C_y) / n_chans)
         noise_cov = alpha_noise * np.identity(n_chans)
+
+        Y_scaled = Y
 
         # === Pass 1: Identify active atoms with Convexity rule ===
         active_set_1, gammas_1 = self._run_sbl(
