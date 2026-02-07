@@ -1,4 +1,6 @@
-.PHONY: install lint format test check clean leaderboard
+PYTHON_VERSIONS ?= 3.9 3.10 3.11
+
+.PHONY: install lint format test test-all check clean leaderboard
 
 install:
 	uv sync --all-extras
@@ -12,9 +14,15 @@ format:
 	uv run ruff format invert tests
 
 test:
-	uv run pytest
+	uv run --extra dev pytest
 
-check: lint test
+test-all:
+	@for v in $(PYTHON_VERSIONS); do \
+		echo "=== Python $$v ==="; \
+		uv run --isolated --extra dev --python $$v pytest || exit 1; \
+	done
+
+check: lint test-all
 	uv run pre-commit run --all-files
 
 leaderboard:
