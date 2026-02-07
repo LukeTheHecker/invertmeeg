@@ -15,6 +15,7 @@ from .hocmcmv import SolverHOCMCMV
 from .hocmv import SolverHOCMV
 from .iresmv import SolverIRESMV
 from .lcmv import SolverLCMV
+from .lcmv_mvpure import SolverLCMVMVPURE
 from .mcmv import SolverMCMV
 from .mvab import SolverMVAB
 from .recipsiicos_plain import SolverReciPSIICOSPlain
@@ -32,6 +33,7 @@ from .wnmv import SolverWNMV
 __all__ = [
     "SolverMVAB",
     "SolverLCMV",
+    "SolverLCMVMVPURE",
     "SolverDICS",
     "SolverSMV",
     "SolverWNMV",

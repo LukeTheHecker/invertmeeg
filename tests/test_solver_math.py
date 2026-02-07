@@ -293,6 +293,144 @@ class TestSolverLCMV:
 
 
 # ---------------------------------------------------------------------------
+# 4b. SolverLCMVMVPURE: projected multi-source LCMV properties
+# ---------------------------------------------------------------------------
+
+
+class TestSolverLCMVMVPURE:
+    def test_single_source_matches_vanilla_lcmv(self, forward_model, sensor_info):
+        """For l=1, MV-PURE reduces to vanilla single-source LCMV."""
+        from invert.solvers.beamformers.lcmv import SolverLCMV
+        from invert.solvers.beamformers.lcmv_mvpure import SolverLCMVMVPURE
+
+        info = sensor_info
+        L = forward_model["sol"]["data"].copy()
+        n_chans, n_dipoles = L.shape
+        idx = int(min(3, n_dipoles - 1))
+
+        n_time = 40
+        rng = np.random.RandomState(2)
+        q = rng.randn(1, n_time)
+        x = (L / np.linalg.norm(L, axis=0, keepdims=True))[:, [idx]] @ q
+        x += 0.05 * rng.randn(*x.shape)
+
+        evoked = mne.EvokedArray(x, info, verbose=0)
+        evoked.set_eeg_reference("average", projection=True, verbose=0)
+        evoked.apply_proj()
+
+        solver_lcmv = SolverLCMV(n_reg_params=1)
+        solver_lcmv.make_inverse_operator(
+            deepcopy(forward_model), evoked, alpha=0.1, weight_norm=False
+        )
+        K_lcmv = _extract_kernel(solver_lcmv)
+
+        solver_mvp = SolverLCMVMVPURE(source_indices=[idx], mvp_rank=1, n_reg_params=1)
+        solver_mvp.make_inverse_operator(
+            deepcopy(forward_model), evoked, alpha=0.1, weight_norm=False
+        )
+        K_mvp = _extract_kernel(solver_mvp)
+
+        np.testing.assert_allclose(K_mvp[idx, :], K_lcmv[idx, :], atol=1e-8)
+
+    def test_full_rank_matches_multisource_lcmv(
+        self, forward_model, sensor_info
+    ):
+        """At rank==l, MV-PURE should equal multi-source LCMV on the same H0."""
+        from invert.solvers.beamformers.lcmv_mvpure import (
+            SolverLCMVMVPURE,
+            _lcmv_multisource_weights_from_inv_cov,
+        )
+
+        info = sensor_info
+        L = forward_model["sol"]["data"].copy()
+        n_chans, n_dipoles = L.shape
+
+        # Deterministic "oracle" source set.
+        sel = np.array([0, min(5, n_dipoles - 1)], dtype=int)
+        n_time = 40
+        rng = np.random.RandomState(0)
+        q = rng.randn(len(sel), n_time)
+        x = (L / np.linalg.norm(L, axis=0, keepdims=True))[:, sel] @ q
+
+        evoked = mne.EvokedArray(x, info, verbose=0)
+        evoked.set_eeg_reference("average", projection=True, verbose=0)
+        evoked.apply_proj()
+
+        solver = SolverLCMVMVPURE(source_indices=sel, mvp_rank=len(sel), n_reg_params=1)
+        solver.make_inverse_operator(
+            deepcopy(forward_model),
+            evoked,
+            alpha=0.1,
+            weight_norm=False,
+        )
+
+        K = _extract_kernel(solver)  # (n_dipoles, n_chans)
+        assert np.allclose(K[np.setdiff1d(np.arange(n_dipoles), sel), :], 0.0)
+
+        # Recompute expected W on the exact matrices used by the solver.
+        L_used = _get_leadfield(solver)
+        y = evoked.data - evoked.data.mean(axis=1, keepdims=True)
+        R = solver.data_covariance(y, center=False, ddof=1)
+        alpha_eff = solver.alphas[0]
+        R_inv = solver.robust_inverse(R + alpha_eff * np.eye(n_chans))
+        H0 = L_used[:, sel]
+
+        W_expected, _ = _lcmv_multisource_weights_from_inv_cov(R_inv, H0)
+        np.testing.assert_allclose(K[sel, :], W_expected, atol=1e-8)
+
+    def test_reduced_rank_is_projected(self, forward_model, sensor_info):
+        """Reduced-rank MV-PURE should drop output-space directions.
+
+        For r=1, the selected block K[sel,:] must have matrix rank <= 1 and
+        should not increase the Frobenius norm relative to the full-rank filter.
+        """
+        from invert.solvers.beamformers.lcmv_mvpure import (
+            SolverLCMVMVPURE,
+            _mvpure_projected_lcmv_weights_from_inv_cov,
+        )
+
+        info = sensor_info
+        L = forward_model["sol"]["data"].copy()
+        n_chans, n_dipoles = L.shape
+
+        sel = np.array([1, min(6, n_dipoles - 1)], dtype=int)
+        n_time = 40
+        rng = np.random.RandomState(1)
+        q = rng.randn(len(sel), n_time)
+        x = (L / np.linalg.norm(L, axis=0, keepdims=True))[:, sel] @ q
+        x += 0.01 * rng.randn(*x.shape)
+
+        evoked = mne.EvokedArray(x, info, verbose=0)
+        evoked.set_eeg_reference("average", projection=True, verbose=0)
+        evoked.apply_proj()
+
+        solver = SolverLCMVMVPURE(source_indices=sel, mvp_rank=1, n_reg_params=1)
+        solver.make_inverse_operator(
+            deepcopy(forward_model),
+            evoked,
+            alpha=0.1,
+            weight_norm=False,
+        )
+
+        K = _extract_kernel(solver)
+        K_sel = K[sel, :]
+        L_used = _get_leadfield(solver)
+        y = evoked.data - evoked.data.mean(axis=1, keepdims=True)
+        R = solver.data_covariance(y, center=False, ddof=1)
+        alpha_eff = solver.alphas[0]
+        R_inv = solver.robust_inverse(R + alpha_eff * np.eye(n_chans))
+        H0 = L_used[:, sel]
+
+        # 1) Rank should be <= 1 (up to numerical tolerance).
+        s = np.linalg.svd(K_sel, compute_uv=False)
+        assert s[1] / (s[0] + 1e-30) < 1e-8
+
+        # 2) Projection should not increase Frobenius norm.
+        W_full = _mvpure_projected_lcmv_weights_from_inv_cov(R_inv, H0, rank=len(sel))
+        assert np.linalg.norm(K_sel, ord="fro") <= np.linalg.norm(W_full, ord="fro") + 1e-12
+
+
+# ---------------------------------------------------------------------------
 # 5. SolverOMP: sparse recovery from noiseless data
 # ---------------------------------------------------------------------------
 

@@ -299,6 +299,12 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         class_name="SolverLCMV",
     ),
     SolverSpec(
+        solver_id="lcmv-mvpure",
+        module_path="invert.solvers.beamformers.lcmv_mvpure",
+        class_name="SolverLCMVMVPURE",
+        aliases=("mvpure-lcmv", "mvpure"),
+    ),
+    SolverSpec(
         solver_id="dics",
         module_path="invert.solvers.beamformers.dics",
         class_name="SolverDICS",

@@ -77,6 +77,7 @@ _SOLVER_REGISTRY: dict[str, tuple[str, str]] = {
     # Beamformers
     "MVAB": ("invert.solvers.beamformers.mvab", "SolverMVAB"),
     "LCMV": ("invert.solvers.beamformers.lcmv", "SolverLCMV"),
+    "LCMV-MVPURE": ("invert.solvers.beamformers.lcmv_mvpure", "SolverLCMVMVPURE"),
     "SMV": ("invert.solvers.beamformers.smv", "SolverSMV"),
     "WNMV": ("invert.solvers.beamformers.wnmv", "SolverWNMV"),
     "HOCMV": ("invert.solvers.beamformers.hocmv", "SolverHOCMV"),

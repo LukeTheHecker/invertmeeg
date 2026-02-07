@@ -56,6 +56,7 @@ __all__ = [
     # Beamformers
     "SolverMVAB",
     "SolverLCMV",
+    "SolverLCMVMVPURE",
     "SolverDICS",
     "SolverSMV",
     "SolverWNMV",
