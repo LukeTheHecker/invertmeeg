@@ -97,7 +97,11 @@ class SolverLCMVMVPURE(BaseSolver):
             "LCMV filter on a selected source set and projects out ill-conditioned "
             "output directions."
         ),
-        references=[],
+        references=[
+            "Jurkowska, J., Dreszer, J., Lewandowska, M., & Piotrowski, T. (2025). "
+            "Multi-Source Neural Activity Indices and Spatial Filters for EEG/MEG "
+            "Inverse Problem: An Extension to MNE-Python. arXiv preprint arXiv:2509.14118."
+        ],
     )
 
     def __init__(
