@@ -20,6 +20,11 @@ check: lint test
 leaderboard:
 	uv run python scripts/eval_all_release.py
 
+docs:
+	uv sync --all-extras
+	uv run mkdocs serve
+	uv run mkdocs build
+
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	find . -type d -name ".mypy_cache" -exec rm -rf {} +
