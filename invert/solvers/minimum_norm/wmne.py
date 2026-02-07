@@ -54,7 +54,9 @@ class SolverWMNE(BaseSolver):
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
         eps = 1e-12
-        col_norms = np.linalg.norm(self.leadfield, axis=0) ** float(self.depth_weighting)
+        col_norms = np.linalg.norm(self.leadfield, axis=0) ** float(
+            self.depth_weighting
+        )
         col_norms = np.maximum(col_norms, eps)
         WTW = np.diag(1.0 / (col_norms**2))
         LWTWL = self.leadfield @ WTW @ self.leadfield.T
