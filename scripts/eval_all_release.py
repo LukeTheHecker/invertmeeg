@@ -11,7 +11,7 @@ from invert.forward import create_forward_model, get_info
 
 if __name__ == "__main__":
     info = get_info(kind="biosemi32")
-    fwd = create_forward_model(sampling="ico2", info=info)
+    fwd = create_forward_model(sampling="ico3", info=info)
 
     runner = BenchmarkRunner(
         fwd,
