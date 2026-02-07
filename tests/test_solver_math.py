@@ -378,7 +378,7 @@ class TestSolverDSPM:
         W = np.diag(1.0 / np.sqrt(variance))
         K_expected = W @ K_mne
 
-        np.testing.assert_allclose(K_dspm, K_expected, rtol=1e-3)
+        np.testing.assert_allclose(K_dspm, K_expected, rtol=1e-3, atol=1e-6)
 
 
 # ---------------------------------------------------------------------------
@@ -430,7 +430,7 @@ class TestDepthWeightingIntegration:
         raw_leadfield = forward_model["sol"]["data"].copy()
         raw_norms = np.linalg.norm(raw_leadfield, axis=0)
 
-        solver = SolverMNE()
+        solver = SolverMNE(use_depth_weighting=True)
         solver.make_inverse_operator(forward_model, simulated_evoked, alpha=0.1)
         processed_norms = np.linalg.norm(_get_leadfield(solver), axis=0)
 

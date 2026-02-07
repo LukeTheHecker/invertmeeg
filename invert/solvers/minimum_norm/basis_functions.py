@@ -69,7 +69,9 @@ class SolverBasisFunctions(BaseSolver):
         gbf_builder = self.create_basis_function(
             function=function, n_basis=n_basis, prior_shift=prior_shift
         )
-        inverse_operators = [InverseOperator(gbf_builder(a), self.name) for a in self.alphas]
+        inverse_operators = [
+            InverseOperator(gbf_builder(a), self.name) for a in self.alphas
+        ]
         self.inverse_operators = inverse_operators
         return self
 
@@ -84,9 +86,7 @@ class SolverBasisFunctions(BaseSolver):
             return n_vertices
         if isinstance(n_basis, float):
             if not 0 < n_basis <= 1:
-                raise ValueError(
-                    f"n_basis as float must be in (0, 1], got {n_basis}"
-                )
+                raise ValueError(f"n_basis as float must be in (0, 1], got {n_basis}")
             return max(2, int(np.ceil(n_basis * n_vertices)))
         n_basis_int = int(n_basis)
         if n_basis_int < 2:
