@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 
 import numpy as np
 
@@ -154,16 +155,16 @@ class SolverLCMVMVPURE(BaseSolver):
         r = max(1, min(r, l0))
         return l0, r
 
-    def make_inverse_operator(
+    def make_inverse_operator(  # type: ignore[override]
         self,
-        forward,
-        mne_obj,
-        *args,
-        alpha="auto",
+        forward: Any,
+        mne_obj: Any,
+        *args: Any,
+        alpha: str | float = "auto",
         weight_norm: bool = True,
         verbose: int = 0,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> Any:
         self.weight_norm = bool(weight_norm)
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
         data = self.unpack_data_obj(mne_obj)

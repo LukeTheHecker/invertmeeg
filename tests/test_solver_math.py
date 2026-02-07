@@ -332,9 +332,7 @@ class TestSolverLCMVMVPURE:
 
         np.testing.assert_allclose(K_mvp[idx, :], K_lcmv[idx, :], atol=1e-8)
 
-    def test_full_rank_matches_multisource_lcmv(
-        self, forward_model, sensor_info
-    ):
+    def test_full_rank_matches_multisource_lcmv(self, forward_model, sensor_info):
         """At rank==l, MV-PURE should equal multi-source LCMV on the same H0."""
         from invert.solvers.beamformers.lcmv_mvpure import (
             SolverLCMVMVPURE,
@@ -427,7 +425,10 @@ class TestSolverLCMVMVPURE:
 
         # 2) Projection should not increase Frobenius norm.
         W_full = _mvpure_projected_lcmv_weights_from_inv_cov(R_inv, H0, rank=len(sel))
-        assert np.linalg.norm(K_sel, ord="fro") <= np.linalg.norm(W_full, ord="fro") + 1e-12
+        assert (
+            np.linalg.norm(K_sel, ord="fro")
+            <= np.linalg.norm(W_full, ord="fro") + 1e-12
+        )
 
 
 # ---------------------------------------------------------------------------
