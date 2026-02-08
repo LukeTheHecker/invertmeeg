@@ -334,8 +334,8 @@ class TestSolverLCMVMVPURE:
 
     def test_full_rank_matches_multisource_lcmv(self, forward_model, sensor_info):
         """At rank==l, MV-PURE should equal multi-source LCMV on the same H0."""
-        from invert.solvers.beamformers.lcmv_mvpure import (
-            SolverLCMVMVPURE,
+        from invert.solvers.beamformers.lcmv_mvpure import SolverLCMVMVPURE
+        from invert.solvers.beamformers.utils import (
             _lcmv_multisource_weights_from_inv_cov,
         )
 
@@ -382,8 +382,8 @@ class TestSolverLCMVMVPURE:
         For r=1, the selected block K[sel,:] must have matrix rank <= 1 and
         should not increase the Frobenius norm relative to the full-rank filter.
         """
-        from invert.solvers.beamformers.lcmv_mvpure import (
-            SolverLCMVMVPURE,
+        from invert.solvers.beamformers.lcmv_mvpure import SolverLCMVMVPURE
+        from invert.solvers.beamformers.utils import (
             _mvpure_projected_lcmv_weights_from_inv_cov,
         )
 
