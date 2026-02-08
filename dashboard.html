@@ -70,7 +70,7 @@ let DATA, CATEGORIES, solverCat = {};
 let state = { dataset: null, category: "all", metric: "mean_localization_error", sort: "median" };
 
 // const file = new URLSearchParams(location.search).get("file") || "results/benchmark_results_muse-claude.json";
-const file = new URLSearchParams(location.search).get("file") || "results/benchmark_results-lowsnr.json";
+const file = new URLSearchParams(location.search).get("file") || "results/benchmark_results.json";
 // const file = new URLSearchParams(location.search).get("file") || "results/benchmark_results_music.json";
 fetch(file).then(r=>r.text()).then(t => JSON.parse(t.replace(/\bNaN\b/g, "null"))).then(init).catch(e => {
   document.getElementById("summary").textContent = "Error loading data: " + e.message;
@@ -106,9 +106,20 @@ function init(d) {
   });
 
   // populate controls
-  const datasets = [...new Set(DATA.results.map(r=>r.dataset_name))].sort();
+  // Handle both new format (datasets as dict) and old format (extract from results)
+  let datasets;
+  if (DATA.datasets && typeof DATA.datasets === 'object' && !Array.isArray(DATA.datasets)) {
+    datasets = Object.keys(DATA.datasets).sort();
+  } else {
+    datasets = [...new Set(DATA.results.map(r=>r.dataset_name))].sort();
+  }
   const dsSel = document.getElementById("dataset");
-  datasets.forEach(ds => { const o = document.createElement("option"); o.value=ds; o.textContent=ds; dsSel.appendChild(o); });
+  datasets.forEach(ds => { 
+    const o = document.createElement("option"); 
+    o.value=ds; 
+    o.textContent=DATA.datasets?.[ds]?.name || ds; 
+    dsSel.appendChild(o); 
+  });
   state.dataset = datasets[0];
 
   const catSel = document.getElementById("category");
@@ -146,7 +157,7 @@ function render() {
   const isRankMetric = m === "dataset_rank" || m === "global_rank";
 
   const perDatasetRanks = DATA.ranks || {};
-  const globalRanks = DATA.global_ranks || DATA.average_ranks || {};
+  const globalRanks = DATA.global_ranks || {};
 
   // Helper to get rank value for current dataset or global
   const getRankValue = (r) => {
