@@ -11,7 +11,7 @@ cd invertmeeg
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Create a virtual environment and install all dependencies
-uv venv --python 3.11
+uv venv --python 3.12
 uv pip install -e ".[dev]"
 
 # Run the tests

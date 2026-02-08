@@ -5,7 +5,7 @@
 </p>
 
 [![PyPI version](https://badge.fury.io/py/invertmeeg.svg)](https://pypi.org/project/invertmeeg/)
-[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 This package provides **96 inverse solvers** for M/EEG source imaging, integrating
