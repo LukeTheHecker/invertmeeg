@@ -177,7 +177,7 @@ class SolverFLEXMUSIC_2(BaseSolver):
                     b = np.stack(
                         [
                             leadfield[:, n] / d + current_leadfield
-                            for d, n in zip(dist, neighbors)
+                            for d, n in zip(dist, neighbors, strict=False)
                         ],
                         axis=1,
                     )
@@ -185,7 +185,7 @@ class SolverFLEXMUSIC_2(BaseSolver):
                     b = np.stack(
                         [
                             leadfield[:, n] + current_leadfield
-                            for d, n in zip(dist, neighbors)
+                            for d, n in zip(dist, neighbors, strict=False)
                         ],
                         axis=1,
                     )

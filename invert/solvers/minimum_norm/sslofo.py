@@ -461,7 +461,7 @@ class SolverSSLOFO(BaseSolver):
             global_to_local = np.full(adjacency.shape[0], -1, dtype=np.int32)
             global_to_local[active_idx] = np.arange(len(active_idx))
 
-            for local_idx, global_idx in zip(smooth_local_idx, smooth_global_idx):
+            for local_idx, global_idx in zip(smooth_local_idx, smooth_global_idx, strict=False):
                 # Find neighbors in global space
                 neighbor_global = adjacency[global_idx, :].nonzero()[0]
 

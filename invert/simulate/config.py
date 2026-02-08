@@ -1,4 +1,4 @@
-from typing import Literal, Optional, Union
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -33,10 +33,10 @@ class SimulationConfig(BaseModel):
 
     batch_size: int = Field(default=1284, ge=1)
     batch_repetitions: int = Field(default=1, ge=1)
-    n_sources: Union[int, tuple[int, int]] = Field(
+    n_sources: int | tuple[int, int] = Field(
         default=(1, 5), description="Single value or (min, max) tuple"
     )
-    n_orders: Union[int, tuple[int, int]] = Field(
+    n_orders: int | tuple[int, int] = Field(
         default=(0, 3), description="Smoothness order or (min, max) tuple"
     )
     amplitude_range: tuple[float, float] = Field(
@@ -50,16 +50,14 @@ class SimulationConfig(BaseModel):
     beta_range: tuple[float, float] = Field(default=(0.0, 3.0))
     add_forward_error: bool = Field(default=False)
     forward_error: float = Field(default=0.1, ge=0.0)
-    inter_source_correlation: Union[float, tuple[float, float]] = Field(
+    inter_source_correlation: float | tuple[float, float] = Field(
         default=(0.25, 0.75)
     )
     diffusion_smoothing: bool = Field(default=True)
     diffusion_parameter: float = Field(default=0.1, ge=0.0)
-    correlation_mode: Optional[
-        Union[Literal["auto", "cholesky", "banded", "diagonal"], None]
-    ] = Field(default=None)
-    noise_color_coeff: Union[float, tuple[float, float]] = Field(default=(0.25, 0.75))
-    random_seed: Optional[int] = Field(default=None)
+    correlation_mode: Literal["auto", "cholesky", "banded", "diagonal"] | None | None = Field(default=None)
+    noise_color_coeff: float | tuple[float, float] = Field(default=(0.25, 0.75))
+    random_seed: int | None = Field(default=None)
     normalize_leadfield: bool = Field(default=False)
     verbose: int = Field(default=0, ge=0)
 
@@ -68,11 +66,11 @@ class SimulationConfig(BaseModel):
         default="patches",
         description="Simulation mode: 'patches' (sparse only) or 'mixture' (smooth background + patches)",
     )
-    background_beta: Union[float, tuple[float, float]] = Field(
+    background_beta: float | tuple[float, float] = Field(
         default=(0.5, 2.0),
         description="1/f^beta exponent for smooth background temporal dynamics",
     )
-    background_mixture_alpha: Union[float, tuple[float, float]] = Field(
+    background_mixture_alpha: float | tuple[float, float] = Field(
         default=(0.7, 0.9),
         description="Mixing coefficient alpha: y = alpha*y_background + (1-alpha)*y_patches",
     )

@@ -7,7 +7,7 @@ multiple inverse solvers across different source configurations and datasets.
 
 import logging
 import time
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any, Union
 
 import matplotlib.pyplot as plt
 import mne
@@ -64,11 +64,11 @@ class Evaluation:
         forward: mne.Forward,
         info: mne.Info,
         solvers: list[Union["BaseSolver", str]],
-        priors: Optional[list[Union[PriorEnum, str]]] = None,
+        priors: list[PriorEnum | str] | None = None,
         n_samples: int = 100,
-        n_timepoints: Optional[int] = None,
+        n_timepoints: int | None = None,
         random_seed: int = 42,
-        alpha: Union[float, str] = "auto",
+        alpha: float | str = "auto",
         verbose: int = 1,
     ):
         self.verbose = verbose
@@ -735,8 +735,8 @@ class Evaluation:
     def plot_results(
         self,
         metric: str = "mean_localization_error",
-        percentile: Optional[int] = None,
-        save_path: Optional[str] = None,
+        percentile: int | None = None,
+        save_path: str | None = None,
     ):
         """
         Create visualization of evaluation results.

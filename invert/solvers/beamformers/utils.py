@@ -144,6 +144,148 @@ def _estimate_rank_mdl(
 
 
 # ---------------------------
+# MV-PURE Utilities
+# ---------------------------
+
+
+def _top_eigenspace_projector_spd(S: np.ndarray, rank: int) -> np.ndarray:
+    """Return orthogonal projector onto top-`rank` eigenspace of an SPD matrix."""
+    if rank <= 0:
+        raise ValueError("rank must be >= 1")
+    if S.ndim != 2 or S.shape[0] != S.shape[1]:
+        raise ValueError("S must be a square matrix")
+    l = S.shape[0]
+    if rank > l:
+        raise ValueError(f"rank ({rank}) cannot exceed matrix size ({l})")
+
+    _, evecs = np.linalg.eigh(S)
+    u = evecs[:, -rank:]
+    return u @ u.T
+
+
+def _lcmv_multisource_weights_from_inv_cov(
+    C_inv: np.ndarray,
+    H: np.ndarray,
+    *,
+    cond_threshold: float = 1e12,
+    regularization: float = 1e-12,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Compute multi-source LCMV weights for a constraint matrix H."""
+    if H.ndim != 2 or C_inv.ndim != 2:
+        raise ValueError("C_inv and H must be 2D arrays")
+    if C_inv.shape[0] != C_inv.shape[1]:
+        raise ValueError("C_inv must be square")
+    if C_inv.shape[0] != H.shape[0]:
+        raise ValueError("C_inv and H must have matching channel dimension")
+
+    S = H.T @ C_inv @ H
+    cond_num = np.linalg.cond(S) if S.size else np.inf
+    if not np.isfinite(cond_num) or cond_num > cond_threshold:
+        S_inv = np.linalg.inv(S + regularization * np.eye(S.shape[0]))
+    else:
+        try:
+            S_inv = np.linalg.inv(S)
+        except np.linalg.LinAlgError:
+            S_inv = np.linalg.inv(S + regularization * np.eye(S.shape[0]))
+
+    W = S_inv @ (H.T @ C_inv)
+    return W, S
+
+
+def _mvpure_projected_lcmv_weights_from_inv_cov(
+    C_inv: np.ndarray,
+    H: np.ndarray,
+    *,
+    rank: int,
+    cond_threshold: float = 1e12,
+    regularization: float = 1e-12,
+) -> np.ndarray:
+    """MV-PURE projected multi-source LCMV: W_r = P_r(S) W."""
+    W, S = _lcmv_multisource_weights_from_inv_cov(
+        C_inv, H, cond_threshold=cond_threshold, regularization=regularization
+    )
+    if rank >= S.shape[0]:
+        return W
+    P = _top_eigenspace_projector_spd(S, rank)
+    return P @ W
+
+
+def _select_top_diverse_indices(
+    scores: np.ndarray,
+    similarity: np.ndarray,
+    n_select: int,
+    corr_threshold: float,
+) -> np.ndarray:
+    """Select top-scoring indices while avoiding near-duplicate leadfields."""
+    if n_select <= 0:
+        return np.array([], dtype=int)
+
+    order = np.argsort(scores)[::-1]
+    selected: list[int] = []
+
+    for idx in order:
+        if len(selected) >= n_select:
+            break
+        if not selected:
+            selected.append(int(idx))
+            continue
+        max_corr = float(np.max(similarity[int(idx), np.asarray(selected, dtype=int)]))
+        if max_corr <= corr_threshold:
+            selected.append(int(idx))
+
+    # Backfill to keep deterministic output size if diversity criterion is strict.
+    if len(selected) < n_select:
+        for idx in order:
+            i = int(idx)
+            if i not in selected:
+                selected.append(i)
+            if len(selected) >= n_select:
+                break
+
+    return np.asarray(selected, dtype=int)
+
+
+def _estimate_noise_floor_from_cov(R: np.ndarray) -> float:
+    """Robust scalar noise-floor estimate from the bottom-third eigenvalues."""
+    evals = np.linalg.eigvalsh(R)
+    k = max(1, len(evals) // 3)
+    floor = float(np.median(evals[:k]))
+    if floor > 0:
+        return floor
+    positive = evals[evals > 0]
+    if positive.size:
+        return float(np.min(positive))
+    return 1.0
+
+
+def _infer_mvpure_n_sources_and_rank(
+    R: np.ndarray,
+    *,
+    mvp_n_sources: int | str = "auto",
+    mvp_rank: int | str = "auto",
+    mvp_max_sources: int = 4,
+    spectrum_threshold: float = 0.05,
+) -> tuple[int, int]:
+    """Infer MV-PURE source count and projection rank from covariance spectrum."""
+    sigma2 = _estimate_noise_floor_from_cov(R)
+    evals = np.linalg.eigvalsh(R)
+    ratios = evals / sigma2
+    n_gt1 = int(np.sum(ratios > (1.0 + float(spectrum_threshold))))
+
+    l0 = max(1, min(n_gt1, int(mvp_max_sources), int(R.shape[0])))
+    if isinstance(mvp_n_sources, (int, np.integer)):
+        l0 = min(int(mvp_n_sources), int(R.shape[0]))
+
+    if isinstance(mvp_rank, (int, np.integer)):
+        r = int(mvp_rank)
+    else:
+        r = max(1, min(n_gt1, l0))
+
+    r = max(1, min(r, l0))
+    return l0, r
+
+
+# ---------------------------
 # ReciPSIICOS Utilities
 # ---------------------------
 

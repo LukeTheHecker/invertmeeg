@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Literal, Optional, Union
+from typing import Literal
 
 import mne
 import numpy as np
@@ -7,7 +7,7 @@ from scipy.linalg import eigh
 from sklearn.covariance import OAS
 
 ArrayLike = np.ndarray
-MNEObj = Union[mne.io.BaseRaw, mne.Epochs, mne.Evoked, mne.EvokedArray]
+MNEObj = mne.io.BaseRaw | mne.Epochs | mne.Evoked | mne.EvokedArray
 
 
 # ============================
@@ -51,12 +51,12 @@ def _inv_sqrt_spd(Q: np.ndarray, d: np.ndarray) -> np.ndarray:
 
 @dataclass
 class DenoiserBase:
-    sfreq: Optional[float] = None
+    sfreq: float | None = None
     window_size: float = 0.5  # seconds
     step_frac: float = 0.5  # overlap = 1 - step_frac
     use_windows: bool = True  # set False to process full signal
 
-    def _ensure_sfreq(self, sfreq: Optional[float]):
+    def _ensure_sfreq(self, sfreq: float | None):
         if self.sfreq is None:
             if sfreq is None:
                 raise ValueError(
@@ -65,7 +65,7 @@ class DenoiserBase:
             self.sfreq = sfreq
 
     # ---- public API on NumPy ----
-    def run(self, X: ArrayLike, sfreq: Optional[float] = None) -> ArrayLike:
+    def run(self, X: ArrayLike, sfreq: float | None = None) -> ArrayLike:
         """
         X shape must be (n_channels, n_times).
         """
@@ -137,12 +137,12 @@ class DenoiserBase:
 
 @dataclass
 class LGSP(DenoiserBase):
-    L: Optional[np.ndarray] = None  # (m, n_sources)
+    L: np.ndarray | None = None  # (m, n_sources)
     sigma_prior: Literal["identity"] = "identity"
     lambda_ref: float = 1e-3  # ridge on C_ref
     alpha_model: float = 0.2  # blend with scaled I: Cref'=(1-a)Cref+a*trace(Cref)/m*I
-    rank: Optional[int] = None  # keep r smallest generalized eigenvalues
-    tau: Optional[float] = None  # or threshold on generalized eigenvalues
+    rank: int | None = None  # keep r smallest generalized eigenvalues
+    tau: float | None = None  # or threshold on generalized eigenvalues
     center: bool = True
     shrink_data: bool = True
 
@@ -164,7 +164,7 @@ class LGSP(DenoiserBase):
         return Cref
 
     def _gevd_brain_projector(
-        self, Cx: np.ndarray, Cref: np.ndarray, r: Optional[int], tau: Optional[float]
+        self, Cx: np.ndarray, Cref: np.ndarray, r: int | None, tau: float | None
     ) -> np.ndarray:
         """
         Return the sensor-space projector P onto the 'brain-like' subspace
@@ -214,7 +214,7 @@ class LGSP(DenoiserBase):
 
 @dataclass
 class SRB(DenoiserBase):
-    L: Optional[np.ndarray] = None  # (m, n_sources) required for meaningful use
+    L: np.ndarray | None = None  # (m, n_sources) required for meaningful use
     mu: float = 1e-1  # Tikhonov on sources (||S||^2)
     beta: float = 0.5  # blend factor: X_clean = beta*L*W*X + (1-beta)*X
     center: bool = True

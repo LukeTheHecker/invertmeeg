@@ -1,4 +1,3 @@
-from typing import Union
 
 from pydantic import BaseModel
 
@@ -6,8 +5,8 @@ from pydantic import BaseModel
 class DatasetConfig(BaseModel):
     name: str
     description: str
-    n_sources: Union[int, tuple[int, int]]
-    n_orders: Union[int, tuple[int, int]]
+    n_sources: int | tuple[int, int]
+    n_orders: int | tuple[int, int]
     snr_range: tuple[float, float]
     n_timepoints: int
     n_samples: int = 50

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from typing import Any
 
 import numpy as np
@@ -12,41 +11,36 @@ from .utils import (
     _select_top_diverse_indices,
 )
 
-logger = logging.getLogger(__name__)
 
+class SolverESMVMVPURE(BaseSolver):
+    """MV-PURE extension of ESMV with a projected multisource LCMV core.
 
-class SolverLCMVMVPURE(BaseSolver):
-    """MV-PURE projected multi-source LCMV (alternative to vanilla single-source LCMV).
-
-    Implements the Stage-2 MV-PURE spatial filter:
-
-        W_LCMV = (H^T R^{-1} H)^{-1} H^T R^{-1}
-        W_MVP(r) = P_r(H^T R^{-1} H) W_LCMV
-
-    Since this package's :class:`SolverLCMV` is single-source (per dipole), this
-    solver computes a joint filter on a selected small set of dipoles and embeds
-    those weights into the full source space (non-selected dipoles get zero).
+    The vanilla ESMV core uses single-source LCMV weights followed by an
+    eigenspace projection. This variant replaces the single-source LCMV stage
+    with an MV-PURE projected multisource LCMV filter on a selected source set.
     """
 
     meta = SolverMeta(
-        slug="lcmv-mvpure",
-        full_name="MV-PURE (Projected) LCMV",
+        slug="esmv-mvpure",
+        full_name="Eigenspace Minimum Variance (MV-PURE)",
         category="Beamformers",
         description=(
-            "Reduced-rank MV-PURE variant of multi-source LCMV: computes a joint "
-            "LCMV filter on a selected source set and projects out ill-conditioned "
-            "output directions."
+            "ESMV variant where the underlying MV filter is replaced by a "
+            "reduced-rank MV-PURE multisource LCMV stage."
         ),
         references=[
+            "Jonmohamadi, Y., Poudel, G., Innes, C., Weiss, D., Krueger, R., & Jones, R. "
+            "(2014). Comparison of beamformers for EEG source signal reconstruction. "
+            "Biomedical Signal Processing and Control, 14, 175-188.",
             "Jurkowska, J., Dreszer, J., Lewandowska, M., & Piotrowski, T. (2025). "
             "Multi-Source Neural Activity Indices and Spatial Filters for EEG/MEG "
-            "Inverse Problem: An Extension to MNE-Python. arXiv preprint arXiv:2509.14118."
+            "Inverse Problem: An Extension to MNE-Python. arXiv preprint arXiv:2509.14118.",
         ],
     )
 
     def __init__(
         self,
-        name: str = "LCMV MV-PURE Beamformer",
+        name: str = "ESMV MV-PURE Beamformer",
         *,
         mvp_n_sources: int | str = "auto",
         mvp_rank: int | str = "auto",
@@ -69,9 +63,9 @@ class SolverLCMVMVPURE(BaseSolver):
         )
         super().__init__(reduce_rank=reduce_rank, rank=rank, **kwargs)
 
-    def _infer_l0_and_rank(self, R: np.ndarray) -> tuple[int, int]:
+    def _infer_l0_and_rank(self, C: np.ndarray) -> tuple[int, int]:
         return _infer_mvpure_n_sources_and_rank(
-            R,
+            C,
             mvp_n_sources=self.mvp_n_sources,
             mvp_rank=self.mvp_rank,
             mvp_max_sources=self.mvp_max_sources,
@@ -84,8 +78,7 @@ class SolverLCMVMVPURE(BaseSolver):
         mne_obj: Any,
         *args: Any,
         alpha: str | float = "auto",
-        weight_norm: bool = True,
-        verbose: int = 0,
+        weight_norm: bool = False,
         **kwargs: Any,
     ) -> Any:
         self.weight_norm = bool(weight_norm)
@@ -101,14 +94,15 @@ class SolverLCMVMVPURE(BaseSolver):
 
         y = data - data.mean(axis=1, keepdims=True)
         I = np.identity(n_chans)
-        R = self.data_covariance(y, center=False, ddof=1)
-        self.get_alphas(reference=R)
+        C = self.data_covariance(y, center=False, ddof=1)
+        C_sub = self.select_signal_subspace(C)
+        self.get_alphas(reference=C)
 
         inverse_operators = []
         selected_sources_per_alpha: list[np.ndarray] = []
         selected_rank_per_alpha: list[int] = []
         for alpha_val in self.alphas:
-            R_inv = self.robust_inverse(R + alpha_val * I)
+            C_inv = self.robust_inverse(C + alpha_val * I)
 
             if self.source_indices is not None:
                 sel = np.unique(self.source_indices)
@@ -122,15 +116,17 @@ class SolverLCMVMVPURE(BaseSolver):
                 )
                 r = max(1, min(r, l0))
             else:
-                l0, r = self._infer_l0_and_rank(R)
+                l0, r = self._infer_l0_and_rank(C)
 
-                # Fast selection: top single-source LCMV output power.
-                upper = R_inv @ leadfield
-                lower = np.einsum("ij,jk,ki->i", leadfield.T, R_inv, leadfield)
+                # Rank sources by vanilla single-source LCMV output power.
+                upper = C_inv @ leadfield
+                lower = np.einsum("ij,jk,ki->i", leadfield.T, C_inv, leadfield)
+                lower = np.maximum(lower, 1e-20)
                 W_vanilla = upper / lower
                 q_hat = W_vanilla.T @ y
                 scores = np.mean(q_hat**2, axis=1)
                 scores = np.nan_to_num(scores, nan=0.0, posinf=0.0, neginf=0.0)
+
                 sel = _select_top_diverse_indices(
                     scores,
                     leadfield_similarity,
@@ -146,18 +142,19 @@ class SolverLCMVMVPURE(BaseSolver):
 
             H0 = leadfield[:, sel]
             W_sel = _mvpure_projected_lcmv_weights_from_inv_cov(
-                R_inv, H0, rank=r, cond_threshold=1e12, regularization=1e-12
+                C_inv, H0, rank=r, cond_threshold=1e12, regularization=1e-12
             )  # (l0, n_chans)
 
             K_full = np.zeros((n_dipoles, n_chans), dtype=W_sel.dtype)
             K_full[sel, :] = W_sel
+            K_esmv = K_full @ C_sub
 
             if self.weight_norm:
-                row_norm = np.linalg.norm(K_full, axis=1)
+                row_norm = np.linalg.norm(K_esmv, axis=1)
                 nz = row_norm > 0
-                K_full[nz, :] = (K_full[nz, :].T / row_norm[nz]).T
+                K_esmv[nz, :] = (K_esmv[nz, :].T / row_norm[nz]).T
 
-            inverse_operators.append(K_full)
+            inverse_operators.append(K_esmv)
 
         self.inverse_operators = [
             InverseOperator(inverse_operator, self.name)

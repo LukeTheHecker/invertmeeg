@@ -1,5 +1,4 @@
 import logging
-from typing import Union
 
 import mne
 import numpy as np
@@ -116,7 +115,7 @@ class ASR:
 
     # -------------------------- mne wrapper --------------------------
 
-    def run_mne(self, mne_obj: Union[mne.io.BaseRaw, mne.Epochs, mne.Evoked]):
+    def run_mne(self, mne_obj: mne.io.BaseRaw | mne.Epochs | mne.Evoked):
         """
         Run ASR on an MNE object and return a cleaned copy.
         """

@@ -14,16 +14,16 @@ if __name__ == "__main__":
         fwd,
         info,
         n_samples=50,
-        categories=[
-            "beamformer",
-            "bayesian",
-            "minimum_norm",
-            "loreta",
-            "music",
-            "matching_pursuit",
-            "other",
-        ],
-        solvers=["CovCNN", "CovCNN-KL", "CovCNN-KL-FLEXOMP"],
+        # categories=[
+        #     "beamformer",
+        #     "bayesian",
+        #     "minimum_norm",
+        #     "loreta",
+        #     "music",
+        #     "matching_pursuit",
+        #     "other",
+        # ],
+        solvers=["ESMV", "ESMV-MVPURE", "LCMV", "LCMV-MVPURE", "FlexESMV", "FlexESMV-MVPURE"],
         n_jobs=-1,
     )
     runner.run()

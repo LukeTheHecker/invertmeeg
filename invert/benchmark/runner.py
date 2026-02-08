@@ -87,6 +87,7 @@ _SOLVER_REGISTRY: dict[str, tuple[str, str]] = {
     "SAM": ("invert.solvers.beamformers.sam", "SolverSAM"),
     # "EBB": ("invert.solvers.beamformers.ebb", "SolverEBB"),
     "ESMV": ("invert.solvers.beamformers.esmv", "SolverESMV"),
+    "ESMV-MVPURE": ("invert.solvers.beamformers.esmv_mvpure", "SolverESMVMVPURE"),
     "ESMV2": ("invert.solvers.beamformers.esmv2", "SolverESMV2"),
     "ESMV3": ("invert.solvers.beamformers.esmv3", "SolverESMV3"),
     "DeblurFlexESMV": (
@@ -94,6 +95,10 @@ _SOLVER_REGISTRY: dict[str, tuple[str, str]] = {
         "SolverDeblurFlexESMV",
     ),
     "FlexESMV": ("invert.solvers.beamformers.flex_esmv", "SolverFlexESMV"),
+    "FlexESMV-MVPURE": (
+        "invert.solvers.beamformers.flex_esmv_mvpure",
+        "SolverFlexESMVMVPURE",
+    ),
     "SafeFlexESMV": ("invert.solvers.beamformers.safe_flex_esmv", "SolverSafeFlexESMV"),
     "SharpFlexESMV": (
         "invert.solvers.beamformers.sharp_flex_esmv",
@@ -226,12 +231,16 @@ def _expects_simulation_config(solver_cls: type[BaseSolver]) -> bool:
 
 
 def _default_nn_batch_size(forward: mne.Forward) -> int:
-    """Default ANN training batch size: 2x number of dipoles in the source model."""
+    """Default ANN training batch size: ~12x number of dipoles (min 4096).
+
+    Larger batches provide more diverse training data per epoch, which
+    significantly improves ANN solver quality (see ann_testbench round-2/3).
+    """
     try:
         n_dipoles = int(forward["sol"]["data"].shape[1])
     except Exception:
         return 1
-    return max(1, 2 * n_dipoles)
+    return max(4096, 12 * n_dipoles)
 
 
 def _generate_solver_categories() -> dict[str, list[str]]:
@@ -579,7 +588,7 @@ class BenchmarkRunner:
                             update={"batch_size": _default_nn_batch_size(self.forward)}
                         )
                         logger.info(
-                            "ANN training batch_size=%d (default=2*n_dipoles) for %s",
+                            "ANN training batch_size=%d for %s",
                             int(train_sim_config.batch_size),
                             solver_name,
                         )

@@ -46,7 +46,7 @@ class Ensemble:
 
         logger.info("Neg Log Likelihoods:")
         for solver_name, neg_log_likelihood in zip(
-            self.solver_names, self.neg_log_likelihoods
+            self.solver_names, self.neg_log_likelihoods, strict=False
         ):
             logger.info(f"{solver_name}: {neg_log_likelihood}")
         logger.info(f"Final likelihood: {final_neg_log_likelihood}")

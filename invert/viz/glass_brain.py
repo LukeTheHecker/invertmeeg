@@ -135,7 +135,7 @@ def plot_glass_brain(
         axes = np.asarray(ax).ravel()
         fig = axes[0].figure
 
-    for ax_i, (label, xi, yi, _xlabel, _ylabel) in zip(axes, planes):
+    for ax_i, (label, xi, yi, _xlabel, _ylabel) in zip(axes, planes, strict=False):
         # 1. Draw brain outline using ConvexHull of projected points
         points_2d = all_pos_mm[:, [xi, yi]]
         try:

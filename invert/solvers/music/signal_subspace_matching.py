@@ -1,6 +1,5 @@
 import logging
 from copy import deepcopy
-from typing import Optional
 
 import mne
 import numpy as np
@@ -261,7 +260,7 @@ class SolverSignalSubspaceMatching(BaseSolver):
         C: np.ndarray,
         P_A: np.ndarray,
         leadfields: list,
-        q_ignore: Optional[list] = None,
+        q_ignore: list | None = None,
         lambda_reg=0.0,
     ):
         """Compute the source with the highest AP value.

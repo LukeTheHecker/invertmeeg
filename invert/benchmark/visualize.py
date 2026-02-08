@@ -1,6 +1,5 @@
 import json
 from pathlib import Path
-from typing import Optional, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -36,9 +35,9 @@ def _solver_to_category(solver_name: str) -> str:
 
 
 def visualize_results(
-    results_path_or_data: Union[str, Path, list[BenchmarkResult]],
-    metrics: Optional[list[str]] = None,
-    save_path: Optional[Union[str, Path]] = None,
+    results_path_or_data: str | Path | list[BenchmarkResult],
+    metrics: list[str] | None = None,
+    save_path: str | Path | None = None,
 ) -> list[plt.Figure]:
     if isinstance(results_path_or_data, (str, Path)):
         path = Path(results_path_or_data)
@@ -120,7 +119,7 @@ def visualize_results(
 
         # Build legend grouped by category, placed below the plot
         handles, labels = ax.get_legend_handles_labels()
-        label_to_handle = dict(zip(labels, handles))
+        label_to_handle = dict(zip(labels, handles, strict=False))
 
         legend_handles = []
         legend_labels = []

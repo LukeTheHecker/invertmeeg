@@ -206,11 +206,11 @@ class SimulationGenerator:
 
         source_covariances = [
             get_cov(n, isc)
-            for n, isc in zip(n_sources_batch, inter_source_correlations)
+            for n, isc in zip(n_sources_batch, inter_source_correlations, strict=False)
         ]
         amplitudes = [
             amp @ np.diag(amplitude_values[i]) @ cov
-            for i, (amp, cov) in enumerate(zip(amplitudes, source_covariances))
+            for i, (amp, cov) in enumerate(zip(amplitudes, source_covariances, strict=False))
         ]
 
         # Generate patch activity using dense source matrix for fast indexing
@@ -281,7 +281,7 @@ class SimulationGenerator:
                     noise_color_coeff=noise_color_level,
                 )
                 for (xx, snr_level, corr_mode, noise_color_level) in zip(
-                    x, snr_levels, modes_batch, noise_color_coeffs
+                    x, snr_levels, modes_batch, noise_color_coeffs, strict=False
                 )
             ],
             axis=0,
@@ -574,11 +574,11 @@ def generator(
             ] * batch_size
         source_covariances = [
             get_cov(n, isc)
-            for n, isc in zip(n_sources_batch, inter_source_correlations)
+            for n, isc in zip(n_sources_batch, inter_source_correlations, strict=False)
         ]
         amplitudes = [
             amp @ np.diag(amplitude_values[i]) @ cov
-            for i, (amp, cov) in enumerate(zip(amplitudes, source_covariances))
+            for i, (amp, cov) in enumerate(zip(amplitudes, source_covariances, strict=False))
         ]
 
         y = np.stack(
@@ -605,7 +605,7 @@ def generator(
                     noise_color_coeff=noise_color_level,
                 )
                 for (xx, snr_level, corr_mode, noise_color_level) in zip(
-                    x, snr_levels, correlation_modes, noise_color_coeffs
+                    x, snr_levels, correlation_modes, noise_color_coeffs, strict=False
                 )
             ],
             axis=0,

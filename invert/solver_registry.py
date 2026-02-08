@@ -332,6 +332,12 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         class_name="SolverESMV",
     ),
     SolverSpec(
+        solver_id="esmv-mvpure",
+        module_path="invert.solvers.beamformers.esmv_mvpure",
+        class_name="SolverESMVMVPURE",
+        aliases=("mvpure-esmv",),
+    ),
+    SolverSpec(
         solver_id="esmv2",
         module_path="invert.solvers.beamformers.esmv2",
         class_name="SolverESMV2",
@@ -385,6 +391,12 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         module_path="invert.solvers.beamformers.flex_esmv",
         class_name="SolverFlexESMV",
         aliases=("flexesmv",),
+    ),
+    SolverSpec(
+        solver_id="flex-esmv-mvpure",
+        module_path="invert.solvers.beamformers.flex_esmv_mvpure",
+        class_name="SolverFlexESMVMVPURE",
+        aliases=("flexesmvmvpure", "mvpure-flex-esmv"),
     ),
     SolverSpec(
         solver_id="flex-esmv2",

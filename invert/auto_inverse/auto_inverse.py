@@ -1,5 +1,4 @@
 import logging
-from typing import Optional, Union
 
 import mne
 import numpy as np
@@ -88,7 +87,7 @@ class Report:
 
         return summary
 
-    def get_recommended_solver(self) -> Optional[str]:
+    def get_recommended_solver(self) -> str | None:
         """Get the recommended solver name."""
         return self.recommended_solver
 
@@ -96,7 +95,7 @@ class Report:
 class AutoInverse:
     def __init__(
         self,
-        prior: Union[str, PriorEnum] = "patch",
+        prior: str | PriorEnum = "patch",
         snr="auto",
         alpha="auto",
         n_samples=100,
@@ -148,16 +147,16 @@ class AutoInverse:
         self.n_samples = n_samples
         self.n_timepoints = n_timepoints
         self.verbose = verbose
-        self.report: Optional[Report] = None
+        self.report: Report | None = None
         self.sim_params = None
         self.solvers_to_test = None
         self.simulation_config = None
 
     def fit(
         self,
-        data: Union[EvokedArray, Evoked],
+        data: EvokedArray | Evoked,
         forward: Forward,
-    ) -> Optional[Report]:
+    ) -> Report | None:
         """
         Fit the auto inverse model to determine the best solver.
 

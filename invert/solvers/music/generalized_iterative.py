@@ -1,6 +1,5 @@
 import logging
 from copy import deepcopy
-from typing import Optional
 
 import mne
 import numpy as np
@@ -337,7 +336,7 @@ class SolverGeneralizedIterative(BaseSolver):
         P_Y: np.ndarray,
         Q: np.ndarray,
         leadfields: list,
-        q_ignore: Optional[list] = None,
+        q_ignore: list | None = None,
         lambda_reg=0.0,
     ):
         """Compute the source with the highest AP value.
@@ -387,7 +386,7 @@ class SolverGeneralizedIterative(BaseSolver):
         P_Y: np.ndarray,
         Q: np.ndarray,
         leadfields: list,
-        q_ignore: Optional[list] = None,
+        q_ignore: list | None = None,
         lambda_reg=0.0,
     ):
         if q_ignore is None:
@@ -405,7 +404,7 @@ class SolverGeneralizedIterative(BaseSolver):
         return expression
 
     @staticmethod
-    def get_source_ap(C, Q, leadfields, q_ignore: Optional[list] = None, **kwargs):
+    def get_source_ap(C, Q, leadfields, q_ignore: list | None = None, **kwargs):
         """Compute the source with the highest AP value.
         Parameters
         ----------

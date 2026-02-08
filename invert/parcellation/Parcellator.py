@@ -1,7 +1,6 @@
 import copy
 import logging
 from pathlib import Path
-from typing import Optional
 
 import mne
 import numpy as np
@@ -15,7 +14,7 @@ class Parcellator:
         self,
         forward: mne.Forward,
         adjacency: coo_matrix,
-        subjects_dir: Optional[str] = None,
+        subjects_dir: str | None = None,
     ):
         """
         Initialize the Parcellator.
@@ -47,7 +46,7 @@ class Parcellator:
         self.vertices = [self.src[0]["vertno"], self.src[1]["vertno"]]
 
     def parcellate(
-        self, parcellation: str = "aparc.a2009s", subject: Optional[str] = None
+        self, parcellation: str = "aparc.a2009s", subject: str | None = None
     ):
         """
         Parcellate the leadfield using the given parcellation scheme.
@@ -317,7 +316,7 @@ class Parcellator:
 
         # Collect parcel edges
         parcel_edges = set()
-        for i, j in zip(adj_coo.row, adj_coo.col):
+        for i, j in zip(adj_coo.row, adj_coo.col, strict=False):
             # Skip if either vertex is not in any parcel (shouldn't happen, but be safe)
             if vertex_to_parcel[i] < 0 or vertex_to_parcel[j] < 0:
                 continue
@@ -441,7 +440,7 @@ class Parcellator:
         parcellation: str = "HCPMMP1_combined",
         roi: str = "front",
         subject: str = "fsaverage",
-        subjects_dir: Optional[str] = None,
+        subjects_dir: str | None = None,
         verbose: bool = True,
     ) -> mne.Forward:
         """
