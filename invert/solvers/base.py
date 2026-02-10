@@ -427,6 +427,270 @@ class BaseSolver:
         denom = max(n_times - int(ddof), 1)
         return (Y @ Y.T) / float(denom)
 
+    @staticmethod
+    def coerce_diag_source_prior(
+        source_cov: np.ndarray | None, n_sources: int
+    ) -> np.ndarray:
+        """Coerce source covariance input to a diagonal prior vector."""
+        if n_sources <= 0:
+            raise ValueError(f"n_sources must be > 0, got {n_sources}")
+
+        if source_cov is None:
+            return np.ones(n_sources, dtype=float)
+
+        source_cov = np.asarray(source_cov, dtype=float)
+        if source_cov.ndim == 0:
+            return np.full(n_sources, float(source_cov), dtype=float)
+
+        if source_cov.ndim == 1:
+            if source_cov.shape[0] != n_sources:
+                msg = (
+                    f"source_cov has length {source_cov.shape[0]}, "
+                    f"expected {n_sources}"
+                )
+                raise ValueError(msg)
+            return source_cov
+
+        if source_cov.ndim == 2:
+            expected = (n_sources, n_sources)
+            if source_cov.shape != expected:
+                msg = f"source_cov has shape {source_cov.shape}, expected {expected}"
+                raise ValueError(msg)
+            off_diag = source_cov - np.diag(np.diag(source_cov))
+            if not np.allclose(off_diag, 0.0):
+                msg = (
+                    "Full (non-diagonal) source_cov is not supported. "
+                    "Pass a 1D diagonal prior instead."
+                )
+                raise ValueError(msg)
+            return np.diag(source_cov)
+
+        raise ValueError(f"Invalid source_cov with ndim={source_cov.ndim}")
+
+    def compute_sensor_projector(
+        self,
+        forward_or_info: Any | None = None,
+        n_chans: int | None = None,
+        fallback_identity: bool = True,
+    ) -> np.ndarray:
+        """Compute SSP projector in sensor space (identity if unavailable)."""
+        if forward_or_info is None:
+            forward_or_info = getattr(self, "forward", None)
+
+        if n_chans is None:
+            if hasattr(self, "leadfield"):
+                n_chans = int(self.leadfield.shape[0])
+            elif forward_or_info is not None:
+                try:
+                    n_chans = int(forward_or_info["sol"]["data"].shape[0])
+                except Exception:
+                    n_chans = None
+
+        if n_chans is None or n_chans <= 0:
+            raise ValueError("n_chans must be provided or inferable from solver state.")
+
+        info = None
+        if isinstance(forward_or_info, dict):
+            if "projs" in forward_or_info:
+                info = forward_or_info
+            else:
+                info = forward_or_info.get("info")
+        elif forward_or_info is not None:
+            info = getattr(forward_or_info, "info", None)
+
+        projs = []
+        bads = []
+        ch_names = []
+        if info is not None:
+            projs = list(info.get("projs", []) or [])
+            bads = list(info.get("bads", []) or [])
+            ch_names = list(info.get("ch_names", []) or [])
+
+        if not ch_names and forward_or_info is not None:
+            try:
+                ch_names = list(forward_or_info.ch_names)  # type: ignore[union-attr]
+            except Exception:
+                ch_names = []
+
+        if not projs:
+            return np.eye(n_chans, dtype=float)
+
+        if len(ch_names) != n_chans:
+            ch_names = [str(i) for i in range(n_chans)]
+
+        try:
+            projector, _nproj, _ = mne.make_projector(
+                projs, ch_names, bads=bads, verbose=0
+            )
+            projector = np.asarray(projector, dtype=float)
+            if projector.shape != (n_chans, n_chans):
+                msg = (
+                    f"Projector has shape {projector.shape}, expected "
+                    f"{(n_chans, n_chans)}"
+                )
+                raise ValueError(msg)
+            return projector
+        except Exception as err:
+            if not fallback_identity:
+                raise
+            logger.warning("Failed to build SSP projector (%s); using I.", err)
+            return np.eye(n_chans, dtype=float)
+
+    @staticmethod
+    def compute_sensor_whitener(
+        noise_cov: np.ndarray,
+        projector: np.ndarray | None = None,
+        *,
+        rank_tol: float = 1e-12,
+        eps: float = 1e-15,
+    ) -> np.ndarray:
+        """Compute PCA-space sensor whitener with rank truncation."""
+        noise_cov = np.asarray(noise_cov, dtype=float)
+        if noise_cov.ndim != 2 or noise_cov.shape[0] != noise_cov.shape[1]:
+            msg = (
+                "noise_cov must be a square 2D array, "
+                f"got shape {noise_cov.shape}"
+            )
+            raise ValueError(msg)
+        n_chans = int(noise_cov.shape[0])
+
+        if projector is None:
+            projector = np.eye(n_chans, dtype=float)
+        projector = np.asarray(projector, dtype=float)
+        if projector.shape != (n_chans, n_chans):
+            msg = f"projector has shape {projector.shape}, expected {(n_chans, n_chans)}"
+            raise ValueError(msg)
+
+        Cn = 0.5 * (noise_cov + noise_cov.T)
+        Cn_proj = projector @ Cn @ projector.T
+        Cn_proj = 0.5 * (Cn_proj + Cn_proj.T)
+
+        eigvals, eigvecs = np.linalg.eigh(Cn_proj)
+        order = np.argsort(eigvals)[::-1]
+        eigvals = eigvals[order]
+        eigvecs = eigvecs[:, order]
+
+        max_ev = float(np.max(eigvals)) if eigvals.size else 0.0
+        if max_ev <= 0:
+            return np.zeros((0, n_chans), dtype=float)
+
+        mask = eigvals > max(rank_tol * max_ev, eps)
+        if not np.any(mask):
+            return np.zeros((0, n_chans), dtype=float)
+
+        return np.asarray((eigvecs[:, mask] / np.sqrt(eigvals[mask])).T, dtype=float)
+
+    @staticmethod
+    def compute_depth_prior_whitened(
+        G_white: np.ndarray,
+        *,
+        depth: float = 0.8,
+        depth_limit: float = 10.0,
+        eps: float = 1e-15,
+    ) -> np.ndarray:
+        """Compute fixed-orientation depth prior from whitened leadfield."""
+        G_white = np.asarray(G_white, dtype=float)
+        if G_white.ndim != 2:
+            raise ValueError(f"G_white must be 2D, got ndim={G_white.ndim}")
+
+        sens = np.sum(G_white * G_white, axis=0)
+        sens = np.maximum(sens, eps)
+        weights = 1.0 / sens
+
+        if depth_limit > 0:
+            w_min = float(np.min(weights))
+            w_max = w_min * float(depth_limit) ** 2
+            weights = np.minimum(weights, w_max)
+
+        if depth != 0:
+            weights = weights ** float(depth)
+        return weights
+
+    @staticmethod
+    def trace_normalize_operator(
+        A: np.ndarray, target_rank: int, *, eps: float = 1e-15
+    ) -> tuple[np.ndarray, float]:
+        """Scale A so trace(A A^T) equals target_rank."""
+        A = np.asarray(A, dtype=float)
+        if A.ndim != 2:
+            raise ValueError(f"A must be 2D, got ndim={A.ndim}")
+        if target_rank <= 0:
+            raise ValueError(f"target_rank must be > 0, got {target_rank}")
+
+        trace_aat = float(np.sum(A * A))
+        scale = np.sqrt(float(target_rank) / max(trace_aat, eps))
+        return A * scale, float(scale)
+
+    @staticmethod
+    def solve_tikhonov_svd(
+        A: np.ndarray,
+        lambda2: float,
+        *,
+        left_scale: np.ndarray | None = None,
+        svd: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None,
+        eps: float = 1e-15,
+    ) -> np.ndarray:
+        """Solve Tikhonov system via SVD with optional row scaling."""
+        if lambda2 < 0:
+            raise ValueError(f"lambda2 must be >= 0, got {lambda2}")
+
+        A = np.asarray(A, dtype=float)
+        if A.ndim != 2:
+            raise ValueError(f"A must be 2D, got ndim={A.ndim}")
+        if A.shape[0] == 0 or A.shape[1] == 0:
+            return np.zeros((A.shape[1], A.shape[0]), dtype=float)
+
+        if svd is None:
+            U, s, Vt = np.linalg.svd(A, full_matrices=False)
+        else:
+            U, s, Vt = svd
+            U = np.asarray(U, dtype=float)
+            s = np.asarray(s, dtype=float)
+            Vt = np.asarray(Vt, dtype=float)
+
+        denom = np.maximum(s * s + float(lambda2), eps)
+        gamma = s / denom
+        kernel = (Vt.T * gamma[np.newaxis, :]) @ U.T
+
+        if left_scale is None:
+            return kernel
+
+        left_scale = np.asarray(left_scale, dtype=float)
+        if left_scale.ndim != 1 or left_scale.shape[0] != kernel.shape[0]:
+            msg = (
+                f"left_scale has shape {left_scale.shape}, expected {(kernel.shape[0],)}"
+            )
+            raise ValueError(msg)
+        return kernel * left_scale[:, np.newaxis]
+
+    @staticmethod
+    def noise_normalize_rows(
+        K_white: np.ndarray,
+        *,
+        K_full: np.ndarray | None = None,
+        eps: float = 1e-15,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Normalize rows by noise std derived from whitened operator."""
+        K_white = np.asarray(K_white, dtype=float)
+        if K_white.ndim != 2:
+            raise ValueError(f"K_white must be 2D, got ndim={K_white.ndim}")
+
+        if K_full is None:
+            K_full = K_white
+        K_full = np.asarray(K_full, dtype=float)
+        if K_full.ndim != 2:
+            raise ValueError(f"K_full must be 2D, got ndim={K_full.ndim}")
+        if K_full.shape[0] != K_white.shape[0]:
+            msg = (
+                "K_full and K_white must have the same number of rows, got "
+                f"{K_full.shape[0]} and {K_white.shape[0]}"
+            )
+            raise ValueError(msg)
+
+        noise_var = np.sum(K_white * K_white, axis=1)
+        noise_std = np.sqrt(np.maximum(noise_var, eps))
+        return K_full / noise_std[:, np.newaxis], noise_std
+
     def regularise_lcurve(self, M, plot=False):
         """Find optimally regularized inverse solution using the L-Curve method [1].
 
