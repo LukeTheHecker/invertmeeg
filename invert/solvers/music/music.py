@@ -39,7 +39,7 @@ class SolverMUSIC(BaseSolver):
         mne_obj,
         *args,
         alpha="auto",
-        n="auto",
+        n="enhanced",
         stop_crit=0.95,
         verbose=0,
         **kwargs,
@@ -54,8 +54,10 @@ class SolverMUSIC(BaseSolver):
             The MNE data object.
         alpha : float
             The regularization parameter.
-        n : int/ str
-            Number of eigenvectors to use or "auto" for l-curve method.
+        n : int or str
+            Number of eigenvectors (signal subspace dimension). Pass an int, or
+            "enhanced" (default, robust for correlated sources), "auto", "L",
+            "drop", or "mean" to use base class estimate_n_sources.
         stop_crit : float
             Criterion to stop recursions. The lower, the more dipoles will be
             incorporated.
@@ -112,6 +114,7 @@ class SolverMUSIC(BaseSolver):
             n_comp = self.estimate_n_sources(y, method=n)
         else:
             n_comp = n
+        n_comp = max(1, min(n_comp, n_chans))  # avoid empty or oversized subspace
 
         Us = U[:, :n_comp]
         Ps = Us @ Us.T
@@ -121,10 +124,14 @@ class SolverMUSIC(BaseSolver):
             l = leadfield[:, p][:, np.newaxis]
             norm_1 = np.linalg.norm(Ps @ l)
             norm_2 = np.linalg.norm(l)
-            mu[p] = norm_1 / norm_2
+            mu[p] = norm_1 / norm_2 if norm_2 > 0 else 0.0
         mu[mu < stop_crit] = 0
 
         dipole_idc = np.where(mu != 0)[0]
+        # If no dipole passes the threshold, use the dipole(s) with largest mu
+        if len(dipole_idc) == 0:
+            n_take = min(max(1, n_comp), n_dipoles)
+            dipole_idc = np.argsort(mu)[-n_take:][::-1]
         # x_hat = np.zeros((n_dipoles, n_time))
         # x_hat[dipole_idc, :] = np.linalg.pinv(leadfield[:, dipole_idc]) @ y
         # return x_hat
