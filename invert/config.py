@@ -10,6 +10,7 @@ all_solvers = [
     "MNE",
     "wMNE",
     "dSPM",
+    "dSPM-MNE",
     "FISTA",
     "L1L2",
     "GFT-L1",

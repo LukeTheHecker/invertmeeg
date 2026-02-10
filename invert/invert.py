@@ -46,6 +46,7 @@ def _build_registry() -> dict[str, Any]:
     _add("gft-mne", solvers.SolverGFTMNE)
     _add("wmne", solvers.SolverWMNE)
     _add("dspm", solvers.SolverDSPM)
+    _add(["dspm-mne", "dspm_mne", "mne-dspm"], solvers.SolverDSPMMNE)
     _add(
         ["l1", "fista", "mce", "minimum current estimate"], solvers.SolverMinimumL1Norm
     )

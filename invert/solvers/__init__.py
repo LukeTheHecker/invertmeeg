@@ -23,6 +23,7 @@ __all__ = [
     "SolverGFTMNE",
     "SolverWMNE",
     "SolverDSPM",
+    "SolverDSPMMNE",
     "SolverMinimumL1Norm",
     "SolverMinimumL1NormGPT",
     "SolverMinimumL1L2Norm",

@@ -23,6 +23,14 @@ class SimulationConfig(BaseModel):
         diffusion_parameter: Smoothing strength (alpha parameter)
         correlation_mode: Spatial noise correlation pattern
         noise_color_coeff: Spatial noise correlation strength
+        noise_temporal_beta: 1/f^beta temporal coloring of sensor noise
+        noise_rank_deficiency: Number of projected-out sensor dimensions
+        apply_sensor_projector: Apply projector to both signal and noise
+        noise_low_rank_dim: Rank for low-rank spatial noise model
+        return_noise_cov: Include per-sample noise covariance matrices in metadata
+        estimate_noise_cov: Estimate covariance from baseline noise samples
+        noise_cov_n_baseline: Number of baseline samples used for covariance estimate
+        noise_cov_shrinkage: Shrinkage factor for estimated covariance
         random_seed: Random seed for reproducibility
         normalize_leadfield: Whether to normalize leadfield columns
         verbose: Verbosity level
@@ -55,8 +63,45 @@ class SimulationConfig(BaseModel):
     )
     diffusion_smoothing: bool = Field(default=True)
     diffusion_parameter: float = Field(default=0.1, ge=0.0)
-    correlation_mode: Literal["auto", "cholesky", "banded", "diagonal"] | None | None = Field(default=None)
+    correlation_mode: Literal[
+        "auto", "cholesky", "banded", "diagonal", "low_rank"
+    ] | None = Field(default=None)
     noise_color_coeff: float | tuple[float, float] = Field(default=(0.25, 0.75))
+    noise_temporal_beta: float | tuple[float, float] = Field(
+        default=0.0,
+        description="Power-law exponent for sensor noise (0=white).",
+    )
+    noise_rank_deficiency: int | tuple[int, int] = Field(
+        default=0,
+        description="Projected-out sensor dimensions (rank loss).",
+    )
+    apply_sensor_projector: bool = Field(
+        default=True,
+        description="Apply simulated projector to signal and sensor noise.",
+    )
+    noise_low_rank_dim: int | tuple[int, int] = Field(
+        default=4,
+        description="Latent dimension for low-rank spatial noise.",
+    )
+    return_noise_cov: bool = Field(
+        default=False,
+        description="Store per-sample noise covariance matrices in metadata.",
+    )
+    estimate_noise_cov: bool = Field(
+        default=True,
+        description="Estimate noise covariance from baseline noise samples.",
+    )
+    noise_cov_n_baseline: int = Field(
+        default=200,
+        ge=8,
+        description="Baseline time samples used for covariance estimation.",
+    )
+    noise_cov_shrinkage: float = Field(
+        default=0.05,
+        ge=0.0,
+        le=1.0,
+        description="Shrinkage factor for covariance estimation.",
+    )
     random_seed: int | None = Field(default=None)
     normalize_leadfield: bool = Field(default=False)
     verbose: int = Field(default=0, ge=0)

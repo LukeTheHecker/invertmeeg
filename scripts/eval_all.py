@@ -7,23 +7,20 @@ if __name__ == "__main__":
     info = get_info(kind="biosemi32")
     fwd = create_forward_model(sampling="ico2", info=info)
 
-    # runner = BenchmarkRunner(fwd, info, n_samples=25)
-    # categories: beamformer, empirical_bayes, sparse_bayesian, music, matching_pursuit, other, baseline
-    # runner = BenchmarkRunner(fwd, info, n_samples=25, categories=["beamformer", "bayesian", "minimum_norm", "loreta", "music", "matching_pursuit", "other"], n_jobs=-1)
     runner = BenchmarkRunner(
         fwd,
         info,
         n_samples=50,
-        # categories=[
-        #     "beamformer",
-        #     "bayesian",
-        #     "minimum_norm",
-        #     "loreta",
-        #     "music",
-        #     "matching_pursuit",
-        #     "other",
-        # ],
-        solvers=["ESMV", "ESMV-MVPURE", "LCMV", "LCMV-MVPURE", "FlexESMV", "FlexESMV-MVPURE"],
+        categories=[
+            "beamformer",
+            "bayesian",
+            # "minimum_norm",
+            # "loreta",
+            "music",
+            # "matching_pursuit",
+            # "other",
+        ],
+        # solvers=["ESMV", "ESMV-MVPURE", "LCMV", "LCMV-MVPURE", "FlexESMV", "FlexESMV-MVPURE"],
         n_jobs=-1,
     )
     runner.run()

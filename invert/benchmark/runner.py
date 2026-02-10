@@ -43,6 +43,7 @@ _SOLVER_REGISTRY: dict[str, tuple[str, str]] = {
     "GFTMNE": ("invert.solvers.minimum_norm.gft_mne", "SolverGFTMNE"),
     "WMNE": ("invert.solvers.minimum_norm.wmne", "SolverWMNE"),
     "dSPM": ("invert.solvers.minimum_norm.dspm", "SolverDSPM"),
+    "dSPM-MNE": ("invert.solvers.minimum_norm.dspm_mne", "SolverDSPMMNE"),
     "MCE": ("invert.solvers.minimum_norm.minimum_l1_norm", "SolverMinimumL1Norm"),
     "GFTMCE": (
         "invert.solvers.minimum_norm.gft_minimum_l1_norm",

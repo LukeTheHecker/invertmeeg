@@ -7,7 +7,15 @@ import pandas as pd
 
 from .config import SimulationConfig
 from .covariance import get_cov
-from .noise import add_error, add_white_noise, powerlaw_noise
+from .noise import (
+    add_error,
+    empirical_covariance,
+    make_rank_projector,
+    make_sensor_noise_covariance,
+    powerlaw_noise,
+    sample_sensor_noise,
+    scale_noise_to_snr,
+)
 from .spatial import build_adjacency, build_spatial_basis
 
 
@@ -106,20 +114,30 @@ class SimulationGenerator:
         self.time_courses = (time_courses.T / abs(time_courses).max(axis=1)).T
 
     def _setup_correlation_samplers(self):
-        """Setup sampling functions for correlation parameters."""
+        """Setup sampling functions for simulation hyperparameters."""
+
+        def _sampler(value, n=1, dtype=float):
+            if isinstance(value, (tuple, list)):
+                lo, hi = value
+                if np.issubdtype(np.dtype(dtype), np.integer):
+                    return self.rng.integers(int(lo), int(hi) + 1, size=n)
+                return self.rng.uniform(lo, hi, n)
+            return np.full(n, value, dtype=dtype)
+
         isc = self.config.inter_source_correlation
-        if isinstance(isc, (tuple, list)):
-            self.get_inter_source_correlation = lambda n=1: self.rng.uniform(
-                isc[0], isc[1], n
-            )
-        else:
-            self.get_inter_source_correlation = lambda n=1: np.full(n, isc)
+        self.get_inter_source_correlation = lambda n=1: _sampler(isc, n=n, dtype=float)
 
         ncc = self.config.noise_color_coeff
-        if isinstance(ncc, (tuple, list)):
-            self.get_noise_color_coeff = lambda n=1: self.rng.uniform(ncc[0], ncc[1], n)
-        else:
-            self.get_noise_color_coeff = lambda n=1: np.full(n, ncc)
+        self.get_noise_color_coeff = lambda n=1: _sampler(ncc, n=n, dtype=float)
+
+        ntb = self.config.noise_temporal_beta
+        self.get_noise_temporal_beta = lambda n=1: _sampler(ntb, n=n, dtype=float)
+
+        nrd = self.config.noise_rank_deficiency
+        self.get_noise_rank_deficiency = lambda n=1: _sampler(nrd, n=n, dtype=int)
+
+        nlr = self.config.noise_low_rank_dim
+        self.get_noise_low_rank_dim = lambda n=1: _sampler(nlr, n=n, dtype=int)
 
     def _generate_smooth_background(self, batch_size):
         """Generate smooth background activity with 1/f^beta temporal dynamics.
@@ -257,63 +275,171 @@ class SimulationGenerator:
         return y, alphas
 
     def _apply_noise(self, x, batch_size, noise_color_coeffs, modes_batch):
-        """Apply sensor noise to EEG data.
+        """Apply realistic sensor noise with optional projection/rank loss.
 
-        Returns:
-            x: [batch_size, n_channels, n_timepoints] noisy EEG data
-            snr_levels: array of SNR values used
+        Returns
+        -------
+        x_noisy : np.ndarray
+            Noisy EEG data [batch_size, n_channels, n_timepoints].
+        noise_meta : dict
+            Per-sample noise metadata (SNR, projector, covariance statistics).
         """
         snr_levels = self.rng.uniform(
             low=self.config.snr_range[0],
             high=self.config.snr_range[1],
             size=batch_size,
         )
+        temporal_betas = self.get_noise_temporal_beta(n=batch_size)
+        rank_losses = self.get_noise_rank_deficiency(n=batch_size)
+        low_rank_dims = self.get_noise_low_rank_dim(n=batch_size)
 
-        x = np.stack(
-            [
-                add_white_noise(
-                    xx,
-                    snr_level,
-                    self.rng,
-                    self.channel_types,
-                    correlation_mode=corr_mode,
-                    noise_color_coeff=noise_color_level,
-                )
-                for (xx, snr_level, corr_mode, noise_color_level) in zip(
-                    x, snr_levels, modes_batch, noise_color_coeffs, strict=False
-                )
-            ],
-            axis=0,
-        )
+        x_noisy_list = []
+        realized_snrs = []
+        projectors = []
+        projector_ranks = []
+        covariance_true = []
+        covariance_est = []
+        covariance_rank_true = []
+        covariance_rank_est = []
 
-        return x, snr_levels
+        for (
+            xx,
+            snr_level,
+            corr_mode,
+            noise_color_level,
+            temporal_beta,
+            rank_loss,
+            low_rank_dim,
+        ) in zip(
+            x,
+            snr_levels,
+            modes_batch,
+            noise_color_coeffs,
+            temporal_betas,
+            rank_losses,
+            low_rank_dims,
+            strict=False,
+        ):
+            P, _ = make_rank_projector(
+                self.n_chans, rank_deficiency=int(rank_loss), rng=self.rng
+            )
+            if self.config.apply_sensor_projector:
+                signal = P @ xx
+            else:
+                signal = xx
+
+            cov_spatial = make_sensor_noise_covariance(
+                self.n_chans,
+                mode=corr_mode,
+                noise_color_coeff=float(noise_color_level),
+                rng=self.rng,
+                low_rank_dim=int(low_rank_dim),
+            )
+
+            noise = sample_sensor_noise(
+                cov_spatial,
+                self.config.n_timepoints,
+                rng=self.rng,
+                temporal_beta=float(temporal_beta),
+            )
+            if self.config.apply_sensor_projector:
+                noise = P @ noise
+
+            noise_scaled, _scale, realized_snr = scale_noise_to_snr(
+                signal, noise, float(snr_level)
+            )
+            x_noisy = signal + noise_scaled
+
+            # True covariance from realized noise in this sample.
+            cov_true = empirical_covariance(noise_scaled, shrinkage=0.0, eps=0.0)
+
+            # Estimated covariance from independent baseline noise.
+            cov_est = None
+            if self.config.estimate_noise_cov:
+                baseline = sample_sensor_noise(
+                    cov_spatial,
+                    int(self.config.noise_cov_n_baseline),
+                    rng=self.rng,
+                    temporal_beta=float(temporal_beta),
+                )
+                if self.config.apply_sensor_projector:
+                    baseline = P @ baseline
+                cov_est = empirical_covariance(
+                    baseline, shrinkage=float(self.config.noise_cov_shrinkage)
+                )
+
+            x_noisy_list.append(x_noisy)
+            realized_snrs.append(realized_snr)
+            projectors.append(P)
+            projector_ranks.append(int(np.linalg.matrix_rank(P)))
+            covariance_true.append(cov_true)
+            covariance_rank_true.append(int(np.linalg.matrix_rank(cov_true)))
+            covariance_est.append(cov_est)
+            covariance_rank_est.append(
+                int(np.linalg.matrix_rank(cov_est))
+                if cov_est is not None
+                else -1
+            )
+
+        x_noisy = np.stack(x_noisy_list, axis=0)
+        noise_meta = {
+            "snr_target": snr_levels,
+            "snr_realized": np.asarray(realized_snrs, dtype=float),
+            "projector": projectors,
+            "projector_rank": np.asarray(projector_ranks, dtype=int),
+            "noise_cov_true": covariance_true,
+            "noise_cov_est": covariance_est,
+            "noise_cov_rank_true": np.asarray(covariance_rank_true, dtype=int),
+            "noise_cov_rank_est": np.asarray(covariance_rank_est, dtype=int),
+            "noise_temporal_beta": np.asarray(temporal_betas, dtype=float),
+            "noise_rank_deficiency": np.asarray(rank_losses, dtype=int),
+            "noise_low_rank_dim": np.asarray(low_rank_dims, dtype=int),
+        }
+        return x_noisy, noise_meta
 
     def _build_metadata(
         self,
         batch_size,
         n_sources_batch,
         amplitude_values,
-        snr_levels,
         inter_source_correlations,
         noise_color_coeffs,
+        modes_batch,
         selection,
         alphas,
+        noise_meta,
     ):
         """Build simulation metadata DataFrame."""
         info_dict = {
             "n_sources": n_sources_batch,
             "amplitudes": amplitude_values,
-            "snr": snr_levels,
+            "snr": noise_meta["snr_target"],
+            "snr_realized": noise_meta["snr_realized"],
             "inter_source_correlations": inter_source_correlations,
             "n_orders": [[self.min_order, self.max_order]] * batch_size,
             "diffusion_parameter": [self.config.diffusion_parameter] * batch_size,
             "n_timepoints": [self.config.n_timepoints] * batch_size,
             "n_timecourses": [self.config.n_timecourses] * batch_size,
-            "correlation_mode": [self.config.correlation_mode] * batch_size,
+            "correlation_mode": modes_batch,
             "noise_color_coeff": noise_color_coeffs,
+            "noise_temporal_beta": noise_meta["noise_temporal_beta"],
+            "noise_rank_deficiency": noise_meta["noise_rank_deficiency"],
+            "projector_rank": noise_meta["projector_rank"],
+            "noise_cov_rank_true": noise_meta["noise_cov_rank_true"],
+            "add_forward_error": [self.config.add_forward_error] * batch_size,
+            "forward_error": [self.config.forward_error] * batch_size,
             "centers": selection,
             "simulation_mode": [self.config.simulation_mode] * batch_size,
         }
+
+        if self.config.estimate_noise_cov:
+            info_dict["noise_cov_rank_est"] = noise_meta["noise_cov_rank_est"]
+
+        if self.config.return_noise_cov:
+            info_dict["projector"] = noise_meta["projector"]
+            info_dict["noise_cov_true"] = noise_meta["noise_cov_true"]
+            if self.config.estimate_noise_cov:
+                info_dict["noise_cov_est"] = noise_meta["noise_cov_est"]
 
         if self.config.simulation_mode == "mixture":
             info_dict.update(
@@ -339,7 +465,7 @@ class SimulationGenerator:
             isinstance(self.config.correlation_mode, str)
             and self.config.correlation_mode.lower() == "auto"
         ):
-            correlation_modes = ["cholesky", "banded", "diagonal", None]
+            correlation_modes = ["cholesky", "banded", "diagonal", "low_rank", None]
             modes_batch = self.rng.choice(correlation_modes, self.config.batch_size)
         else:
             modes_batch = [self.config.correlation_mode] * self.config.batch_size
@@ -361,7 +487,7 @@ class SimulationGenerator:
             # Vectorized leadfield projection
             x = np.einsum("cd,bdt->bct", leadfield, y)
 
-            x, snr_levels = self._apply_noise(
+            x, noise_meta = self._apply_noise(
                 x, self.config.batch_size, noise_color_coeffs, modes_batch
             )
 
@@ -369,16 +495,15 @@ class SimulationGenerator:
                 self.config.batch_size,
                 n_sources_batch,
                 amplitude_values,
-                snr_levels,
                 inter_source_correlations,
                 noise_color_coeffs,
+                modes_batch,
                 selection,
                 alphas,
+                noise_meta,
             )
 
             output = (x, y, info)
 
             for _ in range(self.config.batch_repetitions):
                 yield output
-
-

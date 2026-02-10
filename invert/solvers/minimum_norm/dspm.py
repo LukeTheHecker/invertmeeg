@@ -46,7 +46,12 @@ class SolverDSPM(BaseSolver):
         self.name = name
         kwargs.setdefault("use_depth_weighting", True)
         kwargs.setdefault("depth_weighting", 0.1)
-        return super().__init__(**kwargs)
+        super().__init__(**kwargs)
+        # dSPM depends only on the forward model (and optional covariances).
+        # Marking this allows BenchmarkRunner to compute once per dataset.
+        self.require_recompute = False
+        self.require_data = False
+        return None
 
     def make_inverse_operator(
         self,

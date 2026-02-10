@@ -1,6 +1,7 @@
 from .backus_gilbert import SolverBackusGilbert
 from .basis_functions import SolverBasisFunctions
 from .dspm import SolverDSPM
+from .dspm_mne import SolverDSPMMNE
 from .eloreta import SolverELORETA
 from .epifocus import SolverEPIFOCUS
 from .gft_minimum_l1_norm import SolverGFTMinimumL1Norm
@@ -24,6 +25,7 @@ __all__ = [
     "SolverGFTMNE",
     "SolverWMNE",
     "SolverDSPM",
+    "SolverDSPMMNE",
     "SolverMinimumL1Norm",
     "SolverGFTMinimumL1Norm",
     "SolverMinimumL1NormGPT",
