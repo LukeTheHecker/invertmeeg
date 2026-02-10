@@ -22,7 +22,6 @@ except ModuleNotFoundError as exc:  # pragma: no cover
     nn = _NN()  # type: ignore[assignment]
     _TORCH_IMPORT_ERROR = exc
 
-from ...simulate import generator
 from ..base import BaseSolver, SolverMeta
 from .torch_utils import (
     activation_from_name,
@@ -332,13 +331,11 @@ class SolverFC(BaseSolver):
             count_trainable_parameters(self.model),
         )
 
-    def create_generator(
-        self,
-    ):
-        """Creat the data generator used for the simulations."""
-        gen_args = dict(
-            use_cov=False,
-            return_mask=False,
+    def create_generator(self):
+        """Create the data generator used for the simulations."""
+        from ...simulate import SimulationConfig
+
+        config = SimulationConfig(
             batch_size=self.batch_size,
             batch_repetitions=self.batch_repetitions,
             n_sources=self.n_sources,
@@ -349,7 +346,20 @@ class SolverFC(BaseSolver):
             forward_error=self.forward_error,
             correlation_mode=self.correlation_mode,
             noise_color_coeff=self.noise_color_coeff,
-            scale_data=True,
         )
-        self.generator = generator(self.forward, **gen_args)
-        self.generator.__next__()
+        sim_gen = SimulationGenerator(self.forward, config=config)
+
+        def _fc_generator():
+            for x, y, _info in sim_gen.generate():
+                # x: (batch, n_channels, n_timepoints) -> (batch, n_timepoints, n_channels)
+                x = np.swapaxes(x, 1, 2)
+                x = np.stack([xx / np.max(abs(xx)) for xx in x], axis=0)
+                # y: (batch, n_dipoles, n_timepoints) -> (batch, n_timepoints, n_dipoles)
+                y = np.swapaxes(y, 1, 2)
+                y = np.stack(
+                    [(yy.T / np.max(abs(yy), axis=1)).T for yy in y], axis=0
+                )
+                yield x, y
+
+        self.generator = _fc_generator()
+        next(self.generator)

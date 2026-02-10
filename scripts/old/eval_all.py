@@ -34,7 +34,7 @@ from scipy.spatial.distance import cdist  # noqa: E402
 from invert import Solver  # noqa: E402
 from invert.evaluate import evaluate_all  # noqa: E402
 from invert.forward import create_forward_model, get_info  # noqa: E402
-from invert.simulate import generator  # noqa: E402
+from invert.simulate import SimulationConfig, SimulationGenerator  # noqa: E402
 from invert.util import pos_from_forward  # noqa: E402
 
 pp = dict(surface="inflated", hemi="both", verbose=0, cortex="low_contrast")
@@ -52,9 +52,7 @@ vertices = [source_model[0]["vertno"], source_model[1]["vertno"]]
 adjacency = mne.spatial_src_adjacency(fwd["src"], verbose=0)
 distance_matrix = cdist(pos, pos)
 
-sim_params = dict(
-    use_cov=False,
-    return_mask=False,
+sim_config = SimulationConfig(
     batch_repetitions=1,
     batch_size=20,
     n_sources=(2, 2),
@@ -64,24 +62,16 @@ sim_params = dict(
     amplitude_range=(1, 1),
     n_timecourses=200,
     n_timepoints=20,
-    scale_data=False,
     add_forward_error=False,
     forward_error=0.1,
     inter_source_correlation=0.0,
-    return_info=True,
     diffusion_parameter=0.1,
-    beta_range=(
-        1,
-        1,
-    ),  # Determines the frequency spectrum of each simulted time course (1/f**beta)
-    # correlation_mode="cholesky",
-    # noise_color_coeff=0.5,
+    beta_range=(1, 1),
     normalize_leadfield=True,
-    random_seed=None,
 )
 
-gen = generator(fwd, **sim_params)
-x_test, y_test, sim_info = gen.__next__()
+gen = SimulationGenerator(fwd, config=sim_config)
+x_test, y_test, sim_info = next(gen.generate())
 
 # solver_names = config.all_solvers
 solver_names = ["MNE", "eLORETA", "Champagne", "LCMV", "APSE"]

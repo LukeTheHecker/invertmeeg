@@ -2,83 +2,80 @@
 
 import numpy as np
 
-from invert.simulate import generator
+from invert.simulate import SimulationConfig, SimulationGenerator
 
 
-class TestGeneratorDefaults:
+class TestSimulationGeneratorDefaults:
     def test_output_types(self, forward_model):
         """Generator should yield numpy arrays."""
-        x, y = next(generator(forward_model))
+        gen = SimulationGenerator(forward_model)
+        x, y, info = next(gen.generate())
         assert isinstance(x, np.ndarray)
         assert isinstance(y, np.ndarray)
 
     def test_output_shapes(self, forward_model, dimensions):
         """Default generator shapes should match forward model dimensions."""
         n_chans, n_dipoles = dimensions
-        x, y = next(generator(forward_model))
-        # x is (batch, n_chans, n_chans, 1) by default (covariance mode)
+        gen = SimulationGenerator(forward_model)
+        x, y, info = next(gen.generate())
+        # x is (batch, n_channels, n_timepoints)
         assert x.shape[1] == n_chans
-        assert x.shape[2] == n_chans
-        # y is (batch, n_dipoles)
+        # y is (batch, n_dipoles, n_timepoints)
         assert y.shape[1] == n_dipoles
 
     def test_output_finite(self, forward_model):
         """Generator output should be finite."""
-        x, y = next(generator(forward_model))
+        gen = SimulationGenerator(forward_model)
+        x, y, info = next(gen.generate())
         assert np.all(np.isfinite(x))
         assert np.all(np.isfinite(y))
 
 
-class TestGeneratorCustom:
+class TestSimulationGeneratorCustom:
     def test_custom_params(self, forward_model, dimensions):
         """Generator with custom parameters should respect them."""
         n_chans, n_dipoles = dimensions
-        params = dict(
-            use_cov=False,
+        config = SimulationConfig(
             batch_size=10,
             batch_repetitions=1,
             n_sources=3,
             n_orders=2,
             n_timepoints=30,
             snr_range=(5, 15),
-            remove_channel_dim=True,
             random_seed=42,
-            verbose=0,
         )
-        x, y = next(generator(forward_model, **params))
-        assert x.shape[0] == params["batch_size"]
-        assert x.shape[1] == params["n_timepoints"]
-        assert x.shape[2] == n_chans
+        gen = SimulationGenerator(forward_model, config=config)
+        x, y, info = next(gen.generate())
+        assert x.shape[0] == 10
+        assert x.shape[1] == n_chans
+        assert x.shape[2] == 30
 
     def test_reproducibility(self, forward_model):
         """Same random_seed should produce identical output."""
-        params = dict(
-            use_cov=False,
+        config = SimulationConfig(
             batch_size=5,
             batch_repetitions=1,
             n_timepoints=10,
             random_seed=99,
-            remove_channel_dim=True,
-            verbose=0,
         )
-        x1, y1 = next(generator(forward_model, **params))
-        x2, y2 = next(generator(forward_model, **params))
+        gen1 = SimulationGenerator(forward_model, config=config)
+        x1, y1, _ = next(gen1.generate())
+        gen2 = SimulationGenerator(forward_model, config=config)
+        x2, y2, _ = next(gen2.generate())
         np.testing.assert_array_equal(x1, x2)
         np.testing.assert_array_equal(y1, y2)
 
 
-class TestGeneratorEdgeCases:
+class TestSimulationGeneratorEdgeCases:
     def test_single_source(self, forward_model):
         """Generator should work with a single source."""
-        params = dict(
-            use_cov=False,
+        config = SimulationConfig(
             batch_size=5,
             batch_repetitions=1,
             n_sources=1,
             n_timepoints=10,
-            remove_channel_dim=True,
-            verbose=0,
         )
-        x, y = next(generator(forward_model, **params))
+        gen = SimulationGenerator(forward_model, config=config)
+        x, y, info = next(gen.generate())
         assert np.all(np.isfinite(x))
         assert np.all(np.isfinite(y))
