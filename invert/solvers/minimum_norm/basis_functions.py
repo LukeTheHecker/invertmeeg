@@ -49,6 +49,7 @@ class SolverBasisFunctions(BaseSolver):
         alpha="auto",
         n_basis=None,
         prior_shift=0.1,
+        noise_cov: mne.Covariance | None = None,
         verbose=0,
         **kwargs,
     ):
@@ -66,12 +67,18 @@ class SolverBasisFunctions(BaseSolver):
         self : object returns itself for convenience
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
-        gbf_builder = self.create_basis_function(
-            function=function, n_basis=n_basis, prior_shift=prior_shift
-        )
-        inverse_operators = [
-            InverseOperator(gbf_builder(a), self.name) for a in self.alphas
-        ]
+        wf = self.prepare_whitened_forward(noise_cov)
+        original_leadfield = self.leadfield
+        try:
+            gbf_builder = self.create_basis_function(
+                function=function, n_basis=n_basis, prior_shift=prior_shift
+            )
+            inverse_operators = [
+                InverseOperator(gbf_builder(a) @ wf.sensor_transform, self.name)
+                for a in self.alphas
+            ]
+        finally:
+            self.leadfield = original_leadfield
         self.inverse_operators = inverse_operators
         return self
 

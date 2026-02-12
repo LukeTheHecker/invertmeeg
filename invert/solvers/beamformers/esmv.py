@@ -1,5 +1,6 @@
 import logging
 
+import mne
 import numpy as np
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
@@ -62,7 +63,7 @@ class SolverESMV(BaseSolver):
         mne_obj,
         *args,
         alpha="auto",
-        noise_cov=None,
+        noise_cov: mne.Covariance | None = None,
         **kwargs,
     ):
         """Calculate inverse operator.
@@ -82,31 +83,25 @@ class SolverESMV(BaseSolver):
 
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        if noise_cov is not None:
+            self.coerce_noise_cov(noise_cov)
         data = self.unpack_data_obj(mne_obj)
 
         leadfield = self.leadfield
-        n_chans_raw, _n_dipoles = leadfield.shape
+        _n_chans_raw, _n_dipoles = leadfield.shape
         y_raw = np.asarray(data, dtype=float)
-        noise_cov_raw = None
-        if noise_cov is not None:
-            noise_cov_raw = np.asarray(noise_cov, dtype=float)
-            if noise_cov_raw.shape != (n_chans_raw, n_chans_raw):
-                msg = (
-                    f"noise_cov has shape {noise_cov_raw.shape}, "
-                    f"expected {(n_chans_raw, n_chans_raw)}"
-                )
-                raise ValueError(msg)
-            noise_cov_raw = 0.5 * (noise_cov_raw + noise_cov_raw.T)
 
         lead_norms = np.linalg.norm(leadfield, axis=0)
         leadfield /= np.maximum(lead_norms, self.eps)
 
         if self.use_robust_covariance:
             if self.use_noise_whitening:
-                if noise_cov_raw is None:
-                    noise_cov_raw = np.eye(n_chans_raw, dtype=float)
+                if noise_cov is None:
+                    noise_cov = self.make_identity_noise_cov(
+                        list(self.forward.ch_names)
+                    )
                 wf = self.prepare_whitened_forward(
-                    noise_cov_raw,
+                    noise_cov,
                     rank_tol=self.rank_tol,
                     eps=self.eps,
                 )

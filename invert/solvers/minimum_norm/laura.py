@@ -69,7 +69,7 @@ class SolverLAURA(BaseSolver):
         self,
         forward,
         *args,
-        noise_cov=None,
+        noise_cov: mne.Covariance | None = None,
         alpha="auto",
         drop_off=2,
         verbose=0,
@@ -83,7 +83,7 @@ class SolverLAURA(BaseSolver):
             The mne-python Forward model instance.
         alpha : float or 'auto'
             The regularization parameter.
-        noise_cov : numpy.ndarray, optional
+        noise_cov : mne.Covariance | None, optional
             The noise covariance matrix. If None, identity is used.
         drop_off : float, optional
             Controls the steepness of the spatial weighting distribution.
@@ -96,16 +96,18 @@ class SolverLAURA(BaseSolver):
         self : object returns itself for convenience
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
-        n_chans, n_dipoles = self.leadfield.shape
+        _n_chans, n_dipoles = self.leadfield.shape
         pos = pos_from_forward(forward, verbose=verbose)
 
         if noise_cov is None:
-            noise_cov = np.eye(n_chans, dtype=float)
-        noise_cov = np.asarray(noise_cov, dtype=float)
-        if noise_cov.shape != (n_chans, n_chans):
-            msg = f"noise_cov has shape {noise_cov.shape}, expected {(n_chans, n_chans)}"
-            raise ValueError(msg)
-        noise_cov = 0.5 * (noise_cov + noise_cov.T)
+            noise_cov = self.make_identity_noise_cov(list(self.forward.ch_names))
+        noise_cov_mat, noise_cov_ch_names = self.coerce_noise_cov(noise_cov)
+        forward_ch_names = list(self.forward.ch_names)
+        if noise_cov_ch_names != forward_ch_names:
+            noise_cov_mat = self.reorder_covariance_to_channels(
+                noise_cov_mat, noise_cov_ch_names, forward_ch_names
+            )
+        noise_cov_mat = 0.5 * (noise_cov_mat + noise_cov_mat.T)
 
         if self.use_noise_whitener:
             wf = self.prepare_whitened_forward(
@@ -122,7 +124,7 @@ class SolverLAURA(BaseSolver):
                 rank_tol=self.rank_tol,
                 eps=self.eps,
             )
-            noise_cov_eff = wf.projector @ noise_cov @ wf.projector.T
+            noise_cov_eff = wf.projector @ noise_cov_mat @ wf.projector.T
             noise_cov_eff = 0.5 * (noise_cov_eff + noise_cov_eff.T)
         if wf.whitener_mode not in ("projected", "none"):
             logger.warning("LAURA whitener fallback used: %s", wf.whitener_mode)

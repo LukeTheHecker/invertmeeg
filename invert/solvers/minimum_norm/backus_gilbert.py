@@ -1,5 +1,6 @@
 import logging
 
+import mne
 import numpy as np
 from scipy.spatial.distance import cdist
 
@@ -29,7 +30,14 @@ class SolverBackusGilbert(BaseSolver):
         self.name = name
         return super().__init__(**kwargs)
 
-    def make_inverse_operator(self, forward, *args, alpha="auto", **kwargs):
+    def make_inverse_operator(
+        self,
+        forward,
+        *args,
+        alpha="auto",
+        noise_cov: mne.Covariance | None = None,
+        **kwargs,
+    ):
         """Calculate inverse operator.
 
         Parameters
@@ -44,7 +52,9 @@ class SolverBackusGilbert(BaseSolver):
         self : object returns itself for convenience
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
-        _, n_dipoles = self.leadfield.shape
+        wf = self.prepare_whitened_forward(noise_cov)
+        leadfield = wf.G_white
+        _, n_dipoles = leadfield.shape
         pos = pos_from_forward(forward, verbose=self.verbose)
         dist = cdist(pos, pos)
 
@@ -55,17 +65,17 @@ class SolverBackusGilbert(BaseSolver):
 
         C = []
         for i in range(n_dipoles):
-            C_gamma = self.leadfield @ W_BG[i] @ self.leadfield.T
+            C_gamma = leadfield @ W_BG[i] @ leadfield.T
             C.append(C_gamma)
 
-        F = self.leadfield @ self.leadfield.T
+        F = leadfield @ leadfield.T
 
         E = []
         for i in range(n_dipoles):
             E_gamma = C[i] + F
             E.append(E_gamma)
 
-        L = self.leadfield @ np.ones((n_dipoles, 1))
+        L = leadfield @ np.ones((n_dipoles, 1))
 
         T = []
         for i in range(n_dipoles):
@@ -74,7 +84,7 @@ class SolverBackusGilbert(BaseSolver):
             T.append(T_gamma)
 
         inverse_operators = [
-            np.stack(T, axis=0)[:, :, 0],
+            np.stack(T, axis=0)[:, :, 0] @ wf.sensor_transform,
         ]
 
         self.inverse_operators = [

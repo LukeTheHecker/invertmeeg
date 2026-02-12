@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 
+import mne
 import numpy as np
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
@@ -63,7 +64,7 @@ class SolverSLORETA(BaseSolver):
         forward,
         *args,
         alpha="auto",
-        noise_cov=None,
+        noise_cov: mne.Covariance | None = None,
         verbose=0,
         **kwargs,
     ):
@@ -83,17 +84,25 @@ class SolverSLORETA(BaseSolver):
         self : object returns itself for convenience
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        if noise_cov is not None:
+            self.coerce_noise_cov(noise_cov)
 
         if self.use_noise_whitener:
-            n_chans = self.leadfield.shape[0]
             if noise_cov is None:
-                noise_cov = np.eye(n_chans, dtype=float)
-            wf = self.prepare_whitened_forward(
-                noise_cov,
-                trace_normalize=self.use_trace_normalization,
-                rank_tol=self.rank_tol,
-                eps=self.eps,
-            )
+                wf = self.prepare_whitened_forward(
+                    None,
+                    apply_projector_when_no_cov=False,
+                    trace_normalize=self.use_trace_normalization,
+                    rank_tol=self.rank_tol,
+                    eps=self.eps,
+                )
+            else:
+                wf = self.prepare_whitened_forward(
+                    noise_cov,
+                    trace_normalize=self.use_trace_normalization,
+                    rank_tol=self.rank_tol,
+                    eps=self.eps,
+                )
         else:
             wf = self.prepare_whitened_forward(
                 None,
@@ -123,7 +132,9 @@ class SolverSLORETA(BaseSolver):
             W_diag = np.sqrt(resolution_diag)
 
             K_MNE_full = (float(leadfield_scale) * K_MNE) @ sensor_transform
-            W_slor_full = (float(leadfield_scale) * (K_MNE.T / W_diag).T) @ sensor_transform
+            W_slor_full = (
+                float(leadfield_scale) * (K_MNE.T / W_diag).T
+            ) @ sensor_transform
 
             mne_operators.append(K_MNE_full)
             sloreta_operators.append(W_slor_full)
@@ -157,6 +168,7 @@ class SolverSLORETA(BaseSolver):
             The source estimate.
         """
         data = self.unpack_data_obj(mne_obj)
+        self.validate_operator_data_compatibility(data)
 
         if self.use_last_alpha and self.last_reg_idx is not None:
             idx = self.last_reg_idx

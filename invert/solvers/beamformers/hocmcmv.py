@@ -1,5 +1,6 @@
 from copy import deepcopy
 
+import mne
 import numpy as np
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
@@ -45,6 +46,7 @@ class SolverHOCMCMV(BaseSolver):
         *args,
         weight_norm=True,
         alpha="auto",
+        noise_cov: mne.Covariance | None = None,
         order=3,
         verbose=0,
         **kwargs,
@@ -70,15 +72,16 @@ class SolverHOCMCMV(BaseSolver):
         self : object returns itself for convenience
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        wf = self.prepare_whitened_forward(noise_cov)
         data = self.unpack_data_obj(mne_obj)
 
-        leadfield = self.leadfield
+        leadfield = wf.G_white
         leadfield /= np.linalg.norm(leadfield, axis=0)
-        n_chans, n_dipoles = self.leadfield.shape
+        n_chans, n_dipoles = leadfield.shape
 
         self.weight_norm = weight_norm
 
-        y = data
+        y = wf.sensor_transform @ data
         I = np.identity(n_chans)
 
         # Recompute regularization based on the max eigenvalue of the Covariance
@@ -101,7 +104,7 @@ class SolverHOCMCMV(BaseSolver):
             if self.weight_norm:
                 W /= np.linalg.norm(W, axis=0)
 
-            inverse_operator = W.T
+            inverse_operator = W.T @ wf.sensor_transform
             inverse_operators.append(inverse_operator)
 
         self.inverse_operators = [

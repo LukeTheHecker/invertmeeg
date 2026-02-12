@@ -1,5 +1,6 @@
 import logging
 
+import mne
 import numpy as np
 from scipy.linalg import eigh
 
@@ -55,6 +56,7 @@ class SolverExSoMUSIC(BaseSolver):
         mne_obj,
         *args,
         alpha="auto",
+        noise_cov: mne.Covariance | None = None,
         n="auto",
         adjacency=None,
         positions=None,
@@ -82,7 +84,9 @@ class SolverExSoMUSIC(BaseSolver):
         self : object returns itself for convenience
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        wf = self.prepare_whitened_forward(noise_cov)
         data = self.unpack_data_obj(mne_obj)
+        data = wf.sensor_transform @ data
 
         if not isinstance(n, int):
             num_sources = self.estimate_n_sources(data, method=n)
@@ -114,7 +118,7 @@ class SolverExSoMUSIC(BaseSolver):
             )
 
         self.inverse_operators = [
-            InverseOperator(inverse_operator, self.name),
+            InverseOperator(inverse_operator @ wf.sensor_transform, self.name),
         ]
         return self
 

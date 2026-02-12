@@ -104,6 +104,7 @@ class SolverLSTM(BaseSolver):
         loss="cosine_similarity",
         size_validation_set=256,
         patience=100,
+        noise_cov: mne.Covariance | None = None,
         alpha="auto",
         **kwargs,
     ):
@@ -149,6 +150,7 @@ class SolverLSTM(BaseSolver):
         self : object returns itself for convenience
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        self.prepare_whitened_forward(noise_cov)
         n_channels, n_dipoles = self.leadfield.shape
 
         # Store simulation config
@@ -203,6 +205,8 @@ class SolverLSTM(BaseSolver):
             The mne Source Estimate object.
         """
         data = self.unpack_data_obj(mne_obj)
+        self.validate_operator_data_compatibility(data)
+        data = self._sensor_transform @ data
 
         source_mat = self.apply_model(data)
         stc = self.source_to_object(source_mat)

@@ -61,4 +61,6 @@ class SolverFlexESMV2(BaseSolver):
         return self
 
     def apply_inverse_operator(self, mne_obj):  # type: ignore[override]
+        data = self.unpack_data_obj(mne_obj)
+        self.validate_operator_data_compatibility(data)
         return self._inner.apply_inverse_operator(mne_obj)

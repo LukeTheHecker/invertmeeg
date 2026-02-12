@@ -72,6 +72,7 @@ class SolverAPSE(BaseSolver):
         mne_obj,
         *args,
         alpha="auto",
+        noise_cov: mne.Covariance | None = None,
         max_iter=100,
         convergence_tol=1e-4,
         verbose=0,
@@ -101,9 +102,11 @@ class SolverAPSE(BaseSolver):
             Returns itself for convenience
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        wf = self.prepare_whitened_forward(noise_cov)
 
         # Get data and leadfield
         data = self.unpack_data_obj(mne_obj)
+        data = wf.sensor_transform @ data
         leadfield = self.leadfield
         n_chans, n_dipoles = leadfield.shape
 
@@ -140,7 +143,8 @@ class SolverAPSE(BaseSolver):
             inverse_operators.append(inverse_op)
 
         self.inverse_operators = [
-            InverseOperator(op, self.name) for op in inverse_operators
+            InverseOperator(op @ wf.sensor_transform, self.name)
+            for op in inverse_operators
         ]
         return self
 

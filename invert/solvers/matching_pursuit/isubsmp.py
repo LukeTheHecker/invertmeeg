@@ -46,7 +46,15 @@ class SolverISubSMP(BaseSolver):
         self.name = name
         return super().__init__(**kwargs)
 
-    def make_inverse_operator(self, forward, *args, alpha="auto", verbose=0, **kwargs):
+    def make_inverse_operator(
+        self,
+        forward,
+        *args,
+        alpha="auto",
+        noise_cov: mne.Covariance | None = None,
+        verbose=0,
+        **kwargs,
+    ):
         """Calculate inverse operator.
 
         Parameters
@@ -61,6 +69,7 @@ class SolverISubSMP(BaseSolver):
         self : object returns itself for convenience
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        self.prepare_whitened_forward(noise_cov)
         self.inverse_operators = []
 
         adjacency = mne.spatial_src_adjacency(self.forward["src"], verbose=0).toarray()
@@ -96,6 +105,8 @@ class SolverISubSMP(BaseSolver):
             The mne Source Estimate object
         """
         data = self.unpack_data_obj(mne_obj)
+        self.validate_operator_data_compatibility(data)
+        data = self._sensor_transform @ data
         source_mat = self.calc_subsmp_solution(
             data, include_singletons=include_singletons
         )

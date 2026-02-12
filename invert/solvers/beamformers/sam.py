@@ -1,3 +1,4 @@
+import mne
 import numpy as np
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
@@ -39,6 +40,7 @@ class SolverSAM(BaseSolver):
         *args,
         weight_norm=True,
         alpha="auto",
+        noise_cov: mne.Covariance | None = None,
         verbose=0,
         **kwargs,
     ):
@@ -60,13 +62,14 @@ class SolverSAM(BaseSolver):
         self : object returns itself for convenience
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        wf = self.prepare_whitened_forward(noise_cov)
         data = self.unpack_data_obj(mne_obj)
 
         self.weight_norm = weight_norm
-        leadfield = self.leadfield
+        leadfield = wf.G_white
         n_chans, n_dipoles = leadfield.shape
 
-        y = data
+        y = wf.sensor_transform @ data
         I = np.identity(n_chans)
         C = self.data_covariance(y, center=True, ddof=1)
         self.get_alphas(reference=C)
@@ -82,7 +85,7 @@ class SolverSAM(BaseSolver):
             W = np.stack(W, axis=1)[:, :, 0]
             if self.weight_norm:
                 W = W / np.linalg.norm(W, axis=0)
-            inverse_operator = W.T
+            inverse_operator = W.T @ wf.sensor_transform
             inverse_operators.append(inverse_operator)
 
         self.inverse_operators = [

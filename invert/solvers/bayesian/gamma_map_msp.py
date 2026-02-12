@@ -41,6 +41,7 @@ class SolverGammaMAPMSP(BaseSolver):
         mne_obj,
         *args,
         alpha="auto",
+        noise_cov: mne.Covariance | None = None,
         max_iter=100,
         p=0.5,
         smoothness_order=1,
@@ -71,7 +72,9 @@ class SolverGammaMAPMSP(BaseSolver):
         self : object returns itself for convenience
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        wf = self.prepare_whitened_forward(noise_cov)
         data = self.unpack_data_obj(mne_obj)
+        data = wf.sensor_transform @ data
         data_cov = self.data_covariance(data, center=True, ddof=1)
 
         inverse_operators = []
@@ -83,7 +86,7 @@ class SolverGammaMAPMSP(BaseSolver):
             inverse_operators.append(inverse_operator)
 
         self.inverse_operators = [
-            InverseOperator(inverse_operator, self.name)
+            InverseOperator(inverse_operator @ wf.sensor_transform, self.name)
             for inverse_operator in inverse_operators
         ]
         return self

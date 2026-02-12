@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import mne
 import numpy as np
 
 from ..base import BaseSolver, SolverMeta
@@ -106,6 +107,7 @@ class SolverDICS(BaseSolver):
         mne_obj,
         *args: Any,
         alpha: str | float = "auto",
+        noise_cov: mne.Covariance | None = None,
         fmin: float = 8.0,
         fmax: float = 12.0,
         tmin: float | None = None,
@@ -118,6 +120,7 @@ class SolverDICS(BaseSolver):
         self.fmax = float(fmax)
 
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        wf = self.prepare_whitened_forward(noise_cov)
 
         data = self.unpack_data_obj(mne_obj)
         sfreq = float(self.obj_info["sfreq"])
@@ -133,6 +136,8 @@ class SolverDICS(BaseSolver):
             stop = int(np.clip(stop, start + 1, data.shape[1]))
             data = data[:, start:stop]
 
+        data = wf.sensor_transform @ data
+
         self.csd = self._compute_csd_from_data(
             data, sfreq, self.fmin, self.fmax, n_fft=n_fft, window=window
         )
@@ -140,7 +145,7 @@ class SolverDICS(BaseSolver):
         # Regularization scale based on the CSD (not the leadfield)
         self.get_alphas(reference=np.real(self.csd))
 
-        leadfield = self.leadfield
+        leadfield = wf.G_white
         n_chans = leadfield.shape[0]
 
         self.source_powers = []
@@ -165,6 +170,7 @@ class SolverDICS(BaseSolver):
             )
 
         data = self.unpack_data_obj(mne_obj)
+        self.validate_operator_data_compatibility(data)
         n_time = data.shape[1]
 
         if self.use_last_alpha and self.last_reg_idx is not None:

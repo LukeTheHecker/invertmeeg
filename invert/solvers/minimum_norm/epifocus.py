@@ -1,3 +1,4 @@
+import mne
 import numpy as np
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
@@ -32,7 +33,14 @@ class SolverEPIFOCUS(BaseSolver):
         self.name = name
         return super().__init__(**kwargs)
 
-    def make_inverse_operator(self, forward, *args, alpha="auto", **kwargs):
+    def make_inverse_operator(
+        self,
+        forward,
+        *args,
+        alpha="auto",
+        noise_cov: mne.Covariance | None = None,
+        **kwargs,
+    ):
         """Calculate inverse operator.
 
         Parameters
@@ -47,7 +55,8 @@ class SolverEPIFOCUS(BaseSolver):
         self : object returns itself for convenience
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
-        leadfield = self.leadfield
+        wf = self.prepare_whitened_forward(noise_cov)
+        leadfield = wf.G_white
         leadfield -= leadfield.mean(axis=0)
 
         n_chans, _ = leadfield.shape
@@ -58,7 +67,7 @@ class SolverEPIFOCUS(BaseSolver):
             :, 0
         ]
         inverse_operators = [
-            inverse_operator,
+            inverse_operator @ wf.sensor_transform,
         ]
 
         self.inverse_operators = [

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import mne
 import numpy as np
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
@@ -79,20 +80,23 @@ class SolverESMVMVPURE(BaseSolver):
         *args: Any,
         alpha: str | float = "auto",
         weight_norm: bool = False,
+        noise_cov: mne.Covariance | None = None,
         **kwargs: Any,
     ) -> Any:
         self.weight_norm = bool(weight_norm)
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        wf = self.prepare_whitened_forward(noise_cov)
         data = self.unpack_data_obj(mne_obj)
 
-        leadfield = self.leadfield
+        leadfield = wf.G_white
         leadfield_norm = np.linalg.norm(leadfield, axis=0, keepdims=True)
         leadfield_norm = np.where(leadfield_norm > 0, leadfield_norm, 1.0)
         leadfield /= leadfield_norm
         n_chans, n_dipoles = leadfield.shape
         leadfield_similarity = np.abs(leadfield.T @ leadfield)
 
-        y = data - data.mean(axis=1, keepdims=True)
+        y = wf.sensor_transform @ data
+        y -= y.mean(axis=1, keepdims=True)
         I = np.identity(n_chans)
         C = self.data_covariance(y, center=False, ddof=1)
         C_sub = self.select_signal_subspace(C)
@@ -154,7 +158,7 @@ class SolverESMVMVPURE(BaseSolver):
                 nz = row_norm > 0
                 K_esmv[nz, :] = (K_esmv[nz, :].T / row_norm[nz]).T
 
-            inverse_operators.append(K_esmv)
+            inverse_operators.append(K_esmv @ wf.sensor_transform)
 
         self.inverse_operators = [
             InverseOperator(inverse_operator, self.name)

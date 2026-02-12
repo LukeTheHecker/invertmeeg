@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import mne
 import numpy as np
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
@@ -56,7 +57,7 @@ class SolverReciPSIICOSWhitened(BaseSolver):
         mne_obj,
         *args,
         alpha="auto",
-        noise_cov=None,
+        noise_cov: mne.Covariance | None = None,
         virtual_sensor_energy=0.99,
         pwr_energy=0.9,
         pwr_rank=None,

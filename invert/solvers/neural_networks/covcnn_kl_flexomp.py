@@ -5,6 +5,7 @@ from collections.abc import Iterable
 from copy import deepcopy
 from typing import Any
 
+import mne
 import numpy as np
 
 _TORCH_IMPORT_ERROR: ModuleNotFoundError | None = None
@@ -115,6 +116,7 @@ class SolverCovCNNKLFlexOMP(SolverCovCNNKL):
         blend_weight_dipole: float = 0.5,
         prior_from_flex: bool = False,
         prior_power: float = 1.0,
+        noise_cov: mne.Covariance | None = None,
         alpha: str | float = "auto",
         **kwargs,
     ):
@@ -123,6 +125,7 @@ class SolverCovCNNKLFlexOMP(SolverCovCNNKL):
             forward,
             simulation_config,
             *args,
+            noise_cov=noise_cov,
             alpha=alpha,
             **kwargs,
         )

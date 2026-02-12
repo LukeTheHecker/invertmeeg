@@ -108,7 +108,14 @@ class SolverSSLOFO(BaseSolver):
         self.sloreta_alpha = sloreta_alpha
         super().__init__(**kwargs)
 
-    def make_inverse_operator(self, forward, *args, alpha="auto", **kwargs):
+    def make_inverse_operator(
+        self,
+        forward,
+        *args,
+        alpha="auto",
+        noise_cov: mne.Covariance | None = None,
+        **kwargs,
+    ):
         """Calculate inverse operator using SSLOFO.
 
         Parameters
@@ -123,6 +130,7 @@ class SolverSSLOFO(BaseSolver):
         self : object returns itself for convenience
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        self.prepare_whitened_forward(noise_cov)
 
         # Get adjacency matrix for smoothing operations
         self.adjacency = mne.spatial_src_adjacency(
@@ -165,6 +173,8 @@ class SolverSSLOFO(BaseSolver):
             The source estimate.
         """
         data = self.unpack_data_obj(mne_obj)
+        self.validate_operator_data_compatibility(data)
+        data = self._sensor_transform @ data
         if data.ndim == 1:
             data = data[:, np.newaxis]
 
@@ -461,7 +471,9 @@ class SolverSSLOFO(BaseSolver):
             global_to_local = np.full(adjacency.shape[0], -1, dtype=np.int32)
             global_to_local[active_idx] = np.arange(len(active_idx))
 
-            for local_idx, global_idx in zip(smooth_local_idx, smooth_global_idx, strict=False):
+            for local_idx, global_idx in zip(
+                smooth_local_idx, smooth_global_idx, strict=False
+            ):
                 # Find neighbors in global space
                 neighbor_global = adjacency[global_idx, :].nonzero()[0]
 

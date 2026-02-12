@@ -65,13 +65,24 @@ class SolverIRESMV(BaseSolver):
         self.sparsity_exponent = sparsity_exponent
         return super().__init__(reduce_rank=reduce_rank, rank=rank, **kwargs)
 
-    def make_inverse_operator(self, forward, mne_obj, *args, alpha="auto", **kwargs):
+    def make_inverse_operator(
+        self,
+        forward,
+        mne_obj,
+        *args,
+        alpha="auto",
+        noise_cov: mne.Covariance | None = None,
+        **kwargs,
+    ):
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        self.prepare_whitened_forward(noise_cov)
         self.inverse_operators = []
         return self
 
     def apply_inverse_operator(self, mne_obj) -> mne.SourceEstimate:
         data = self.unpack_data_obj(mne_obj)
+        self.validate_operator_data_compatibility(data)
+        data = self._sensor_transform @ data
         source_mat = self._solve(data)
         stc = self.source_to_object(source_mat)
         return stc

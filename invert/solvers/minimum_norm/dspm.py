@@ -1,5 +1,6 @@
 import logging
 
+import mne
 import numpy as np
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
@@ -62,7 +63,7 @@ class SolverDSPM(BaseSolver):
         self.rank_tol = float(rank_tol)
         self.eps = float(eps)
 
-        kwargs.setdefault("use_depth_weighting", True)
+        kwargs.setdefault("use_depth_weighting", False)
         super().__init__(**kwargs)
 
         # dSPM now uses an MNE-style, trace-normalized formulation where the
@@ -123,7 +124,7 @@ class SolverDSPM(BaseSolver):
         forward,
         *args,
         alpha="auto",
-        noise_cov=None,
+        noise_cov: mne.Covariance | None = None,
         source_cov=None,
         verbose=0,
         **kwargs,
@@ -152,17 +153,14 @@ class SolverDSPM(BaseSolver):
             self.depth = float(kwargs.pop("depth"))
 
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
-        n_chans = self.leadfield.shape[0]
-
-        if noise_cov is None:
-            noise_cov = np.eye(n_chans, dtype=float)
 
         wf = self.prepare_whitened_forward(
             noise_cov,
+            apply_projector_when_no_cov=False,
             source_cov=source_cov,
             depth=self.depth if self.use_depth_weighting else None,
             depth_limit=self.depth_limit,
-            trace_normalize=True,
+            trace_normalize=False,
             precompute_svd=True,
             rank_tol=self.rank_tol,
             eps=self.eps,
@@ -170,15 +168,29 @@ class SolverDSPM(BaseSolver):
         if wf.whitener_mode != "projected" and wf.whitener_mode != "none":
             logger.warning("dSPM whitener fallback used: %s", wf.whitener_mode)
 
+        if wf.A is not None:
+            tikhonov_matrix = wf.A
+            left_scale = wf.R_sqrt
+            svd = wf.svd
+        elif wf.R_sqrt is not None:
+            tikhonov_matrix = wf.G_white * wf.R_sqrt[np.newaxis, :]
+            left_scale = wf.R_sqrt
+            # Precomputed SVD is for G_white in this branch, not G_white*R_sqrt.
+            svd = None
+        else:
+            tikhonov_matrix = wf.G_white
+            left_scale = None
+            svd = wf.svd
+
         inverse_operators = []
         mne_operators = []
         for lambda2 in self.alphas:
             lambda2 = float(lambda2)
             K_white = self.solve_tikhonov_svd(
-                wf.A,
+                tikhonov_matrix,
                 lambda2,
-                left_scale=wf.R_sqrt,
-                svd=wf.svd,
+                left_scale=left_scale,
+                svd=svd,
                 eps=self.eps,
             )
 
@@ -219,6 +231,7 @@ class SolverDSPM(BaseSolver):
         producing only ``inf`` GCV values.
         """
         data = self.unpack_data_obj(mne_obj)
+        self.validate_operator_data_compatibility(data)
 
         dspm_ops = self.inverse_operators
         reg_ops = getattr(self, "_mne_inverse_operators", None) or dspm_ops
@@ -248,9 +261,7 @@ class SolverDSPM(BaseSolver):
                 elif method == "product":
                     _, idx = self.regularise_product(data, plot=self.plot_reg)
                 else:
-                    msg = (
-                        f"{self.regularisation_method} is no valid regularisation method."
-                    )
+                    msg = f"{self.regularisation_method} is no valid regularisation method."
                     raise AttributeError(msg)
             finally:
                 self.inverse_operators = original_ops

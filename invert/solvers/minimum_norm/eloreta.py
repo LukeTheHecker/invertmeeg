@@ -1,5 +1,6 @@
 import logging
 
+import mne
 import numpy as np
 from scipy.linalg import pinv
 
@@ -56,7 +57,7 @@ class SolverELORETA(BaseSolver):
         forward,
         *args,
         alpha="auto",
-        noise_cov=None,
+        noise_cov: mne.Covariance | None = None,
         verbose=0,
         stop_crit=1e-3,
         max_iter=100,
@@ -80,17 +81,25 @@ class SolverELORETA(BaseSolver):
         self : object returns itself for convenience
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        if noise_cov is not None:
+            self.coerce_noise_cov(noise_cov)
 
         if self.use_noise_whitener:
-            n_chans = self.leadfield.shape[0]
             if noise_cov is None:
-                noise_cov = np.eye(n_chans, dtype=float)
-            wf = self.prepare_whitened_forward(
-                noise_cov,
-                trace_normalize=self.use_trace_normalization,
-                rank_tol=self.rank_tol,
-                eps=self.eps,
-            )
+                wf = self.prepare_whitened_forward(
+                    None,
+                    apply_projector_when_no_cov=False,
+                    trace_normalize=self.use_trace_normalization,
+                    rank_tol=self.rank_tol,
+                    eps=self.eps,
+                )
+            else:
+                wf = self.prepare_whitened_forward(
+                    noise_cov,
+                    trace_normalize=self.use_trace_normalization,
+                    rank_tol=self.rank_tol,
+                    eps=self.eps,
+                )
         else:
             wf = self.prepare_whitened_forward(
                 None,
@@ -104,7 +113,6 @@ class SolverELORETA(BaseSolver):
         leadfield = wf.A if wf.A is not None else wf.G_white
         leadfield_scale = wf.trace_scale
         sensor_transform = wf.sensor_transform
-        self._sensor_transform = sensor_transform
         # Keep alpha scaling consistent with the transformed leadfield.
         self.get_alphas(reference=leadfield @ leadfield.T)
 
@@ -136,9 +144,9 @@ class SolverELORETA(BaseSolver):
 
                 # Compute the final inverse operator
                 inner_term = LW_inv @ self.leadfield.T + alpha * I
-                inverse_operator_eff = (W_inv_diag[:, np.newaxis] * self.leadfield.T) @ pinv(
-                    inner_term
-                )
+                inverse_operator_eff = (
+                    W_inv_diag[:, np.newaxis] * self.leadfield.T
+                ) @ pinv(inner_term)
                 inverse_operator = (
                     float(leadfield_scale) * inverse_operator_eff
                 ) @ sensor_transform

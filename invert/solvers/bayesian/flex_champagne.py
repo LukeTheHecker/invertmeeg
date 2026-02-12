@@ -64,13 +64,17 @@ class SolverFlexChampagne(BaseSolver):
         mne_obj,
         *args,
         alpha="auto",
+        noise_cov: mne.Covariance | None = None,
         max_iter=2000,
         pruning_thresh=1e-3,
         convergence_criterion=1e-8,
         **kwargs,
     ):
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        wf = self.prepare_whitened_forward(noise_cov)
+        self.is_prepared = False
         data = self.unpack_data_obj(mne_obj)
+        data = wf.sensor_transform @ data
 
         if not self.is_prepared:
             self._prepare_flex()
@@ -78,7 +82,9 @@ class SolverFlexChampagne(BaseSolver):
         inverse_operator = self._flex_champagne(
             data, pruning_thresh, max_iter, convergence_criterion
         )
-        self.inverse_operators = [InverseOperator(inverse_operator, self.name)]
+        self.inverse_operators = [
+            InverseOperator(inverse_operator @ wf.sensor_transform, self.name)
+        ]
         return self
 
     # ------------------------------------------------------------------

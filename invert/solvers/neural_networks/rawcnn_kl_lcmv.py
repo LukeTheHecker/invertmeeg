@@ -29,7 +29,9 @@ from .torch_utils import (
 logger = logging.getLogger(__name__)
 
 
-def _lcmv_power_map(Y: np.ndarray, leadfield: np.ndarray, reg: float = 0.05) -> np.ndarray:
+def _lcmv_power_map(
+    Y: np.ndarray, leadfield: np.ndarray, reg: float = 0.05
+) -> np.ndarray:
     """Compute LCMV beamformer power map from raw data.
 
     Parameters
@@ -201,10 +203,12 @@ class SolverRawCNNKLLCMV(BaseSolver):
         target_power: float = 0.5,
         temperature: float = 1.0,
         gamma_power: float = 1.5,
+        noise_cov: mne.Covariance | None = None,
         alpha: str | float = "auto",
         **kwargs,
     ):
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        self.prepare_whitened_forward(noise_cov)
         self.forward = forward
         self.simulation_config = simulation_config
         self.n_timepoints = int(simulation_config.n_timepoints)
@@ -231,6 +235,8 @@ class SolverRawCNNKLLCMV(BaseSolver):
 
     def apply_inverse_operator(self, mne_obj, prior=None) -> mne.SourceEstimate:
         data = self.unpack_data_obj(mne_obj)
+        self.validate_operator_data_compatibility(data)
+        data = self._sensor_transform @ data
         source_mat = self.apply_model(data, prior=prior)
         return self.source_to_object(source_mat)
 
@@ -319,7 +325,9 @@ class SolverRawCNNKLLCMV(BaseSolver):
 
             self.model.eval()
             with torch.no_grad():
-                v_logits = self.model(x_val_raw_t, x_val_lcmv_t) / float(self.temperature)
+                v_logits = self.model(x_val_raw_t, x_val_lcmv_t) / float(
+                    self.temperature
+                )
                 v_log_probs = F.log_softmax(v_logits, dim=-1)
                 val_loss = float(
                     F.kl_div(v_log_probs, y_val_t, reduction="batchmean").cpu().item()
@@ -331,22 +339,28 @@ class SolverRawCNNKLLCMV(BaseSolver):
                 patience_left = int(self.patience)
                 logger.info(
                     "Epoch %d/%d - loss=%.6f val_loss=%.6f (new best)",
-                    epoch + 1, self.epochs,
-                    float(loss.detach().cpu().item()), val_loss,
+                    epoch + 1,
+                    self.epochs,
+                    float(loss.detach().cpu().item()),
+                    val_loss,
                 )
             else:
                 patience_left -= 1
                 if (epoch == 0) or ((epoch + 1) % log_every == 0):
                     logger.info(
                         "Epoch %d/%d - loss=%.6f val_loss=%.6f (patience_left=%d)",
-                        epoch + 1, self.epochs,
-                        float(loss.detach().cpu().item()), val_loss,
+                        epoch + 1,
+                        self.epochs,
+                        float(loss.detach().cpu().item()),
+                        val_loss,
                         patience_left,
                     )
                 if patience_left <= 0:
                     logger.info(
                         "Early stopping at epoch %d/%d (best_val=%.6f)",
-                        epoch + 1, self.epochs, best_val,
+                        epoch + 1,
+                        self.epochs,
+                        best_val,
                     )
                     break
 
@@ -363,7 +377,7 @@ class SolverRawCNNKLLCMV(BaseSolver):
         if n_times < self.n_timepoints:
             y = np.pad(y, ((0, 0), (0, self.n_timepoints - n_times)))
         elif n_times > self.n_timepoints:
-            y = y[:, :self.n_timepoints]
+            y = y[:, : self.n_timepoints]
 
         # Compute LCMV power map
         lcmv_map = _lcmv_power_map(y, self.leadfield).astype(np.float32)

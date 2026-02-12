@@ -77,6 +77,7 @@ class SolverSubspaceSBL(BaseSolver):
         mne_obj,
         *args,
         alpha="auto",
+        noise_cov: mne.Covariance | None = None,
         n="enhanced",
         max_iter_ssm=5,
         max_iter_nlc=500,
@@ -88,7 +89,10 @@ class SolverSubspaceSBL(BaseSolver):
         **kwargs,
     ):
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        wf = self.prepare_whitened_forward(noise_cov)
+        self.is_prepared = False
         data = self.unpack_data_obj(mne_obj)
+        data = wf.sensor_transform @ data
 
         if not self.is_prepared:
             self._prepare_flex()
@@ -104,7 +108,9 @@ class SolverSubspaceSBL(BaseSolver):
             pruning_thresh=pruning_thresh,
             conv_crit=convergence_criterion,
         )
-        self.inverse_operators = [InverseOperator(inverse_operator, self.name)]
+        self.inverse_operators = [
+            InverseOperator(inverse_operator @ wf.sensor_transform, self.name)
+        ]
         return self
 
     # ================================================================

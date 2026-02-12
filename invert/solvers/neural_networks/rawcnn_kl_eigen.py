@@ -156,10 +156,12 @@ class SolverRawCNNKLEigen(BaseSolver):
         temperature: float = 1.0,
         gamma_power: float = 1.5,
         n_components: int = 8,
+        noise_cov: mne.Covariance | None = None,
         alpha: str | float = "auto",
         **kwargs,
     ):
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        self.prepare_whitened_forward(noise_cov)
         self.forward = forward
         self.simulation_config = simulation_config
         self.n_components = int(n_components)
@@ -186,6 +188,8 @@ class SolverRawCNNKLEigen(BaseSolver):
 
     def apply_inverse_operator(self, mne_obj, prior=None) -> mne.SourceEstimate:
         data = self.unpack_data_obj(mne_obj)
+        self.validate_operator_data_compatibility(data)
+        data = self._sensor_transform @ data
         source_mat = self.apply_model(data, prior=prior)
         return self.source_to_object(source_mat)
 
@@ -286,22 +290,28 @@ class SolverRawCNNKLEigen(BaseSolver):
                 patience_left = int(self.patience)
                 logger.info(
                     "Epoch %d/%d - loss=%.6f val_loss=%.6f (new best)",
-                    epoch + 1, self.epochs,
-                    float(loss.detach().cpu().item()), val_loss,
+                    epoch + 1,
+                    self.epochs,
+                    float(loss.detach().cpu().item()),
+                    val_loss,
                 )
             else:
                 patience_left -= 1
                 if (epoch == 0) or ((epoch + 1) % log_every == 0):
                     logger.info(
                         "Epoch %d/%d - loss=%.6f val_loss=%.6f (patience_left=%d)",
-                        epoch + 1, self.epochs,
-                        float(loss.detach().cpu().item()), val_loss,
+                        epoch + 1,
+                        self.epochs,
+                        float(loss.detach().cpu().item()),
+                        val_loss,
                         patience_left,
                     )
                 if patience_left <= 0:
                     logger.info(
                         "Early stopping at epoch %d/%d (best_val=%.6f)",
-                        epoch + 1, self.epochs, best_val,
+                        epoch + 1,
+                        self.epochs,
+                        best_val,
                     )
                     break
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import mne
 import numpy as np
 
 from ..base import BaseSolver, SolverMeta
@@ -56,21 +57,37 @@ class SolverFlexESMV(BaseSolver):
         self._inner_kwargs.pop("verbose", None)
         return super().__init__(reduce_rank=reduce_rank, rank=rank, **kwargs)
 
-    def make_inverse_operator(self, forward, mne_obj, *args, alpha="auto", **kwargs):
+    def make_inverse_operator(
+        self,
+        forward,
+        mne_obj,
+        *args,
+        alpha="auto",
+        noise_cov: mne.Covariance | None = None,
+        **kwargs,
+    ):
         # Just ensure forward/info handling is consistent
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        if noise_cov is not None:
+            self.coerce_noise_cov(noise_cov)
+        self._noise_cov = noise_cov
         _ = self.unpack_data_obj(mne_obj)
         self.inverse_operators = []
         return self
 
     def apply_inverse_operator(self, mne_obj):  # type: ignore[override]
+        data = self.unpack_data_obj(mne_obj)
+        self.validate_operator_data_compatibility(data)
+
         base = SolverFlexESMV2(
             reduce_rank=self.reduce_rank,
             rank=self.rank,
             verbose=self.verbose,
             **self._inner_kwargs,
         )
-        base.make_inverse_operator(self.forward, mne_obj, alpha="auto")
+        base.make_inverse_operator(
+            self.forward, mne_obj, alpha="auto", noise_cov=self._noise_cov
+        )
         stc = base.apply_inverse_operator(mne_obj)
 
         y = stc.data

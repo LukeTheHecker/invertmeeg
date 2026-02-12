@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import mne
 import numpy as np
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
@@ -55,7 +56,7 @@ class SolverVBSBL(BaseSolver):
         *args: Any,
         alpha: str | float = "auto",
         max_iter: int = 300,
-        noise_cov: np.ndarray | None = None,
+        noise_cov: mne.Covariance | None = None,
         prune: bool = True,
         pruning_thresh: float = 1e-4,
         convergence_criterion: float = 1e-6,

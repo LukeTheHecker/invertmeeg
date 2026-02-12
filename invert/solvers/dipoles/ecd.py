@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import mne
 import numpy as np
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
@@ -48,13 +49,16 @@ class SolverECD(BaseSolver):
         mne_obj,
         *args: Any,
         alpha: str | float = "auto",
+        noise_cov: mne.Covariance | None = None,
         tmin: float | None = None,
         tmax: float | None = None,
         **kwargs: Any,
     ):
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        wf = self.prepare_whitened_forward(noise_cov)
 
         data = self.unpack_data_obj(mne_obj)
+        data = wf.sensor_transform @ data
         sfreq = float(self.obj_info["sfreq"])
         if tmin is not None or tmax is not None:
             start = 0 if tmin is None else int(round((tmin - self.tmin) * sfreq))
@@ -87,5 +91,7 @@ class SolverECD(BaseSolver):
         self.dipole_index = best
         self.gof = float(gof[best])
 
-        self.inverse_operators = [InverseOperator(kernel, self.name)]
+        self.inverse_operators = [
+            InverseOperator(kernel @ wf.sensor_transform, self.name)
+        ]
         return self

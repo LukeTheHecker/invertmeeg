@@ -47,7 +47,14 @@ class SolverGFTMNE(BaseSolver):
         return super().__init__(**kwargs)
 
     def make_inverse_operator(
-        self, forward, *args, alpha="auto", cutoff=0.3, verbose=0, **kwargs
+        self,
+        forward,
+        *args,
+        alpha="auto",
+        cutoff=0.3,
+        noise_cov: mne.Covariance | None = None,
+        verbose=0,
+        **kwargs,
     ):
         """Calculate inverse operator.
 
@@ -65,8 +72,8 @@ class SolverGFTMNE(BaseSolver):
         super().make_inverse_operator(
             forward, *args, reference=None, alpha=alpha, **kwargs
         )
-
-        leadfield = self.leadfield
+        wf = self.prepare_whitened_forward(noise_cov)
+        leadfield = wf.G_white
         n_chans, _ = leadfield.shape
 
         # Get Adjacency matrix
@@ -92,7 +99,7 @@ class SolverGFTMNE(BaseSolver):
             inverse_operator = np.linalg.solve(
                 LLT + alpha * np.identity(n_chans), leadfield_gft
             ).T
-            inverse_operators.append(U @ inverse_operator)
+            inverse_operators.append(U @ inverse_operator @ wf.sensor_transform)
 
         self.inverse_operators = [
             InverseOperator(inverse_operator, self.name)

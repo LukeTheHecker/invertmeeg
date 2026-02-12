@@ -109,8 +109,18 @@ class SolverAdaptFlexESMV(BaseSolver):
 
         self.is_prepared = True
 
-    def make_inverse_operator(self, forward, mne_obj, *args, alpha="auto", **kwargs):
+    def make_inverse_operator(
+        self,
+        forward,
+        mne_obj,
+        *args,
+        alpha="auto",
+        noise_cov: mne.Covariance | None = None,
+        **kwargs,
+    ):
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        wf = self.prepare_whitened_forward(noise_cov)
+        self.is_prepared = False
         data = self.unpack_data_obj(mne_obj)
 
         if not self.is_prepared:
@@ -120,7 +130,7 @@ class SolverAdaptFlexESMV(BaseSolver):
         n_orders = len(self.leadfields)
         epsilon = 1e-15
 
-        y = data
+        y = wf.sensor_transform @ data
         I = np.identity(n_chans)
         y -= y.mean(axis=1, keepdims=True)
         C = self.data_covariance(y, center=False, ddof=1)
@@ -194,7 +204,7 @@ class SolverAdaptFlexESMV(BaseSolver):
 
                 inv_op += G_sel.T @ W_sel.T
 
-            inverse_operators.append(inv_op)
+            inverse_operators.append(inv_op @ wf.sensor_transform)
 
         self.inverse_operators = [
             InverseOperator(op, self.name) for op in inverse_operators

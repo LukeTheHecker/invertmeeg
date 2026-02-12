@@ -1,6 +1,7 @@
 import logging
 from copy import deepcopy
 
+import mne
 import numpy as np
 from scipy.sparse import diags
 
@@ -109,7 +110,7 @@ class SolverChampagne(BaseSolver):
         *args,
         alpha="auto",
         max_iter=2000,
-        noise_cov=None,
+        noise_cov: mne.Covariance | None = None,
         prune=True,
         pruning_thresh=1e-3,
         convergence_criterion=1e-8,
@@ -128,7 +129,7 @@ class SolverChampagne(BaseSolver):
             The regularization parameter.
         max_iter : int
             Maximum number of iterations.
-        noise_cov : [None, numpy.ndarray]
+        noise_cov : [None, mne.Covariance]
             The noise covariance matrix. Use "None" if not available.
         prune : bool
             If True, the algorithm sets small-activity dipoles to zero
@@ -148,10 +149,17 @@ class SolverChampagne(BaseSolver):
 
         n_chans = self.leadfield.shape[0]
         if noise_cov is None:
-            noise_cov = np.identity(n_chans, dtype=float)
-        noise_cov = np.asarray(noise_cov, dtype=float)
+            noise_cov = self.make_identity_noise_cov(list(self.forward.ch_names))
+        noise_cov, noise_cov_ch_names = self.coerce_noise_cov(noise_cov)
+        forward_ch_names = list(self.forward.ch_names)
+        if noise_cov_ch_names != forward_ch_names:
+            noise_cov = self.reorder_covariance_to_channels(
+                noise_cov, noise_cov_ch_names, forward_ch_names
+            )
         if noise_cov.shape != (n_chans, n_chans):
-            msg = f"noise_cov has shape {noise_cov.shape}, expected {(n_chans, n_chans)}"
+            msg = (
+                f"noise_cov has shape {noise_cov.shape}, expected {(n_chans, n_chans)}"
+            )
             raise ValueError(msg)
         noise_cov = 0.5 * (noise_cov + noise_cov.T)
 

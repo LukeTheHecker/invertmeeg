@@ -1,5 +1,6 @@
 import logging
 
+import mne
 import numpy as np
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
@@ -58,7 +59,7 @@ class SolverMNE(BaseSolver):
         forward,
         *args,
         alpha="auto",
-        noise_cov=None,
+        noise_cov: mne.Covariance | None = None,
         verbose=0,
         **kwargs,
     ):
@@ -82,16 +83,23 @@ class SolverMNE(BaseSolver):
         super().make_inverse_operator(
             forward, *args, reference=None, alpha=alpha, **kwargs
         )
+        if noise_cov is not None:
+            self.coerce_noise_cov(noise_cov)
 
         if self.use_noise_whitener:
-            n_chans = self.leadfield.shape[0]
             if noise_cov is None:
-                noise_cov = np.eye(n_chans, dtype=float)
-            wf = self.prepare_whitened_forward(
-                noise_cov,
-                rank_tol=self.rank_tol,
-                eps=self.eps,
-            )
+                wf = self.prepare_whitened_forward(
+                    None,
+                    apply_projector_when_no_cov=False,
+                    rank_tol=self.rank_tol,
+                    eps=self.eps,
+                )
+            else:
+                wf = self.prepare_whitened_forward(
+                    noise_cov,
+                    rank_tol=self.rank_tol,
+                    eps=self.eps,
+                )
         else:
             wf = self.prepare_whitened_forward(None)
         if wf.whitener_mode not in ("projected", "none"):
@@ -118,9 +126,7 @@ class SolverMNE(BaseSolver):
             LLT = leadfield_sensor @ leadfield_sensor.T
             I = np.identity(int(leadfield_sensor.shape[0]))
             for alpha in self.alphas:
-                kernel_eff = np.linalg.solve(
-                    LLT + float(alpha) * I, leadfield_sensor
-                ).T
+                kernel_eff = np.linalg.solve(LLT + float(alpha) * I, leadfield_sensor).T
                 inverse_operators.append(kernel_eff @ sensor_transform)
 
         self.inverse_operators = [

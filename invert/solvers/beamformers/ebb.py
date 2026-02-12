@@ -1,5 +1,6 @@
 import logging
 
+import mne
 import numpy as np
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
@@ -40,7 +41,7 @@ class SolverEBB(BaseSolver):
         mne_obj,
         *args,
         weight_norm=True,
-        noise_cov=None,
+        noise_cov: mne.Covariance | None = None,
         alpha="auto",
         max_iter=100,
         tol=1e-6,
@@ -73,30 +74,33 @@ class SolverEBB(BaseSolver):
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
 
         data = self.unpack_data_obj(mne_obj)
-        leadfield = self.leadfield
-        n_channels, n_times = data.shape
+
+        wf = self.prepare_whitened_forward(noise_cov)
+        leadfield = wf.G_white.copy()
+        sensor_transform = wf.sensor_transform
+        n_channels = wf.n_eff
         n_sources = leadfield.shape[1]
 
         # normalize leadfield
         leadfield /= np.linalg.norm(leadfield, axis=0)
 
-        # Compute data covariance
-        data_cov = self.data_covariance(data, center=True, ddof=1)
-
-        # handle noise_cov - use scaled identity as default
-        if noise_cov is None:
-            noise_cov = np.identity(n_channels)
+        # Whiten data and compute covariance
+        data_w = sensor_transform @ data
+        data_cov = self.data_covariance(data_w, center=True, ddof=1)
 
         inverse_operators = []
         self.alphas = self.get_alphas(reference=data_cov)
+
+        # In whitened space, noise covariance is identity
+        I_eff = np.identity(n_channels)
 
         for alpha in self.alphas:
             # Initialize source variances (diagonal of source covariance)
             # Start with uniform prior
             gamma = np.ones(n_sources)
 
-            # Regularized noise covariance
-            Cn = alpha * noise_cov
+            # Regularized noise covariance (identity in whitened space)
+            Cn = alpha * I_eff
 
             # Iterative empirical Bayes updates
             for n_iter in range(max_iter):
@@ -124,8 +128,8 @@ class SolverEBB(BaseSolver):
                 # Compute beamformer weights for this iteration
                 W = Sigma_s @ leadfield.T @ Cn_inv  # shape: (n_sources, n_channels)
 
-                # Estimate source activity
-                source_estimates = W @ data  # shape: (n_sources, n_times)
+                # Estimate source activity (in whitened space)
+                source_estimates = W @ data_w  # shape: (n_sources, n_times)
 
                 # Update source variances using empirical estimates
                 # gamma_new[i] = trace(Sigma_s[i,i]) + (source_estimates[i,:]^2).mean()
@@ -167,11 +171,13 @@ class SolverEBB(BaseSolver):
 
             W = middle_inv @ leadfield.T @ Cn_inv
 
-            # Optional weight normalization
+            # Optional weight normalization (in whitened space where noise cov is I)
             if weight_norm:
                 W /= np.linalg.norm(W, axis=1, keepdims=True)
 
-            inverse_operators.append(W)  # Transpose to match expected shape
+            # Map back to raw sensor space: W_raw @ data = W_eff @ sensor_transform @ data
+            W_raw = W @ sensor_transform
+            inverse_operators.append(W_raw)
 
         self.inverse_operators = [
             InverseOperator(inverse_operator, self.name)

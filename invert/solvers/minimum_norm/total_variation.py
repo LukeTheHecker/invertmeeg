@@ -42,9 +42,15 @@ class SolverTotalVariation(BaseSolver):
         super().__init__(**kwargs)
 
     def make_inverse_operator(
-        self, forward, *args: Any, alpha: str | float = "auto", **kwargs: Any
+        self,
+        forward,
+        *args: Any,
+        alpha: str | float = "auto",
+        noise_cov: mne.Covariance | None = None,
+        **kwargs: Any,
     ):
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        self.prepare_whitened_forward(noise_cov)
 
         adjacency = mne.spatial_src_adjacency(self.forward["src"], verbose=0).tocoo()
         i = adjacency.row.astype(int)
@@ -70,6 +76,8 @@ class SolverTotalVariation(BaseSolver):
             )
 
         Y = self.unpack_data_obj(mne_obj)
+        self.validate_operator_data_compatibility(Y)
+        Y = self._sensor_transform @ Y
         L = self.leadfield
         n_chans, n_sources = L.shape
         n_time = Y.shape[1]

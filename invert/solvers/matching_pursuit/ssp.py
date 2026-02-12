@@ -43,7 +43,15 @@ class SolverSSP(BaseSolver):
         self.name = name
         return super().__init__(**kwargs)
 
-    def make_inverse_operator(self, forward, *args, alpha="auto", verbose=0, **kwargs):
+    def make_inverse_operator(
+        self,
+        forward,
+        *args,
+        alpha="auto",
+        noise_cov: mne.Covariance | None = None,
+        verbose=0,
+        **kwargs,
+    ):
         """Calculate inverse operator.
 
         Parameters
@@ -58,6 +66,7 @@ class SolverSSP(BaseSolver):
         self : object returns itself for convenience
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        self.prepare_whitened_forward(noise_cov)
         # Store original leadfield for coefficient estimation
         self.leadfield_original = self.leadfield.copy()
         # Use robust normalization from base class for atom selection
@@ -82,6 +91,8 @@ class SolverSSP(BaseSolver):
             The source estimate containing the inverse solution.
         """
         data = self.unpack_data_obj(mne_obj)
+        self.validate_operator_data_compatibility(data)
+        data = self._sensor_transform @ data
         source_mat = self.calc_ssp_solution(data, K=K)
         stc = self.source_to_object(source_mat)
         return stc

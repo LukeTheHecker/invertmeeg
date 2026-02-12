@@ -1,5 +1,6 @@
 import logging
 
+import mne
 import numpy as np
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
@@ -56,7 +57,7 @@ class SolverLCMV(BaseSolver):
         mne_obj,
         *args,
         alpha="auto",
-        noise_cov=None,
+        noise_cov: mne.Covariance | None = None,
         weight_norm=True,
         verbose=0,
         **kwargs,
@@ -81,6 +82,23 @@ class SolverLCMV(BaseSolver):
         """
         self.weight_norm = weight_norm
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        noise_cov_raw = None
+        if noise_cov is not None:
+            noise_cov_raw, noise_cov_ch_names = self.coerce_noise_cov(noise_cov)
+            try:
+                noise_cov_raw = self.reorder_covariance_to_channels(
+                    noise_cov_raw,
+                    noise_cov_ch_names,
+                    list(self.forward.ch_names),
+                )
+            except KeyError:
+                logger.warning(
+                    "LCMV: noise_cov channels do not align with forward channels; "
+                    "falling back to Euclidean weight normalization."
+                )
+                noise_cov_raw = None
+            else:
+                noise_cov_raw = 0.5 * (noise_cov_raw + noise_cov_raw.T)
         data = self.unpack_data_obj(mne_obj)
         # Match legacy behavior: column-normalize leadfield *in place* so
         # downstream solvers/tests that relied on this side-effect keep working.
@@ -88,26 +106,16 @@ class SolverLCMV(BaseSolver):
         lead_norms = np.linalg.norm(leadfield, axis=0)
         leadfield /= np.maximum(lead_norms, self.eps)
 
-        n_chans_raw = int(leadfield.shape[0])
+        _n_chans_raw = int(leadfield.shape[0])
         y_raw = data
-        noise_cov_raw = None
-        if noise_cov is not None:
-            noise_cov_raw = np.asarray(noise_cov, dtype=float)
-            if noise_cov_raw.shape != (n_chans_raw, n_chans_raw):
-                msg = (
-                    f"noise_cov has shape {noise_cov_raw.shape}, "
-                    f"expected {(n_chans_raw, n_chans_raw)}"
-                )
-                raise ValueError(msg)
-            noise_cov_raw = 0.5 * (noise_cov_raw + noise_cov_raw.T)
 
         # Optional robust path: whiten + project in sensor space using noise_cov.
         use_robust_covariance = bool(self.use_robust_covariance)
         if use_robust_covariance:
-            if noise_cov_raw is None:
-                noise_cov_raw = np.eye(n_chans_raw, dtype=float)
+            if noise_cov is None:
+                noise_cov = self.make_identity_noise_cov(list(self.forward.ch_names))
             wf = self.prepare_whitened_forward(
-                noise_cov_raw,
+                noise_cov,
                 rank_tol=self.rank_tol,
                 eps=self.eps,
             )

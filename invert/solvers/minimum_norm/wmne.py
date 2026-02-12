@@ -1,5 +1,6 @@
 import logging
 
+import mne
 import numpy as np
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
@@ -53,7 +54,7 @@ class SolverWMNE(BaseSolver):
         forward,
         *args,
         alpha="auto",
-        noise_cov=None,
+        noise_cov: mne.Covariance | None = None,
         verbose=0,
         **kwargs,
     ):
@@ -74,11 +75,12 @@ class SolverWMNE(BaseSolver):
         self : object returns itself for convenience
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        if noise_cov is not None:
+            self.coerce_noise_cov(noise_cov)
 
         if self.use_noise_whitener:
-            n_chans = self.leadfield.shape[0]
             if noise_cov is None:
-                noise_cov = np.eye(n_chans, dtype=float)
+                noise_cov = self.make_identity_noise_cov(list(self.forward.ch_names))
             wf = self.prepare_whitened_forward(
                 noise_cov,
                 rank_tol=self.rank_tol,
@@ -105,7 +107,9 @@ class SolverWMNE(BaseSolver):
         for alpha in self.alphas:
             inverse_operator = (
                 WTW
-                @ np.linalg.solve(LWTWL + float(alpha) * np.identity(n_eff), leadfield).T
+                @ np.linalg.solve(
+                    LWTWL + float(alpha) * np.identity(n_eff), leadfield
+                ).T
             )
             inverse_operators.append(inverse_operator @ sensor_transform)
 

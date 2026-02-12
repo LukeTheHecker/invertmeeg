@@ -1,5 +1,6 @@
 import logging
 
+import mne
 import numpy as np
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
@@ -39,7 +40,14 @@ class SolverSMV(BaseSolver):
         return super().__init__(reduce_rank=reduce_rank, rank=rank, **kwargs)
 
     def make_inverse_operator(
-        self, forward, mne_obj, *args, weight_norm=True, alpha="auto", **kwargs
+        self,
+        forward,
+        mne_obj,
+        *args,
+        weight_norm=True,
+        alpha="auto",
+        noise_cov: mne.Covariance | None = None,
+        **kwargs,
     ):
         """Calculate inverse operator.
 
@@ -60,15 +68,16 @@ class SolverSMV(BaseSolver):
 
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        wf = self.prepare_whitened_forward(noise_cov)
         data = self.unpack_data_obj(mne_obj)
 
-        leadfield = self.leadfield
+        leadfield = wf.G_white
         leadfield /= np.linalg.norm(leadfield, axis=0)
-        n_chans, n_dipoles = self.leadfield.shape
+        n_chans, n_dipoles = leadfield.shape
 
         self.weight_norm = weight_norm
 
-        y = data
+        y = wf.sensor_transform @ data
         I = np.identity(n_chans)
 
         # Recompute regularization based on the max eigenvalue of the Covariance
@@ -86,7 +95,7 @@ class SolverSMV(BaseSolver):
 
             if self.weight_norm:
                 W /= np.linalg.norm(W, axis=0)
-            inverse_operator = W.T
+            inverse_operator = W.T @ wf.sensor_transform
             inverse_operators.append(inverse_operator)
 
         self.inverse_operators = [

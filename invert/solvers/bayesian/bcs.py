@@ -31,7 +31,14 @@ class SolverBCS(BaseSolver):
         self.name = name
         return super().__init__(**kwargs)
 
-    def make_inverse_operator(self, forward, *args, alpha="auto", **kwargs):
+    def make_inverse_operator(
+        self,
+        forward,
+        *args,
+        alpha="auto",
+        noise_cov: mne.Covariance | None = None,
+        **kwargs,
+    ):
         """Calculate inverse operator.
 
         Parameters
@@ -46,7 +53,9 @@ class SolverBCS(BaseSolver):
         self : object returns itself for convenience
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
-        self.leadfield_norm = self.leadfield
+        wf = self.prepare_whitened_forward(noise_cov)
+        self.leadfield = wf.G_white
+        self.leadfield_norm = wf.G_white
 
         return self
 
@@ -73,6 +82,8 @@ class SolverBCS(BaseSolver):
 
         """
         data = self.unpack_data_obj(mne_obj)
+        self.validate_operator_data_compatibility(data)
+        data = self._sensor_transform @ data
         source_mat = self.calc_bcs_solution(
             data, max_iter=max_iter, alpha_0=alpha_0, eps=eps
         )

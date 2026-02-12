@@ -53,7 +53,7 @@ class SolverLORETA(BaseSolver):
         forward,
         *args,
         alpha="auto",
-        noise_cov=None,
+        noise_cov: mne.Covariance | None = None,
         **kwargs,
     ):
         """Calculate inverse operator.
@@ -70,11 +70,12 @@ class SolverLORETA(BaseSolver):
         self : object returns itself for convenience
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        if noise_cov is not None:
+            self.coerce_noise_cov(noise_cov)
 
         if self.use_noise_whitener:
-            n_chans = self.leadfield.shape[0]
             if noise_cov is None:
-                noise_cov = np.eye(n_chans, dtype=float)
+                noise_cov = self.make_identity_noise_cov(list(self.forward.ch_names))
             wf = self.prepare_whitened_forward(
                 noise_cov,
                 trace_normalize=self.use_trace_normalization,
@@ -115,7 +116,9 @@ class SolverLORETA(BaseSolver):
         inverse_operators = []
         for alpha in self.alphas:
             kernel_eff = np.linalg.solve(LTL + float(alpha) * BLapTLapB, leadfield.T)
-            inverse_operators.append((float(leadfield_scale) * kernel_eff) @ sensor_transform)
+            inverse_operators.append(
+                (float(leadfield_scale) * kernel_eff) @ sensor_transform
+            )
 
         self.inverse_operators = [
             InverseOperator(inverse_operator, self.name)

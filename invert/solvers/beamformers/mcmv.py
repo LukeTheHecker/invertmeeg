@@ -1,3 +1,4 @@
+import mne
 import numpy as np
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
@@ -44,7 +45,7 @@ class SolverMCMV(BaseSolver):
         mne_obj,
         *args,
         weight_norm=True,
-        noise_cov=None,
+        noise_cov: mne.Covariance | None = None,
         alpha="auto",
         k_constraints=3,
         verbose=0,
@@ -78,19 +79,18 @@ class SolverMCMV(BaseSolver):
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
         data = self.unpack_data_obj(mne_obj)
 
-        leadfield = self.leadfield
+        wf = self.prepare_whitened_forward(noise_cov)
+        leadfield = wf.G_white.copy()
+        sensor_transform = wf.sensor_transform
         leadfield /= np.linalg.norm(leadfield, axis=0)
         n_chans, n_dipoles = leadfield.shape
-
-        if noise_cov is None:
-            noise_cov = np.identity(n_chans)
 
         self.weight_norm = weight_norm
         self.k_constraints = min(
             k_constraints, n_dipoles
         )  # Ensure k doesn't exceed n_dipoles
 
-        y = data
+        y = sensor_transform @ data
         I = np.identity(n_chans)
 
         # Recompute regularization based on the max eigenvalue of the Covariance
@@ -151,7 +151,8 @@ class SolverMCMV(BaseSolver):
             if self.weight_norm:
                 W /= np.linalg.norm(W, axis=0)
 
-            inverse_operator = W.T
+            # Map back to raw sensor space
+            inverse_operator = (sensor_transform.T @ W).T
             inverse_operators.append(inverse_operator)
 
         self.inverse_operators = [

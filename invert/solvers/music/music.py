@@ -1,3 +1,4 @@
+import mne
 import numpy as np
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
@@ -39,6 +40,7 @@ class SolverMUSIC(BaseSolver):
         mne_obj,
         *args,
         alpha="auto",
+        noise_cov: mne.Covariance | None = None,
         n="enhanced",
         stop_crit=0.95,
         verbose=0,
@@ -67,10 +69,12 @@ class SolverMUSIC(BaseSolver):
         self : object returns itself for convenience
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        wf = self.prepare_whitened_forward(noise_cov)
         data = self.unpack_data_obj(mne_obj)
+        data = wf.sensor_transform @ data
         inverse_operator = self.make_music(data, n, stop_crit)
         self.inverse_operators = [
-            InverseOperator(inverse_operator, self.name),
+            InverseOperator(inverse_operator @ wf.sensor_transform, self.name),
         ]
         return self
 

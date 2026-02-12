@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 
+import mne
 import numpy as np
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
@@ -104,17 +105,15 @@ class SolverDSPMMNE(BaseSolver):
         forward,
         *args,
         alpha="auto",
-        noise_cov=None,
+        noise_cov: mne.Covariance | None = None,
         source_cov=None,
         verbose: int = 0,  # noqa: ARG002
         **kwargs,
     ):
         """Calculate inverse operators for a lambda2 grid."""
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
-        n_chans = self.leadfield.shape[0]
-
         if noise_cov is None:
-            noise_cov = np.eye(n_chans, dtype=float)
+            noise_cov = self.make_identity_noise_cov(list(self.forward.ch_names))
 
         wf = self.prepare_whitened_forward(
             noise_cov,

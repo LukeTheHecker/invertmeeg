@@ -22,6 +22,7 @@ except ModuleNotFoundError as exc:  # pragma: no cover
     nn = _NN()  # type: ignore[assignment]
     _TORCH_IMPORT_ERROR = exc
 
+from ...simulate import SimulationGenerator
 from ..base import BaseSolver, SolverMeta
 from .torch_utils import (
     activation_from_name,
@@ -94,6 +95,7 @@ class SolverFC(BaseSolver):
         loss="cosine_similarity",
         size_validation_set=256,
         patience=100,
+        noise_cov: mne.Covariance | None = None,
         alpha="auto",
         **kwargs,
     ):
@@ -148,6 +150,7 @@ class SolverFC(BaseSolver):
         super().make_inverse_operator(
             forward, *args, alpha=alpha, verbose=self.verbose, **kwargs
         )
+        self.prepare_whitened_forward(noise_cov)
         n_channels, n_dipoles = self.leadfield.shape
 
         # Store simulation config
@@ -199,6 +202,8 @@ class SolverFC(BaseSolver):
             The mne Source Estimate object.
         """
         data = self.unpack_data_obj(mne_obj)
+        self.validate_operator_data_compatibility(data)
+        data = self._sensor_transform @ data
 
         source_mat = self.apply_model(data)
         stc = self.source_to_object(source_mat)
@@ -356,9 +361,7 @@ class SolverFC(BaseSolver):
                 x = np.stack([xx / np.max(abs(xx)) for xx in x], axis=0)
                 # y: (batch, n_dipoles, n_timepoints) -> (batch, n_timepoints, n_dipoles)
                 y = np.swapaxes(y, 1, 2)
-                y = np.stack(
-                    [(yy.T / np.max(abs(yy), axis=1)).T for yy in y], axis=0
-                )
+                y = np.stack([(yy.T / np.max(abs(yy), axis=1)).T for yy in y], axis=0)
                 yield x, y
 
         self.generator = _fc_generator()

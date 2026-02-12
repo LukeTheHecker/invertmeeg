@@ -131,6 +131,7 @@ class SolverCovCNN(BaseSolver):
         epsilon=0.0,
         patience=100,
         cov_type="basic",
+        noise_cov: mne.Covariance | None = None,
         alpha="auto",
         **kwargs,
     ):
@@ -181,6 +182,7 @@ class SolverCovCNN(BaseSolver):
         self : object returns itself for convenience
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        self.prepare_whitened_forward(noise_cov)
         n_channels, n_dipoles = self.leadfield.shape
 
         if n_filters == "auto":
@@ -244,6 +246,8 @@ class SolverCovCNN(BaseSolver):
             The mne Source Estimate object.
         """
         data = self.unpack_data_obj(mne_obj)
+        self.validate_operator_data_compatibility(data)
+        data = self._sensor_transform @ data
 
         source_mat = self.apply_model(data, prior=prior)
         stc = self.source_to_object(source_mat)

@@ -94,13 +94,18 @@ class SolverOmniChampagne(BaseSolver):
         mne_obj,
         *args,
         alpha: str | float = "auto",
+        noise_cov: mne.Covariance | None = None,
         **kwargs,
     ):
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        wf = self.prepare_whitened_forward(noise_cov)
         data = self.unpack_data_obj(mne_obj)
+        data = wf.sensor_transform @ data
 
         inv_op = self._fit_and_build_inverse_operator(data)
-        self.inverse_operators = [InverseOperator(inv_op, self.name)]
+        self.inverse_operators = [
+            InverseOperator(inv_op @ wf.sensor_transform, self.name)
+        ]
         return self
 
     # ------------------------------------------------------------------

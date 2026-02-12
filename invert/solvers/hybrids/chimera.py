@@ -80,8 +80,18 @@ class SolverChimera(BaseSolver):
         self.require_recompute = True
         self.require_data = True
 
-    def make_inverse_operator(self, forward, mne_obj, *args, alpha="auto", **kwargs):
+    def make_inverse_operator(
+        self,
+        forward,
+        mne_obj,
+        *args,
+        alpha="auto",
+        noise_cov: mne.Covariance | None = None,
+        **kwargs,
+    ):
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        self.prepare_whitened_forward(noise_cov)
+        self._noise_cov = noise_cov
         _ = self.unpack_data_obj(mne_obj)
 
         # Precompute adjacency + diffusion operator for the detection ratio.
@@ -100,12 +110,17 @@ class SolverChimera(BaseSolver):
         return self
 
     def apply_inverse_operator(self, mne_obj):  # type: ignore[override]
-        Y = self.unpack_data_obj(mne_obj).copy()
+        Y = self.unpack_data_obj(mne_obj)
+        self.validate_operator_data_compatibility(Y)
+        Y = Y.copy()
+        Y = self._sensor_transform @ Y
 
         is_single_focal = self._is_single_focal(Y)
         if is_single_focal:
             solver = SolverFlexESMV(verbose=self.verbose)
-            solver.make_inverse_operator(self.forward, mne_obj, alpha="auto")
+            solver.make_inverse_operator(
+                self.forward, mne_obj, alpha="auto", noise_cov=self._noise_cov
+            )
             return solver.apply_inverse_operator(mne_obj)
 
         solver = SolverSignalSubspaceMatching(verbose=self.verbose)
@@ -113,6 +128,7 @@ class SolverChimera(BaseSolver):
             self.forward,
             mne_obj,
             alpha="auto",
+            noise_cov=self._noise_cov,
             n_orders=self._p.ssm_n_orders,
         )
         return solver.apply_inverse_operator(mne_obj)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import mne
 import numpy as np
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
@@ -85,6 +86,7 @@ class SolverLCMVMVPURE(BaseSolver):
         *args: Any,
         alpha: str | float = "auto",
         weight_norm: bool = True,
+        noise_cov: mne.Covariance | None = None,
         verbose: int = 0,
         **kwargs: Any,
     ) -> Any:
@@ -92,14 +94,23 @@ class SolverLCMVMVPURE(BaseSolver):
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
         data = self.unpack_data_obj(mne_obj)
 
-        leadfield = self.leadfield
+        if noise_cov is None:
+            # Match vanilla LCMV exactly in the no-noise-covariance path.
+            sensor_transform = np.eye(int(self.leadfield.shape[0]), dtype=float)
+            leadfield = self.leadfield
+        else:
+            wf = self.prepare_whitened_forward(noise_cov)
+            sensor_transform = wf.sensor_transform
+            leadfield = wf.G_white
+
         leadfield_norm = np.linalg.norm(leadfield, axis=0, keepdims=True)
         leadfield_norm = np.where(leadfield_norm > 0, leadfield_norm, 1.0)
         leadfield /= leadfield_norm
         n_chans, n_dipoles = leadfield.shape
         leadfield_similarity = np.abs(leadfield.T @ leadfield)
 
-        y = data - data.mean(axis=1, keepdims=True)
+        y = sensor_transform @ data
+        y -= y.mean(axis=1, keepdims=True)
         I = np.identity(n_chans)
         R = self.data_covariance(y, center=False, ddof=1)
         self.get_alphas(reference=R)
@@ -145,9 +156,17 @@ class SolverLCMVMVPURE(BaseSolver):
             selected_rank_per_alpha.append(int(r))
 
             H0 = leadfield[:, sel]
-            W_sel = _mvpure_projected_lcmv_weights_from_inv_cov(
-                R_inv, H0, rank=r, cond_threshold=1e12, regularization=1e-12
-            )  # (l0, n_chans)
+            if H0.shape[1] == 1 and r == 1:
+                # For the single-source case, MV-PURE reduces exactly to
+                # vanilla LCMV; keep the closed form to avoid projection
+                # round-off differences.
+                h = H0[:, [0]]
+                denom = float(np.asarray(h.T @ R_inv @ h).item())
+                W_sel = (R_inv @ h / denom).T
+            else:
+                W_sel = _mvpure_projected_lcmv_weights_from_inv_cov(
+                    R_inv, H0, rank=r, cond_threshold=1e12, regularization=1e-12
+                )  # (l0, n_chans)
 
             K_full = np.zeros((n_dipoles, n_chans), dtype=W_sel.dtype)
             K_full[sel, :] = W_sel
@@ -157,7 +176,7 @@ class SolverLCMVMVPURE(BaseSolver):
                 nz = row_norm > 0
                 K_full[nz, :] = (K_full[nz, :].T / row_norm[nz]).T
 
-            inverse_operators.append(K_full)
+            inverse_operators.append(K_full @ sensor_transform)
 
         self.inverse_operators = [
             InverseOperator(inverse_operator, self.name)

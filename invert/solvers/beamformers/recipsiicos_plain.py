@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import mne
 import numpy as np
 
 try:
@@ -63,7 +64,7 @@ class SolverReciPSIICOSPlain(BaseSolver):
         mne_obj,
         *args,
         alpha="auto",
-        noise_cov=None,
+        noise_cov: mne.Covariance | None = None,
         virtual_sensor_energy=0.99,
         pwr_energy=0.8,
         pwr_rank=None,

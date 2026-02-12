@@ -40,6 +40,7 @@ class SolverSourceMAP(BaseSolver):
         mne_obj,
         *args,
         alpha="auto",
+        noise_cov: mne.Covariance | None = None,
         smoothness_prior=False,
         max_iter=100,
         p=0.5,
@@ -66,7 +67,9 @@ class SolverSourceMAP(BaseSolver):
 
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        wf = self.prepare_whitened_forward(noise_cov)
         data = self.unpack_data_obj(mne_obj)
+        data = wf.sensor_transform @ data
         leadfield = self.leadfield
         n_chans, n_dipoles = leadfield.shape
         data_cov = self.data_covariance(data, center=True, ddof=1)
@@ -88,7 +91,7 @@ class SolverSourceMAP(BaseSolver):
             inverse_operators.append(inverse_operator)
 
         self.inverse_operators = [
-            InverseOperator(inverse_operator, self.name)
+            InverseOperator(inverse_operator @ wf.sensor_transform, self.name)
             for inverse_operator in inverse_operators
         ]
         return self

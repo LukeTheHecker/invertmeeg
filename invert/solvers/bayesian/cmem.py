@@ -1,6 +1,7 @@
 import logging
 import warnings
 
+import mne
 import numpy as np
 from scipy.optimize import minimize
 from sklearn.cluster import KMeans
@@ -66,6 +67,7 @@ class SolverCMEM(BaseSolver):
         mne_obj,
         *args,
         alpha="auto",
+        noise_cov: mne.Covariance | None = None,
         adjacency=None,
         positions=None,
         **kwargs,
@@ -90,7 +92,9 @@ class SolverCMEM(BaseSolver):
         self : object returns itself for convenience
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        wf = self.prepare_whitened_forward(noise_cov)
         data = self.unpack_data_obj(mne_obj)
+        data = wf.sensor_transform @ data
 
         J, parcels = _cmem(
             data,
@@ -127,6 +131,8 @@ class SolverCMEM(BaseSolver):
             The source estimate.
         """
         data = self.unpack_data_obj(mne_obj)
+        self.validate_operator_data_compatibility(data)
+        data = self._sensor_transform @ data
 
         J, self.parcels = _cmem(
             data,

@@ -1,6 +1,7 @@
 import logging
 from copy import deepcopy
 
+import mne
 import numpy as np
 from scipy.sparse import csr_matrix
 
@@ -43,7 +44,7 @@ class SolverNLChampagne(BaseSolver):
         *args,
         alpha="auto",
         max_iter=1000,
-        noise_cov=None,
+        noise_cov: mne.Covariance | None = None,
         prune=True,
         pruning_thresh=1e-3,
         convergence_criterion=1e-8,
@@ -78,6 +79,8 @@ class SolverNLChampagne(BaseSolver):
 
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        if noise_cov is not None:
+            self.coerce_noise_cov(noise_cov)
         data = self.unpack_data_obj(mne_obj)
 
         # SSP projection via standard pipeline (no whitening — NL-Champagne

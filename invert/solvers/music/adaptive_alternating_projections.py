@@ -54,6 +54,7 @@ class SolverAdaptiveAlternatingProjections(BaseSolver):
         *args,
         n_orders=3,
         alpha="auto",
+        noise_cov: mne.Covariance | None = None,
         n="enhanced",
         k="auto",
         stop_crit=0.95,
@@ -106,6 +107,8 @@ class SolverAdaptiveAlternatingProjections(BaseSolver):
         self : object returns itself for convenience
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        wf = self.prepare_whitened_forward(noise_cov)
+        self.is_prepared = False
 
         self.diffusion_smoothing = (diffusion_smoothing,)
         self.diffusion_parameter = diffusion_parameter
@@ -113,6 +116,7 @@ class SolverAdaptiveAlternatingProjections(BaseSolver):
         self.adjacency_type = adjacency_type
         self.adjacency_distance = adjacency_distance
         data = self.unpack_data_obj(mne_obj)
+        data = wf.sensor_transform @ data
 
         if not self.is_prepared:
             self.prepare_flex()
@@ -125,7 +129,7 @@ class SolverAdaptiveAlternatingProjections(BaseSolver):
             depth_weights=depth_weights,
         )
         self.inverse_operators = [
-            InverseOperator(inverse_operator, self.name),
+            InverseOperator(inverse_operator @ wf.sensor_transform, self.name),
         ]
         return self
 

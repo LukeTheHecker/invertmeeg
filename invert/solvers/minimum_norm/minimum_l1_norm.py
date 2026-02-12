@@ -45,7 +45,7 @@ class SolverMinimumL1Norm(BaseSolver):
         *args,
         alpha="auto",
         max_iter=1000,
-        noise_cov=None,
+        noise_cov: mne.Covariance | None = None,
         verbose=0,
         **kwargs,
     ):
@@ -64,11 +64,7 @@ class SolverMinimumL1Norm(BaseSolver):
         """
 
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
-        n_chans = self.leadfield.shape[0]
-        if noise_cov is None:
-            noise_cov = np.identity(n_chans)
-
-        self.noise_cov = noise_cov
+        self.prepare_whitened_forward(noise_cov)
         self.inverse_operators = []
         return self
 
@@ -112,6 +108,8 @@ class SolverMinimumL1Norm(BaseSolver):
             The mne Source Estimate object.
         """
         data = self.unpack_data_obj(mne_obj)
+        self.validate_operator_data_compatibility(data)
+        data = self._sensor_transform @ data
         source_mat = self.fista_wrap(
             data,
             max_iter=max_iter,

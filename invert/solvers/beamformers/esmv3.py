@@ -1,3 +1,4 @@
+import mne
 import numpy as np
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
@@ -38,7 +39,15 @@ class SolverESMV3(BaseSolver):
         self.name = name
         return super().__init__(reduce_rank=reduce_rank, rank=rank, **kwargs)
 
-    def make_inverse_operator(self, forward, mne_obj, *args, alpha="auto", **kwargs):
+    def make_inverse_operator(
+        self,
+        forward,
+        mne_obj,
+        *args,
+        alpha="auto",
+        noise_cov: mne.Covariance | None = None,
+        **kwargs,
+    ):
         """Calculate inverse operator.
 
         Parameters
@@ -56,16 +65,17 @@ class SolverESMV3(BaseSolver):
 
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        wf = self.prepare_whitened_forward(noise_cov)
         data = self.unpack_data_obj(mne_obj)
 
-        leadfield = self.leadfield
+        leadfield = wf.G_white
         leadfield /= np.linalg.norm(leadfield, axis=0)
 
         n_chans, n_dipoles = leadfield.shape
         data.shape[1]
         epsilon = 1e-8
 
-        y = data
+        y = wf.sensor_transform @ data
         I = np.identity(n_chans)
 
         # CAR
@@ -123,7 +133,7 @@ class SolverESMV3(BaseSolver):
             # β = 0.25  # β=0 → standard ESMV, β=1 → covariance weighted, β=1.5 → more aggressive weighting
             # W_ESMV = E_S @ (Λ_S ** β) @ (E_S.T @ W_mv)
 
-            inverse_operator = W_ESMV.T
+            inverse_operator = W_ESMV.T @ wf.sensor_transform
             inverse_operators.append(inverse_operator)
 
         self.inverse_operators = [

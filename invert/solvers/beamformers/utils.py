@@ -319,11 +319,13 @@ def _regularize(C: np.ndarray, lam: float) -> np.ndarray:
 
 
 def _whiten(
-    Y: np.ndarray, L: np.ndarray, noise_cov: np.ndarray | None
+    Y: np.ndarray, L: np.ndarray, noise_cov: np.ndarray | dict | None
 ) -> tuple[np.ndarray, np.ndarray]:
     """Prewhiten Y and L by noise covariance (if provided)."""
     if noise_cov is None:
         return Y, L
+    if isinstance(noise_cov, dict) and "data" in noise_cov:
+        noise_cov = np.asarray(noise_cov["data"], dtype=float)
     w, V = eigh(noise_cov)
     w = np.clip(w, 1e-12, None)
     W = (V * (1.0 / np.sqrt(w))) @ V.T

@@ -72,6 +72,7 @@ class SolverSelfRegularizedELORETA(BaseSolver):
         forward,
         *args,
         alpha="auto",
+        noise_cov: mne.Covariance | None = None,
         verbose=0,
         stop_crit=1e-3,
         max_iter=100,
@@ -95,6 +96,7 @@ class SolverSelfRegularizedELORETA(BaseSolver):
         self : object returns itself for convenience
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        self.prepare_whitened_forward(noise_cov)
         self.stop_crit = stop_crit
         self.max_iter = max_iter
 
@@ -237,6 +239,8 @@ class SolverSelfRegularizedELORETA(BaseSolver):
             logger.info("Step 1: Computing initial eLORETA solution...")
 
         data = self.unpack_data_obj(mne_obj)
+        self.validate_operator_data_compatibility(data)
+        data = self._sensor_transform @ data
 
         # Apply regularization method to get initial source estimate
         if self.use_last_alpha and self.last_reg_idx is not None:

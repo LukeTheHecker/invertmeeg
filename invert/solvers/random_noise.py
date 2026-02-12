@@ -32,6 +32,7 @@ class SolverRandomNoise(BaseSolver):
 
     def apply_inverse_operator(self, mne_obj):
         data = self.unpack_data_obj(mne_obj)
+        self.validate_operator_data_compatibility(data)
         n_time = data.shape[1] if data.ndim > 1 else 1
         source_mat = np.random.randn(self.n_sources, n_time)
         return self.source_to_object(source_mat)

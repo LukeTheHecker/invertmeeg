@@ -51,7 +51,7 @@ class SolverGFTMinimumL1Norm(BaseSolver):
         mode_fraction=1.0,
         high_freq_penalty=0.0,
         max_iter=1000,
-        noise_cov=None,
+        noise_cov: mne.Covariance | None = None,
         verbose=0,
         **kwargs,
     ):
@@ -70,9 +70,6 @@ class SolverGFTMinimumL1Norm(BaseSolver):
         """
 
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
-        n_chans = self.leadfield.shape[0]
-        if noise_cov is None:
-            noise_cov = np.identity(n_chans)
 
         adjacency = mne.spatial_src_adjacency(forward["src"], verbose=0)
         graph_laplacian = laplacian(adjacency, normed=False).astype(float).toarray()
@@ -92,7 +89,7 @@ class SolverGFTMinimumL1Norm(BaseSolver):
             normalized = self.graph_laplacian_eigenvalues / max_eig
         self.mode_weights = 1.0 + float(high_freq_penalty) * normalized
 
-        self.noise_cov = noise_cov
+        self.prepare_whitened_forward(noise_cov)
         self.inverse_operators = []
         return self
 
@@ -141,6 +138,8 @@ class SolverGFTMinimumL1Norm(BaseSolver):
             The mne Source Estimate object.
         """
         data = self.unpack_data_obj(mne_obj)
+        self.validate_operator_data_compatibility(data)
+        data = self._sensor_transform @ data
         source_mat = self.fista_wrap(
             data,
             max_iter=max_iter,

@@ -1,3 +1,4 @@
+import mne
 import numpy as np
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
@@ -33,7 +34,7 @@ class SolverUnitNoiseGain(BaseSolver):
         mne_obj,
         *args,
         weight_norm=True,
-        noise_cov=None,
+        noise_cov: mne.Covariance | None = None,
         alpha="auto",
         verbose=0,
         **kwargs,
@@ -58,16 +59,14 @@ class SolverUnitNoiseGain(BaseSolver):
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
         data = self.unpack_data_obj(mne_obj)
 
-        leadfield = self.leadfield
-        # leadfield /= np.linalg.norm(leadfield, axis=0)
+        wf = self.prepare_whitened_forward(noise_cov)
+        leadfield = wf.G_white
+        sensor_transform = wf.sensor_transform
         n_chans, n_dipoles = leadfield.shape
-
-        if noise_cov is None:
-            noise_cov = np.identity(n_chans)
 
         self.weight_norm = weight_norm
 
-        y = data
+        y = sensor_transform @ data
         I = np.identity(n_chans)
 
         # Recompute regularization based on the max eigenvalue of the Covariance
@@ -84,15 +83,13 @@ class SolverUnitNoiseGain(BaseSolver):
             # Use np.einsum to compute the diagonal elements
             diag_elements = np.einsum("ij,ji->i", leadfield_C_inv_sq, leadfield)
 
-            # W = C_inv @ leadfield * (1.0 / diag_elements)
             W = C_inv @ leadfield * (1 / np.sqrt(diag_elements))
-
-            # W = C_inv @ leadfield @ np.linalg.pinv(leadfield.T @ C_inv @ leadfield)
 
             if self.weight_norm:
                 W /= np.linalg.norm(W, axis=0)
 
-            inverse_operator = W.T
+            # Map back to raw sensor space
+            inverse_operator = (sensor_transform.T @ W).T
             inverse_operators.append(inverse_operator)
 
         self.inverse_operators = [

@@ -95,7 +95,15 @@ class SolverMSP(BaseSolver):
         self.patch_order = patch_order
         return super().__init__(reduce_rank=reduce_rank, rank=rank, **kwargs)
 
-    def make_inverse_operator(self, forward, mne_obj, *args, alpha="auto", **kwargs):
+    def make_inverse_operator(
+        self,
+        forward,
+        mne_obj,
+        *args,
+        alpha="auto",
+        noise_cov: mne.Covariance | None = None,
+        **kwargs,
+    ):
         """Calculate inverse operator using Multiple Sparse Priors with ReML.
 
         Parameters
@@ -113,7 +121,9 @@ class SolverMSP(BaseSolver):
         self : object returns itself for convenience
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        wf = self.prepare_whitened_forward(noise_cov)
         data = self.unpack_data_obj(mne_obj)
+        data = wf.sensor_transform @ data
         leadfield = self.leadfield
 
         # Generate patterns automatically if not provided
@@ -380,7 +390,7 @@ class SolverMSP(BaseSolver):
         self.Re = Re
 
         # Create inverse operator (single operator for MSP)
-        self.inverse_operators = [InverseOperator(M, self.name)]
+        self.inverse_operators = [InverseOperator(M @ wf.sensor_transform, self.name)]
         return self
 
     def _generate_patterns(self, forward):

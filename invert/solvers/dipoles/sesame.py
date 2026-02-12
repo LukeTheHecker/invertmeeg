@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import mne
 import numpy as np
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
@@ -55,6 +56,7 @@ class SolverSESAME(BaseSolver):
         mne_obj,
         *args: Any,
         alpha: str | float = "auto",
+        noise_cov: mne.Covariance | None = None,
         n: int | str | None = None,
         n_dipoles: int | str | None = None,
         n_particles: int = 64,
@@ -67,8 +69,10 @@ class SolverSESAME(BaseSolver):
         **kwargs: Any,
     ):
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        wf = self.prepare_whitened_forward(noise_cov)
 
         data = self.unpack_data_obj(mne_obj)
+        data = wf.sensor_transform @ data
         data = data - data.mean(axis=0, keepdims=True)
 
         leadfield = self.leadfield
@@ -206,5 +210,7 @@ class SolverSESAME(BaseSolver):
             kernel[int(src_idx), :] += pinv[row, :]
 
         self.selected_dipoles = best_dipoles
-        self.inverse_operators = [InverseOperator(kernel, self.name)]
+        self.inverse_operators = [
+            InverseOperator(kernel @ wf.sensor_transform, self.name)
+        ]
         return self
