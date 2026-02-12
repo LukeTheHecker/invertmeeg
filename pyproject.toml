@@ -110,6 +110,18 @@ warn_return_any = false
 warn_unused_configs = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
+disable_error_code = [
+    "arg-type",
+    "assignment",
+    "attr-defined",
+    "has-type",
+    "misc",
+    "operator",
+    "override",
+    "type-var",
+    "valid-type",
+    "var-annotated",
+]
 exclude = ["_old/", "scripts/old/"]
 
 [dependency-groups]

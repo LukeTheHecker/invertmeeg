@@ -55,28 +55,28 @@ SOLVERS = {
 # method is passed to regularise_gcv; gamma overrides the solver attribute
 METHODS = [
     # Baseline
-    ("GCV",          "gcv",       1.0),
+    ("GCV", "gcv", 1.0),
     # MGCV sweep  (c < 1 = bias toward LESS reg, c > 1 = MORE)
-    ("MGCV-0.85",   "mgcv",      0.85),
-    ("MGCV-0.90",   "mgcv",      0.90),
-    ("MGCV-0.95",   "mgcv",      0.95),
-    ("MGCV-1.05",   "mgcv",      1.05),
-    ("MGCV-1.10",   "mgcv",      1.10),
+    ("MGCV-0.85", "mgcv", 0.85),
+    ("MGCV-0.90", "mgcv", 0.90),
+    ("MGCV-0.95", "mgcv", 0.95),
+    ("MGCV-1.05", "mgcv", 1.05),
+    ("MGCV-1.10", "mgcv", 1.10),
     # RGCV sweep  (γ < 1 = bias toward MORE reg, γ > 1 = LESS)
-    ("RGCV-0.3",    "rgcv",      0.3),
-    ("RGCV-0.5",    "rgcv",      0.5),
-    ("RGCV-0.7",    "rgcv",      0.7),
-    ("RGCV-0.9",    "rgcv",      0.9),
-    ("RGCV-1.1",    "rgcv",      1.1),
-    ("RGCV-1.3",    "rgcv",      1.3),
-    ("RGCV-1.5",    "rgcv",      1.5),
-    ("RGCV-2.0",    "rgcv",      2.0),
+    ("RGCV-0.3", "rgcv", 0.3),
+    ("RGCV-0.5", "rgcv", 0.5),
+    ("RGCV-0.7", "rgcv", 0.7),
+    ("RGCV-0.9", "rgcv", 0.9),
+    ("RGCV-1.1", "rgcv", 1.1),
+    ("RGCV-1.3", "rgcv", 1.3),
+    ("RGCV-1.5", "rgcv", 1.5),
+    ("RGCV-2.0", "rgcv", 2.0),
     # R1GCV at two γ values
-    ("R1GCV-0.5",   "r1gcv",     0.5),
-    ("R1GCV-1.5",   "r1gcv",     1.5),
+    ("R1GCV-0.5", "r1gcv", 0.5),
+    ("R1GCV-1.5", "r1gcv", 1.5),
     # Composite (geomean of GCV × RGCV)
-    ("Comp-0.5",    "composite", 0.5),
-    ("Comp-1.5",    "composite", 1.5),
+    ("Comp-0.5", "composite", 0.5),
+    ("Comp-1.5", "composite", 1.5),
 ]
 
 N_REG_PARAMS = 50
@@ -84,10 +84,10 @@ N_SAMPLES = 10
 RANDOM_SEED = 42
 
 DATASETS = {
-    "focal_source":    dict(n_sources=(1, 1), n_orders=(0, 0), snr_range=(0.9, 0.99)),
-    "multi_source":    dict(n_sources=(2, 5), n_orders=(0, 0), snr_range=(0.9, 0.99)),
+    "focal_source": dict(n_sources=(1, 1), n_orders=(0, 0), snr_range=(0.9, 0.99)),
+    "multi_source": dict(n_sources=(2, 5), n_orders=(0, 0), snr_range=(0.9, 0.99)),
     "extended_source": dict(n_sources=(1, 3), n_orders=(1, 5), snr_range=(0.9, 0.99)),
-    "noisy":           dict(n_sources=(1, 3), n_orders=(0, 3), snr_range=(0.1, 0.4)),
+    "noisy": dict(n_sources=(1, 3), n_orders=(0, 3), snr_range=(0.1, 0.4)),
 }
 
 # Metrics where lower is better
@@ -95,6 +95,7 @@ LOWER_BETTER = {"Mean_Localization_Error", "EMD", "sd"}
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
+
 
 def get_solver_cls(name: str):
     module_path, class_name = SOLVERS[name]
@@ -138,6 +139,7 @@ def apply_with_method(solver, solver_name, evoked, method, gamma):
 
 # ── Main ───────────────────────────────────────────────────────────────────
 
+
 def run():
     info = get_info(kind="biosemi32")
     fwd = create_forward_model(sampling="ico2", info=info)
@@ -158,8 +160,10 @@ def run():
         alpha_idx[ds_name] = {}
 
         sim_config = SimulationConfig(
-            batch_size=N_SAMPLES, n_timepoints=10,
-            random_seed=RANDOM_SEED, **ds_kwargs,
+            batch_size=N_SAMPLES,
+            n_timepoints=10,
+            random_seed=RANDOM_SEED,
+            **ds_kwargs,
         )
         gen = SimulationGenerator(fwd, config=sim_config)
         x_batch, y_batch, _ = next(gen.generate())
@@ -204,6 +208,7 @@ def run():
 
 
 # ── Reporting ──────────────────────────────────────────────────────────────
+
 
 def print_results(results, alpha_idx, method_labels):
     all_metrics = list(
@@ -260,7 +265,7 @@ def print_results(results, alpha_idx, method_labels):
 
         for pos, idx in enumerate(sorted_order[:10]):  # top 10
             print(
-                f"  {pos+1:<6} {method_labels[idx]:<14} {mean_ranks[idx]:>10.2f}"
+                f"  {pos + 1:<6} {method_labels[idx]:<14} {mean_ranks[idx]:>10.2f}"
                 f"  {wins[idx]:>5}"
             )
 
@@ -298,7 +303,9 @@ def print_results(results, alpha_idx, method_labels):
         direction = "↓" if lower else "↑"
         print(f"\n  {metric} ({direction})")
         for ds_name in results:
-            header = f"    {ds_name + ':':<20}" + "".join(f"{l:>14}" for l in top5_labels)
+            header = f"    {ds_name + ':':<20}" + "".join(
+                f"{l:>14}" for l in top5_labels
+            )
             print(header)
             for solver_name in SOLVERS:
                 vals = [

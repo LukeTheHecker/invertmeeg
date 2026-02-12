@@ -147,7 +147,10 @@ def _build_registry() -> dict[str, Any]:
     _add(["ebb", "empirical-bayesian-beamformer"], solvers.SolverEBB)
     _add(["adapt-flex-esmv", "adaptflexesmv"], solvers.SolverAdaptFlexESMV)
     _add(["flex-esmv", "flexesmv"], solvers.SolverFlexESMV)
-    _add(["flex-esmv-mvpure", "flexesmvmvpure", "mvpure-flex-esmv"], solvers.SolverFlexESMVMVPURE)
+    _add(
+        ["flex-esmv-mvpure", "flexesmvmvpure", "mvpure-flex-esmv"],
+        solvers.SolverFlexESMVMVPURE,
+    )
     _add(["flex-esmv2", "flexesmv2"], solvers.SolverFlexESMV2)
     _add(["deblur-flex-esmv", "deblurflexesmv"], solvers.SolverDeblurFlexESMV)
     _add(["safe-flex-esmv", "safeflexesmv"], solvers.SolverSafeFlexESMV)

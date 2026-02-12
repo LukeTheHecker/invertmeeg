@@ -99,7 +99,7 @@ def print_comparison(before_path: Path, after_path: Path) -> None:
             continue
         print(f"\n--- {metric.upper()} ---")
         print(f"  {'Solver':<25} {'Before':>10} {'After':>10} {'Delta':>10}")
-        print(f"  {'-'*60}")
+        print(f"  {'-' * 60}")
         for solver in PHASE2_SOLVERS:
             b = b_met.get(solver, float("nan"))
             a = a_met.get(solver, float("nan"))

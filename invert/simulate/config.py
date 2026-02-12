@@ -58,14 +58,12 @@ class SimulationConfig(BaseModel):
     beta_range: tuple[float, float] = Field(default=(0.0, 3.0))
     add_forward_error: bool = Field(default=False)
     forward_error: float = Field(default=0.1, ge=0.0)
-    inter_source_correlation: float | tuple[float, float] = Field(
-        default=(0.25, 0.75)
-    )
+    inter_source_correlation: float | tuple[float, float] = Field(default=(0.25, 0.75))
     diffusion_smoothing: bool = Field(default=True)
     diffusion_parameter: float = Field(default=0.1, ge=0.0)
-    correlation_mode: Literal[
-        "auto", "cholesky", "banded", "diagonal", "low_rank"
-    ] | None = Field(default=None)
+    correlation_mode: (
+        Literal["auto", "cholesky", "banded", "diagonal", "low_rank"] | None
+    ) = Field(default=None)
     noise_color_coeff: float | tuple[float, float] = Field(default=(0.25, 0.75))
     noise_temporal_beta: float | tuple[float, float] = Field(
         default=0.0,

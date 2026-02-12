@@ -14,7 +14,6 @@ from __future__ import annotations
 import copy
 import importlib.util as _ilu
 import json
-import sys
 import time
 from pathlib import Path
 
@@ -41,16 +40,27 @@ from invert.util.util import pos_from_forward  # noqa: E402
 
 # ── configuration ──────────────────────────────────────────────────────────
 SOLVERS = [
-    "Champagne", "ESMV", "LCMV", "dSPM",
-    "eLORETA", "LORETA", "sLORETA",
-    "LAURA", "MNE", "SMAP", "WMNE",
+    "Champagne",
+    "ESMV",
+    "LCMV",
+    "dSPM",
+    "eLORETA",
+    "LORETA",
+    "sLORETA",
+    "LAURA",
+    "MNE",
+    "SMAP",
+    "WMNE",
 ]
 N_SAMPLES = 50
 SEED = 42
 STRUCTURED_MODES = ["banded", "diagonal", "low_rank"]
 METRICS = [
-    "Mean_Localization_Error", "EMD", "sd",
-    "average_precision", "correlation",
+    "Mean_Localization_Error",
+    "EMD",
+    "sd",
+    "average_precision",
+    "correlation",
 ]
 
 
@@ -208,9 +218,9 @@ if __name__ == "__main__":
     }
 
     for ds_name, ds_config in BENCHMARK_DATASETS.items():
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print(f"DATASET: {ds_name}")
-        print(f"{'='*70}")
+        print(f"{'=' * 70}")
 
         # Generate data for both noise modes (reuse across whitening conditions)
         gen_data: dict[str, tuple] = {}
@@ -244,14 +254,18 @@ if __name__ == "__main__":
     print(f"\nSaved to {out_path}")
 
     # ── print summary ──────────────────────────────────────────────────────
-    ms = {"Mean_Localization_Error": "MLE", "EMD": "EMD",
-          "sd": "SD", "average_precision": "AP",
-          "correlation": "Corr"}
+    ms = {
+        "Mean_Localization_Error": "MLE",
+        "EMD": "EMD",
+        "sd": "SD",
+        "average_precision": "AP",
+        "correlation": "Corr",
+    }
     lower_better = {"Mean_Localization_Error", "EMD", "sd"}
 
-    print(f"\n{'='*100}")
+    print(f"\n{'=' * 100}")
     print("SUMMARY: Effect of structured noise and whitening")
-    print(f"{'='*100}")
+    print(f"{'=' * 100}")
 
     for ds_name in BENCHMARK_DATASETS:
         print(f"\n--- {ds_name} ---")
@@ -278,10 +292,14 @@ if __name__ == "__main__":
                 else:
                     better = wht_v > raw_v * 1.03
                     worse = wht_v < raw_v * 0.97
-                tag = " << whitening helps" if better else (" >> whitening hurts" if worse else "")
+                tag = (
+                    " << whitening helps"
+                    if better
+                    else (" >> whitening hurts" if worse else "")
+                )
                 row += tag
                 print(row)
             print(f"  {'---':<13}" + "   ".rjust(19) * 4)
 
     elapsed = time.time() - t0
-    print(f"\nTotal time: {elapsed/60:.1f} min")
+    print(f"\nTotal time: {elapsed / 60:.1f} min")

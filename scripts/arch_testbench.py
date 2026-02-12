@@ -16,21 +16,20 @@ Usage:
     .venv/bin/python scripts/arch_testbench.py --only baseline rawcnn
     .venv/bin/python scripts/arch_testbench.py --n-test 10
 """
+
 from __future__ import annotations
 
 import argparse
+import importlib.util as _ilu
 import json
 import logging
 import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 import mne
 import numpy as np
-
-import importlib.util as _ilu
 
 # Import evaluate_all directly to avoid seaborn dependency
 _spec = _ilu.spec_from_file_location(
@@ -59,22 +58,28 @@ logger = logging.getLogger("arch_testbench")
 # Solver imports (lazy to catch import errors gracefully)
 # ---------------------------------------------------------------------------
 
+
 def _import_solver(name: str):
     """Import a solver class by name."""
     if name == "CovCNN-KL":
         from invert.solvers.neural_networks.covcnn_kl import SolverCovCNNKL
+
         return SolverCovCNNKL
     elif name == "RawCNN-KL":
         from invert.solvers.neural_networks.rawcnn_kl import SolverRawCNNKL
+
         return SolverRawCNNKL
     elif name == "RawCNN-KL-LCMV":
         from invert.solvers.neural_networks.rawcnn_kl_lcmv import SolverRawCNNKLLCMV
+
         return SolverRawCNNKLLCMV
     elif name == "RawCNN-KL-Eigen":
         from invert.solvers.neural_networks.rawcnn_kl_eigen import SolverRawCNNKLEigen
+
         return SolverRawCNNKLEigen
     elif name == "IterCNN-KL":
         from invert.solvers.neural_networks.itercnn_kl import SolverIterCNNKL
+
         return SolverIterCNNKL
     else:
         raise ValueError(f"Unknown solver: {name}")
@@ -84,9 +89,11 @@ def _import_solver(name: str):
 # Experiment definitions
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ArchExperiment:
     """One architecture experiment."""
+
     label: str
     solver_name: str
     # Architecture
@@ -112,50 +119,64 @@ def get_experiments() -> list[ArchExperiment]:
     experiments = []
 
     # Baseline: CovCNN-KL with reduced settings (for fair comparison)
-    experiments.append(ArchExperiment(
-        label="baseline-covcnn-kl",
-        solver_name="CovCNN-KL",
-    ))
+    experiments.append(
+        ArchExperiment(
+            label="baseline-covcnn-kl",
+            solver_name="CovCNN-KL",
+        )
+    )
 
     # Experiment 1: Raw Data Model
-    experiments.append(ArchExperiment(
-        label="rawcnn-kl",
-        solver_name="RawCNN-KL",
-    ))
+    experiments.append(
+        ArchExperiment(
+            label="rawcnn-kl",
+            solver_name="RawCNN-KL",
+        )
+    )
 
     # Experiment 2: Raw Data + LCMV
-    experiments.append(ArchExperiment(
-        label="rawcnn-kl-lcmv",
-        solver_name="RawCNN-KL-LCMV",
-    ))
+    experiments.append(
+        ArchExperiment(
+            label="rawcnn-kl-lcmv",
+            solver_name="RawCNN-KL-LCMV",
+        )
+    )
 
     # Experiment 3: Raw Data + Eigenspace (K=8)
-    experiments.append(ArchExperiment(
-        label="rawcnn-kl-eigen-k8",
-        solver_name="RawCNN-KL-Eigen",
-        extra_params={"n_components": 8},
-    ))
+    experiments.append(
+        ArchExperiment(
+            label="rawcnn-kl-eigen-k8",
+            solver_name="RawCNN-KL-Eigen",
+            extra_params={"n_components": 8},
+        )
+    )
 
     # Experiment 3b: Raw Data + Eigenspace (K=5)
-    experiments.append(ArchExperiment(
-        label="rawcnn-kl-eigen-k5",
-        solver_name="RawCNN-KL-Eigen",
-        extra_params={"n_components": 5},
-    ))
+    experiments.append(
+        ArchExperiment(
+            label="rawcnn-kl-eigen-k5",
+            solver_name="RawCNN-KL-Eigen",
+            extra_params={"n_components": 5},
+        )
+    )
 
     # Experiment 4: Iterative Refinement (2 steps)
-    experiments.append(ArchExperiment(
-        label="itercnn-kl-2step",
-        solver_name="IterCNN-KL",
-        extra_params={"n_refinement_steps": 2},
-    ))
+    experiments.append(
+        ArchExperiment(
+            label="itercnn-kl-2step",
+            solver_name="IterCNN-KL",
+            extra_params={"n_refinement_steps": 2},
+        )
+    )
 
     # Experiment 4b: Iterative Refinement (3 steps)
-    experiments.append(ArchExperiment(
-        label="itercnn-kl-3step",
-        solver_name="IterCNN-KL",
-        extra_params={"n_refinement_steps": 3},
-    ))
+    experiments.append(
+        ArchExperiment(
+            label="itercnn-kl-3step",
+            solver_name="IterCNN-KL",
+            extra_params={"n_refinement_steps": 3},
+        )
+    )
 
     return experiments
 
@@ -164,11 +185,14 @@ def get_experiments() -> list[ArchExperiment]:
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def generate_test_set(
     fwd, sim_config: SimulationConfig, n_samples: int = 20, seed: int = 99
 ) -> tuple[np.ndarray, np.ndarray]:
     """Generate a fixed test set."""
-    rng_cfg = sim_config.model_copy(update={"random_seed": seed, "batch_size": n_samples})
+    rng_cfg = sim_config.model_copy(
+        update={"random_seed": seed, "batch_size": n_samples}
+    )
     sim_gen = SimulationGenerator(fwd, config=rng_cfg)
     gen = sim_gen.generate()
     x_batch, y_batch, _info = next(gen)
@@ -210,15 +234,23 @@ def train_and_evaluate(
     solver_cls = _import_solver(exp.solver_name)
     solver = solver_cls()
 
-    train_sim_config = sim_config.model_copy(update={
-        "batch_size": exp.batch_size,
-    })
+    train_sim_config = sim_config.model_copy(
+        update={
+            "batch_size": exp.batch_size,
+        }
+    )
 
     logger.info("=" * 60)
     logger.info("EXPERIMENT: %s (solver=%s)", exp.label, exp.solver_name)
-    logger.info("  units=%d, layers=%d, epochs=%d, lr=%g, patience=%d, batch_size=%d",
-                exp.n_dense_units, exp.n_dense_layers, exp.epochs,
-                exp.learning_rate, exp.patience, exp.batch_size)
+    logger.info(
+        "  units=%d, layers=%d, epochs=%d, lr=%g, patience=%d, batch_size=%d",
+        exp.n_dense_units,
+        exp.n_dense_layers,
+        exp.epochs,
+        exp.learning_rate,
+        exp.patience,
+        exp.batch_size,
+    )
     if exp.extra_params:
         logger.info("  extra: %s", exp.extra_params)
     logger.info("=" * 60)
@@ -243,6 +275,7 @@ def train_and_evaluate(
 
     # Count parameters
     from invert.solvers.neural_networks.torch_utils import count_trainable_parameters
+
     n_params = count_trainable_parameters(solver.model)
 
     # Evaluate
@@ -265,7 +298,9 @@ def train_and_evaluate(
 def print_summary(results: list[dict]) -> None:
     """Print a formatted summary table."""
     print("\n" + "=" * 120)
-    print("ARCHITECTURE COMPARISON  (MLE/EMD/SD: lower=better; AvgPrec/Corr: higher=better)")
+    print(
+        "ARCHITECTURE COMPARISON  (MLE/EMD/SD: lower=better; AvgPrec/Corr: higher=better)"
+    )
     print("=" * 120)
     header = (
         f"{'Label':<25} {'Solver':<18} {'Params':>10} {'Train(s)':>9} "
@@ -295,10 +330,19 @@ def print_summary(results: list[dict]) -> None:
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main():
-    parser = argparse.ArgumentParser(description="Architecture testbench for CovCNN-KL variants")
-    parser.add_argument("--only", nargs="*", help="Run only experiments whose labels contain these substrings")
-    parser.add_argument("--n-test", type=int, default=20, help="Number of test samples (default: 20)")
+    parser = argparse.ArgumentParser(
+        description="Architecture testbench for CovCNN-KL variants"
+    )
+    parser.add_argument(
+        "--only",
+        nargs="*",
+        help="Run only experiments whose labels contain these substrings",
+    )
+    parser.add_argument(
+        "--n-test", type=int, default=20, help="Number of test samples (default: 20)"
+    )
     args = parser.parse_args()
 
     mne.set_log_level("WARNING")
@@ -308,7 +352,11 @@ def main():
     fwd = create_forward_model(sampling="ico2", info=info)
     n_dipoles = fwd["sol"]["data"].shape[1]
     n_channels = fwd["sol"]["data"].shape[0]
-    logger.info("Forward model: biosemi32/ico2, n_channels=%d, n_dipoles=%d", n_channels, n_dipoles)
+    logger.info(
+        "Forward model: biosemi32/ico2, n_channels=%d, n_dipoles=%d",
+        n_channels,
+        n_dipoles,
+    )
 
     # Adjacency & positions
     adjacency = build_adjacency(fwd, verbose=0)
@@ -348,7 +396,9 @@ def main():
             results.append(result)
         except Exception as e:
             logger.error("FAILED [%s]: %s", exp.label, e, exc_info=True)
-            results.append({"label": exp.label, "solver": exp.solver_name, "error": str(e)})
+            results.append(
+                {"label": exp.label, "solver": exp.solver_name, "error": str(e)}
+            )
 
         # Save incrementally
         with open(out_path, "w") as f:

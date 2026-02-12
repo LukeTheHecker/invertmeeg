@@ -227,7 +227,9 @@ class SimulationGenerator:
         ]
         amplitudes = [
             amp @ np.diag(amplitude_values[i]) @ cov
-            for i, (amp, cov) in enumerate(zip(amplitudes, source_covariances, strict=False))
+            for i, (amp, cov) in enumerate(
+                zip(amplitudes, source_covariances, strict=False)
+            )
         ]
 
         # Generate patch activity using dense source matrix for fast indexing
@@ -391,9 +393,7 @@ class SimulationGenerator:
             covariance_est.append(cov_est)
             covariance_est_scaled.append(cov_est_s)
             covariance_rank_est.append(
-                int(np.linalg.matrix_rank(cov_est))
-                if cov_est is not None
-                else -1
+                int(np.linalg.matrix_rank(cov_est)) if cov_est is not None else -1
             )
 
         x_noisy = np.stack(x_noisy_list, axis=0)

@@ -114,11 +114,11 @@ function init(d) {
     datasets = [...new Set(DATA.results.map(r=>r.dataset_name))].sort();
   }
   const dsSel = document.getElementById("dataset");
-  datasets.forEach(ds => { 
-    const o = document.createElement("option"); 
-    o.value=ds; 
-    o.textContent=DATA.datasets?.[ds]?.name || ds; 
-    dsSel.appendChild(o); 
+  datasets.forEach(ds => {
+    const o = document.createElement("option");
+    o.value=ds;
+    o.textContent=DATA.datasets?.[ds]?.name || ds;
+    dsSel.appendChild(o);
   });
   state.dataset = datasets[0];
 

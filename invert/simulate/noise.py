@@ -174,7 +174,7 @@ def make_sensor_noise_covariance(
     elif mode == "banded":
         idx = np.arange(n_chans)
         dist = np.abs(idx[:, None] - idx[None, :])
-        cov = coeff ** dist
+        cov = coeff**dist
         np.fill_diagonal(cov, 1.0)
     elif mode == "diagonal":
         variances = np.ones(n_chans)

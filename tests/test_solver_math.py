@@ -179,7 +179,9 @@ class TestSolverSLORETA:
         solver.make_inverse_operator(forward_model, simulated_evoked, alpha="auto")
 
         L = _get_leadfield(solver)
-        for mne_op, slor_op in zip(solver.inverse_operators, solver._sloreta_operators, strict=False):
+        for mne_op, slor_op in zip(
+            solver.inverse_operators, solver._sloreta_operators, strict=False
+        ):
             K_mne = mne_op.data[0]
             K_slor = slor_op.data[0]
             R_mne_diag = np.diag(K_mne @ L)

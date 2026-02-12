@@ -14,7 +14,6 @@ import importlib
 import importlib.util as _ilu
 import json
 import logging
-import sys
 import time
 from pathlib import Path
 
@@ -151,7 +150,9 @@ def run_comparison():
 
 def print_results(results, alpha_picks):
     """Print a comparison table for each metric."""
-    all_metrics = list(next(iter(next(iter(next(iter(results.values())).values())).values())).keys())
+    all_metrics = list(
+        next(iter(next(iter(next(iter(results.values())).values())).values())).keys()
+    )
 
     # ── Per-metric, per-dataset tables ──
     for metric in all_metrics:
@@ -161,7 +162,11 @@ def print_results(results, alpha_picks):
 
         for ds_name in results:
             print(f"\n  Dataset: {ds_name}")
-            header = f"  {'Solver':<12}" + "".join(f"{m:>12}" for m in GCV_METHODS) + "    best"
+            header = (
+                f"  {'Solver':<12}"
+                + "".join(f"{m:>12}" for m in GCV_METHODS)
+                + "    best"
+            )
             print(header)
             print(f"  {'-' * (len(header) - 2)}")
 

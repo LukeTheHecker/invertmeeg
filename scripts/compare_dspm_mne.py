@@ -9,7 +9,6 @@ from pathlib import Path
 from invert.benchmark import BenchmarkRunner
 from invert.forward import create_forward_model, get_info
 
-
 SOLVERS = ["dSPM", "dSPM-MNE"]
 N_SAMPLES = 50
 RANDOM_SEED = 42
@@ -46,4 +45,3 @@ def main() -> Path:
 
 if __name__ == "__main__":
     main()
-
