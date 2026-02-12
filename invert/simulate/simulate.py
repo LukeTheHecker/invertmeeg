@@ -295,10 +295,13 @@ class SimulationGenerator:
 
         x_noisy_list = []
         realized_snrs = []
+        noise_scales = []
         projectors = []
         projector_ranks = []
+        covariance_model = []
         covariance_true = []
         covariance_est = []
+        covariance_est_scaled = []
         covariance_rank_true = []
         covariance_rank_est = []
 
@@ -350,11 +353,18 @@ class SimulationGenerator:
             )
             x_noisy = signal + noise_scaled
 
+            # Theoretical covariance of the realized noise (up to sampling error).
+            if self.config.apply_sensor_projector:
+                cov_model = (_scale**2) * (P @ cov_spatial @ P.T)
+            else:
+                cov_model = (_scale**2) * cov_spatial
+
             # True covariance from realized noise in this sample.
             cov_true = empirical_covariance(noise_scaled, shrinkage=0.0, eps=0.0)
 
             # Estimated covariance from independent baseline noise.
             cov_est = None
+            cov_est_s = None
             if self.config.estimate_noise_cov:
                 baseline = sample_sensor_noise(
                     cov_spatial,
@@ -367,14 +377,19 @@ class SimulationGenerator:
                 cov_est = empirical_covariance(
                     baseline, shrinkage=float(self.config.noise_cov_shrinkage)
                 )
+                # Match the baseline estimate to the scaled noise actually added to the data.
+                cov_est_s = (_scale**2) * cov_est
 
             x_noisy_list.append(x_noisy)
             realized_snrs.append(realized_snr)
+            noise_scales.append(_scale)
             projectors.append(P)
             projector_ranks.append(int(np.linalg.matrix_rank(P)))
+            covariance_model.append(cov_model)
             covariance_true.append(cov_true)
             covariance_rank_true.append(int(np.linalg.matrix_rank(cov_true)))
             covariance_est.append(cov_est)
+            covariance_est_scaled.append(cov_est_s)
             covariance_rank_est.append(
                 int(np.linalg.matrix_rank(cov_est))
                 if cov_est is not None
@@ -385,10 +400,13 @@ class SimulationGenerator:
         noise_meta = {
             "snr_target": snr_levels,
             "snr_realized": np.asarray(realized_snrs, dtype=float),
+            "noise_scale": np.asarray(noise_scales, dtype=float),
             "projector": projectors,
             "projector_rank": np.asarray(projector_ranks, dtype=int),
+            "noise_cov_model": covariance_model,
             "noise_cov_true": covariance_true,
             "noise_cov_est": covariance_est,
+            "noise_cov_est_scaled": covariance_est_scaled,
             "noise_cov_rank_true": np.asarray(covariance_rank_true, dtype=int),
             "noise_cov_rank_est": np.asarray(covariance_rank_est, dtype=int),
             "noise_temporal_beta": np.asarray(temporal_betas, dtype=float),
@@ -415,6 +433,7 @@ class SimulationGenerator:
             "amplitudes": amplitude_values,
             "snr": noise_meta["snr_target"],
             "snr_realized": noise_meta["snr_realized"],
+            "noise_scale": noise_meta["noise_scale"],
             "inter_source_correlations": inter_source_correlations,
             "n_orders": [[self.min_order, self.max_order]] * batch_size,
             "diffusion_parameter": [self.config.diffusion_parameter] * batch_size,
@@ -437,9 +456,11 @@ class SimulationGenerator:
 
         if self.config.return_noise_cov:
             info_dict["projector"] = noise_meta["projector"]
+            info_dict["noise_cov_model"] = noise_meta["noise_cov_model"]
             info_dict["noise_cov_true"] = noise_meta["noise_cov_true"]
             if self.config.estimate_noise_cov:
                 info_dict["noise_cov_est"] = noise_meta["noise_cov_est"]
+                info_dict["noise_cov_est_scaled"] = noise_meta["noise_cov_est_scaled"]
 
         if self.config.simulation_mode == "mixture":
             info_dict.update(

@@ -622,16 +622,22 @@ class SolverSSLOFO(BaseSolver):
         idx : int
             Selected regularization index into ``self.alphas``.
         """
-        if self.regularisation_method.lower() == "l":
+        method = self.regularisation_method.lower()
+        if method == "l":
             _, idx = self.regularise_lcurve(data, plot=self.plot_reg)
-        elif self.regularisation_method.lower() in {"gcv", "mgcv"}:
-            gamma = (
-                self.gcv_gamma
-                if self.regularisation_method.lower() == "gcv"
-                else self.mgcv_gamma
+        elif method in {"gcv", "mgcv", "rgcv", "r1gcv", "composite"}:
+            if method == "gcv":
+                gamma = self.gcv_gamma
+            elif method == "mgcv":
+                gamma = self.mgcv_gamma
+            elif method in {"rgcv", "composite"}:
+                gamma = self.rgcv_gamma
+            else:
+                gamma = self.r1gcv_gamma
+            _, idx = self.regularise_gcv(
+                data, plot=self.plot_reg, gamma=gamma, method=method
             )
-            _, idx = self.regularise_gcv(data, plot=self.plot_reg, gamma=gamma)
-        elif self.regularisation_method.lower() == "product":
+        elif method == "product":
             _, idx = self.regularise_product(data, plot=self.plot_reg)
         else:
             idx = len(self.alphas) // 2

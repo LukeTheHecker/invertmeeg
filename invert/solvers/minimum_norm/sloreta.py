@@ -41,13 +41,32 @@ class SolverSLORETA(BaseSolver):
     )
 
     def __init__(
-        self, name="Standardized Low Resolution Tomography", reduce_rank=False, **kwargs
+        self,
+        name="Standardized Low Resolution Tomography",
+        reduce_rank: bool = False,
+        use_noise_whitener: bool = True,
+        use_trace_normalization: bool = True,
+        rank_tol: float = 1e-12,
+        eps: float = 1e-15,
+        **kwargs,
     ):
         self.name = name
         self.reduce_rank = reduce_rank
-        return super().__init__(reduce_rank=reduce_rank, **kwargs)
+        self.use_noise_whitener = bool(use_noise_whitener)
+        self.use_trace_normalization = bool(use_trace_normalization)
+        self.rank_tol = float(rank_tol)
+        self.eps = float(eps)
+        super().__init__(reduce_rank=reduce_rank, **kwargs)
 
-    def make_inverse_operator(self, forward, *args, alpha="auto", verbose=0, **kwargs):
+    def make_inverse_operator(
+        self,
+        forward,
+        *args,
+        alpha="auto",
+        noise_cov=None,
+        verbose=0,
+        **kwargs,
+    ):
         """Calculate inverse operator.
 
         Parameters
@@ -65,24 +84,49 @@ class SolverSLORETA(BaseSolver):
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
 
-        leadfield = self.leadfield
-        n_chans = leadfield.shape[0]
+        if self.use_noise_whitener:
+            n_chans = self.leadfield.shape[0]
+            if noise_cov is None:
+                noise_cov = np.eye(n_chans, dtype=float)
+            wf = self.prepare_whitened_forward(
+                noise_cov,
+                trace_normalize=self.use_trace_normalization,
+                rank_tol=self.rank_tol,
+                eps=self.eps,
+            )
+        else:
+            wf = self.prepare_whitened_forward(
+                None,
+                trace_normalize=self.use_trace_normalization,
+                rank_tol=self.rank_tol,
+                eps=self.eps,
+            )
+        if wf.whitener_mode not in ("projected", "none"):
+            logger.warning("sLORETA whitener fallback used: %s", wf.whitener_mode)
 
+        leadfield = wf.A if wf.A is not None else wf.G_white
+        leadfield_scale = wf.trace_scale
+        sensor_transform = wf.sensor_transform
+
+        # Keep alpha scaling consistent with the transformed leadfield.
+        self.get_alphas(reference=leadfield @ leadfield.T)
+
+        n_eff = int(leadfield.shape[0])
         LLT = leadfield @ leadfield.T
-
-        I = np.identity(n_chans)
+        I = np.identity(n_eff)
 
         mne_operators = []
         sloreta_operators = []
-        eps = 1e-12
         for alpha in self.alphas:
             K_MNE = leadfield.T @ np.linalg.pinv(LLT + alpha * I)
-            resolution_diag = np.maximum(np.diag(K_MNE @ leadfield), eps)
+            resolution_diag = np.maximum(np.diag(K_MNE @ leadfield), self.eps)
             W_diag = np.sqrt(resolution_diag)
-            W_slor = (K_MNE.T / W_diag).T
 
-            mne_operators.append(K_MNE)
-            sloreta_operators.append(W_slor)
+            K_MNE_full = (float(leadfield_scale) * K_MNE) @ sensor_transform
+            W_slor_full = (float(leadfield_scale) * (K_MNE.T / W_diag).T) @ sensor_transform
+
+            mne_operators.append(K_MNE_full)
+            sloreta_operators.append(W_slor_full)
 
         # Store MNE operators for regularization selection and sLORETA
         # operators for the final result.

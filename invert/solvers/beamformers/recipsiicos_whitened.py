@@ -11,7 +11,6 @@ from .utils import (
     _project_covariance_whitened,
     _psd_spectral_flip,
     _virtual_sensors,
-    _whiten,
 )
 
 
@@ -104,18 +103,13 @@ class SolverReciPSIICOSWhitened(BaseSolver):
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
         data = self.unpack_data_obj(mne_obj)
 
-        L = self.leadfield
-        Y = data
-        n_chans, n_dipoles = L.shape
-
-        # Normalize leadfield columns
-        L = L / np.linalg.norm(L, axis=0)
-
-        # 1) Optional noise whitening
-        Yw, Lw = _whiten(Y, L, noise_cov)
+        # 1) Whiten leadfield and data via standard pipeline (SSP + noise whitening)
+        wf = self.prepare_whitened_forward(noise_cov)
+        L = wf.G_white / np.linalg.norm(wf.G_white, axis=0)
+        Yw = wf.sensor_transform @ data
 
         # 2) Virtual sensors via leadfield SVD
-        UrT, Lr = _virtual_sensors(Lw, keep_energy=virtual_sensor_energy)
+        UrT, Lr = _virtual_sensors(L, keep_energy=virtual_sensor_energy)
         Yr = UrT @ Yw
 
         # 3) Data covariance in reduced space
@@ -148,7 +142,8 @@ class SolverReciPSIICOSWhitened(BaseSolver):
         inverse_operators = []
         for reg in self.alphas:
             W_reduced = _lcmv_inverse_operator(Lr, Ct, reg=reg)
-            W_full = W_reduced @ UrT
+            # Map from reduced whitened space back to raw sensor space
+            W_full = W_reduced @ UrT @ wf.sensor_transform
             inverse_operator = W_full
             inverse_operators.append(inverse_operator)
 

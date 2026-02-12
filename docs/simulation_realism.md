@@ -180,12 +180,20 @@ Implementation:
 
 This mirrors a real-world situation: estimators often regularize covariances for numerical stability.
 
+**Important note about scaling**
+- In this simulator, sensor noise is scaled per sample to hit a target SNR.
+- As a result, the baseline-estimated covariance `noise_cov_est` matches the *shape* (correlation structure)
+  but not necessarily the *magnitude* of the realized noise in `x`.
+- For a covariance estimate on the same scale as the injected noise, use `noise_cov_est_scaled`
+  (or `noise_cov_model` for the theoretical covariance implied by the simulation parameters).
+
 ## 6. Metadata Added to `SimulationGenerator.generate()`
 
 The generator still yields `(x, y, info)` where `info` is a `pandas.DataFrame`.
 New columns include (depending on configuration):
 
 - `snr` / `snr_realized`
+- `noise_scale` (per-sample scalar applied to sensor noise)
 - `correlation_mode`, `noise_color_coeff`
 - `noise_temporal_beta`
 - `noise_rank_deficiency`
@@ -193,8 +201,10 @@ New columns include (depending on configuration):
 - `noise_cov_rank_true`, `noise_cov_rank_est`
 - Optional heavy objects when `return_noise_cov=True`:
   - `projector` (the projector matrix `P`)
+  - `noise_cov_model` (theoretical covariance implied by the noise model + SNR scaling)
   - `noise_cov_true` (empirical cov from realized noise)
   - `noise_cov_est` (baseline-estimated cov)
+  - `noise_cov_est_scaled` (baseline-estimated cov scaled to match realized noise magnitude)
 
 These are produced in:
 - `/Users/lukas/projects/invert/invert-package/invert/simulate/simulate.py:400` (`_build_metadata`)
@@ -218,4 +228,3 @@ For a single sample:
    `solver.make_inverse_operator(forward, alpha="auto", noise_cov=noise_cov)`
 
 This is the mechanism used to compare `dSPM` vs `dSPM-MNE` under realistic correlated noise.
-

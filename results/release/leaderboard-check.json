@@ -1,0 +1,1834 @@
+{
+  "ranks": {
+    "extended_source": {
+      "ESMV": 2.2,
+      "Champagne": 2.8,
+      "eLORETA": 4.8,
+      "WMNE": 4.8,
+      "sLORETA": 5.0,
+      "MNE": 5.0,
+      "LCMV": 5.8,
+      "LAURA": 7.0,
+      "dSPM": 8.2,
+      "LORETA": 9.4,
+      "SMAP": 9.4
+    },
+    "focal_source": {
+      "Champagne": 1.0,
+      "ESMV": 1.8,
+      "LCMV": 2.8,
+      "eLORETA": 4.8,
+      "WMNE": 6.0,
+      "sLORETA": 6.2,
+      "LAURA": 6.4,
+      "MNE": 6.6,
+      "dSPM": 7.6,
+      "LORETA": 10.0,
+      "SMAP": 10.0
+    },
+    "multi_source": {
+      "Champagne": 1.0,
+      "ESMV": 2.4,
+      "LCMV": 4.2,
+      "eLORETA": 5.0,
+      "WMNE": 5.4,
+      "sLORETA": 5.8,
+      "MNE": 5.8,
+      "LAURA": 6.4,
+      "dSPM": 8.0,
+      "LORETA": 10.0,
+      "SMAP": 10.0
+    },
+    "noisy": {
+      "Champagne": 1.4,
+      "ESMV": 1.8,
+      "sLORETA": 4.8,
+      "MNE": 4.8,
+      "eLORETA": 5.0,
+      "WMNE": 5.6,
+      "LCMV": 6.2,
+      "LAURA": 6.2,
+      "dSPM": 8.2,
+      "LORETA": 10.0,
+      "SMAP": 10.0
+    }
+  },
+  "global_ranks": {
+    "Champagne": 1.55,
+    "ESMV": 2.05,
+    "LCMV": 4.75,
+    "eLORETA": 4.9,
+    "sLORETA": 5.45,
+    "WMNE": 5.45,
+    "MNE": 5.55,
+    "LAURA": 6.5,
+    "dSPM": 8.0,
+    "LORETA": 9.85,
+    "SMAP": 9.85
+  },
+  "metadata": {
+    "name": "Leaderboard Check",
+    "description": "Targeted check for solvers modified on 2026-02-11.",
+    "timestamp": "2026-02-11T13:40:56.729064",
+    "n_samples": 50,
+    "random_seed": null,
+    "solvers": [
+      "Champagne",
+      "ESMV",
+      "LCMV",
+      "dSPM",
+      "eLORETA",
+      "LORETA",
+      "sLORETA",
+      "LAURA",
+      "MNE",
+      "SMAP",
+      "WMNE"
+    ],
+    "m": 32,
+    "n": 1284,
+    "m_electrodes": 32,
+    "n_sources": 1284,
+    "n_leadfield_columns": 1284,
+    "n_orient": 1
+  },
+  "datasets": {
+    "focal_source": {
+      "name": "Focal Source",
+      "description": "Single focal dipole source with moderate noise",
+      "n_sources": 1,
+      "n_orders": 0,
+      "snr_range": [
+        3.0,
+        5.0
+      ],
+      "n_timepoints": 50,
+      "n_samples": 50
+    },
+    "multi_source": {
+      "name": "Multi Source",
+      "description": "Multiple focal dipole sources with low-to-moderate noise",
+      "n_sources": [
+        2,
+        4
+      ],
+      "n_orders": 0,
+      "snr_range": [
+        1.0,
+        3.0
+      ],
+      "n_timepoints": 50,
+      "n_samples": 50
+    },
+    "extended_source": {
+      "name": "Extended Source",
+      "description": "Multiple extended patch sources with spatial smoothing",
+      "n_sources": [
+        2,
+        4
+      ],
+      "n_orders": [
+        1,
+        3
+      ],
+      "snr_range": [
+        1.0,
+        3.0
+      ],
+      "n_timepoints": 50,
+      "n_samples": 50
+    },
+    "noisy": {
+      "name": "Noisy",
+      "description": "Variable sources under challenging low-SNR conditions",
+      "n_sources": [
+        1,
+        3
+      ],
+      "n_orders": [
+        0,
+        2
+      ],
+      "snr_range": [
+        -5.0,
+        0.0
+      ],
+      "n_timepoints": 50,
+      "n_samples": 50
+    }
+  },
+  "results": [
+    {
+      "solver_name": "Champagne",
+      "dataset_name": "focal_source",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.012326927977183419,
+          "std": 0.08628849584028393,
+          "median": 0.0,
+          "worst_10_pct": 0.0
+        },
+        "emd": {
+          "mean": 0.01739232156933686,
+          "std": 0.121746250985358,
+          "median": 0.0,
+          "worst_10_pct": 0.0
+        },
+        "spatial_dispersion": {
+          "mean": 1.0204296500573096,
+          "std": 0.14300755040116708,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "average_precision": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "correlation": {
+          "mean": 0.9974934436079382,
+          "std": 0.017545894744430877,
+          "median": 0.9999999999999998,
+          "worst_10_pct": 0.9999999999999997
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "ESMV",
+      "dataset_name": "focal_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 3.5956676834584966,
+          "std": 3.64722620224303,
+          "median": 3.933385865659596,
+          "worst_10_pct": 7.946983195660145
+        },
+        "emd": {
+          "mean": 1.0292804406961154,
+          "std": 2.414045058500917,
+          "median": 0.0,
+          "worst_10_pct": 4.173023508040859
+        },
+        "spatial_dispersion": {
+          "mean": 1.0411834757396066,
+          "std": 0.20176351360384814,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "average_precision": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "correlation": {
+          "mean": 0.9138805392934921,
+          "std": 0.08434555529411389,
+          "median": 0.942550415573692,
+          "worst_10_pct": 0.8406019854023891
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "LCMV",
+      "dataset_name": "focal_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 18.006861569572763,
+          "std": 9.586111133713219,
+          "median": 17.083181359814812,
+          "worst_10_pct": 30.40998855496442
+        },
+        "emd": {
+          "mean": 47.10978826265095,
+          "std": 27.37587827337388,
+          "median": 50.1685469154492,
+          "worst_10_pct": 82.89768117660752
+        },
+        "spatial_dispersion": {
+          "mean": 4.294940749029988,
+          "std": 17.996439427447452,
+          "median": 1.0,
+          "worst_10_pct": 3.7164456534186687
+        },
+        "average_precision": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "correlation": {
+          "mean": 0.17729043962480215,
+          "std": 0.06183972732091534,
+          "median": 0.17446145372915448,
+          "worst_10_pct": 0.10958734846666308
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "dSPM",
+      "dataset_name": "focal_source",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 21.76770357287913,
+          "std": 8.529466269673426,
+          "median": 20.57456318129073,
+          "worst_10_pct": 34.50054259356234
+        },
+        "emd": {
+          "mean": 69.96834958930954,
+          "std": 10.364072029573643,
+          "median": 71.70961637845863,
+          "worst_10_pct": 83.57735138381577
+        },
+        "spatial_dispersion": {
+          "mean": 129.28577227553396,
+          "std": 216.30222696221784,
+          "median": 67.20203681880088,
+          "worst_10_pct": 222.98055795146922
+        },
+        "average_precision": {
+          "mean": 0.17634213394973447,
+          "std": 0.24465227302603043,
+          "median": 0.07417582417582418,
+          "worst_10_pct": 0.030050505050505053
+        },
+        "correlation": {
+          "mean": 0.0392437613133717,
+          "std": 0.011037912819562838,
+          "median": 0.039298328870730655,
+          "worst_10_pct": 0.026538470974623973
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "eLORETA",
+      "dataset_name": "focal_source",
+      "category": "loreta",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 9.156297280566355,
+          "std": 2.178612051546546,
+          "median": 9.0239110589497,
+          "worst_10_pct": 11.520209810552094
+        },
+        "emd": {
+          "mean": 55.245633163131764,
+          "std": 5.9310485554026835,
+          "median": 55.180854779692766,
+          "worst_10_pct": 61.120588597501445
+        },
+        "spatial_dispersion": {
+          "mean": 147.732964702039,
+          "std": 54.81915371709271,
+          "median": 137.59094929814995,
+          "worst_10_pct": 201.16066263054498
+        },
+        "average_precision": {
+          "mean": 1.0,
+          "std": 0.0,
+          "median": 1.0,
+          "worst_10_pct": 1.0
+        },
+        "correlation": {
+          "mean": 0.07647485762626109,
+          "std": 0.01242959657531372,
+          "median": 0.0782311021950733,
+          "worst_10_pct": 0.059719389938565945
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "LORETA",
+      "dataset_name": "focal_source",
+      "category": "loreta",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 52.62848948113503,
+          "std": 16.32452115737305,
+          "median": 52.51787164306644,
+          "worst_10_pct": 74.2165259974611
+        },
+        "emd": {
+          "mean": 75.29320730108586,
+          "std": 9.0419243594724,
+          "median": 74.5422640742432,
+          "worst_10_pct": 88.9134019398032
+        },
+        "spatial_dispersion": {
+          "mean": 1030.956279369741,
+          "std": 283.73911044618757,
+          "median": 1090.775271138239,
+          "worst_10_pct": 1384.595187928282
+        },
+        "average_precision": {
+          "mean": 0.010871244860851162,
+          "std": 0.028895061405267798,
+          "median": 0.001784134098128967,
+          "worst_10_pct": 0.0009394725169743082
+        },
+        "correlation": {
+          "mean": 0.014797955691246643,
+          "std": 0.02037034955403915,
+          "median": 0.01823720870412649,
+          "worst_10_pct": -0.014632850849627994
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "sLORETA",
+      "dataset_name": "focal_source",
+      "category": "loreta",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 28.69899153531219,
+          "std": 15.219893404602043,
+          "median": 24.390801291014927,
+          "worst_10_pct": 49.02553094790394
+        },
+        "emd": {
+          "mean": 54.47123601441258,
+          "std": 11.20217094739145,
+          "median": 54.91100517774758,
+          "worst_10_pct": 68.14974760681326
+        },
+        "spatial_dispersion": {
+          "mean": 73.02715818958893,
+          "std": 64.89549945327472,
+          "median": 52.10774986578332,
+          "worst_10_pct": 148.84588403568713
+        },
+        "average_precision": {
+          "mean": 0.16023555576858264,
+          "std": 0.24353160277547678,
+          "median": 0.05555555555555555,
+          "worst_10_pct": 0.013533586400396105
+        },
+        "correlation": {
+          "mean": 0.06966583810184089,
+          "std": 0.030818688750061104,
+          "median": 0.06500078007505497,
+          "worst_10_pct": 0.03616809635265168
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "LAURA",
+      "dataset_name": "focal_source",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 29.653346054207706,
+          "std": 10.036950609875689,
+          "median": 29.10725435213972,
+          "worst_10_pct": 43.0008833216137
+        },
+        "emd": {
+          "mean": 51.29747762808825,
+          "std": 9.070429357772403,
+          "median": 52.99906304504903,
+          "worst_10_pct": 61.958580006931676
+        },
+        "spatial_dispersion": {
+          "mean": 33.22953887059195,
+          "std": 24.606785500790973,
+          "median": 27.508727022253993,
+          "worst_10_pct": 63.32659033213575
+        },
+        "average_precision": {
+          "mean": 0.11978331035362495,
+          "std": 0.20213274146951715,
+          "median": 0.041666666666666664,
+          "worst_10_pct": 0.008532643826761475
+        },
+        "correlation": {
+          "mean": 0.07317191562030603,
+          "std": 0.03542840538115098,
+          "median": 0.06547767879058725,
+          "worst_10_pct": 0.037709520473702574
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "MNE",
+      "dataset_name": "focal_source",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 28.69899153531219,
+          "std": 15.219893404602043,
+          "median": 24.390801291014927,
+          "worst_10_pct": 49.02553094790394
+        },
+        "emd": {
+          "mean": 54.47123601441259,
+          "std": 11.202170947391448,
+          "median": 54.91100517774761,
+          "worst_10_pct": 68.14974760681322
+        },
+        "spatial_dispersion": {
+          "mean": 73.02715818958893,
+          "std": 64.89549945327472,
+          "median": 52.10774986578332,
+          "worst_10_pct": 148.84588403568713
+        },
+        "average_precision": {
+          "mean": 0.16023555576858264,
+          "std": 0.24353160277547678,
+          "median": 0.05555555555555555,
+          "worst_10_pct": 0.013533586400396105
+        },
+        "correlation": {
+          "mean": 0.06966583810184088,
+          "std": 0.03081868875006111,
+          "median": 0.06500078007505494,
+          "worst_10_pct": 0.03616809635265163
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SMAP",
+      "dataset_name": "focal_source",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 52.62848948113503,
+          "std": 16.32452115737305,
+          "median": 52.51787164306644,
+          "worst_10_pct": 74.2165259974611
+        },
+        "emd": {
+          "mean": 75.29320730108586,
+          "std": 9.0419243594724,
+          "median": 74.5422640742432,
+          "worst_10_pct": 88.9134019398032
+        },
+        "spatial_dispersion": {
+          "mean": 1030.956279369741,
+          "std": 283.73911044618757,
+          "median": 1090.775271138239,
+          "worst_10_pct": 1384.595187928282
+        },
+        "average_precision": {
+          "mean": 0.010871244860851162,
+          "std": 0.028895061405267798,
+          "median": 0.001784134098128967,
+          "worst_10_pct": 0.0009394725169743082
+        },
+        "correlation": {
+          "mean": 0.014797955691246643,
+          "std": 0.02037034955403915,
+          "median": 0.01823720870412649,
+          "worst_10_pct": -0.014632850849627994
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "WMNE",
+      "dataset_name": "focal_source",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 18.621018774241023,
+          "std": 11.045293696211237,
+          "median": 14.144480787354343,
+          "worst_10_pct": 34.089215064269034
+        },
+        "emd": {
+          "mean": 55.797371037385986,
+          "std": 7.563933068821335,
+          "median": 55.87447369070736,
+          "worst_10_pct": 64.79467228799139
+        },
+        "spatial_dispersion": {
+          "mean": 113.13287155308335,
+          "std": 83.38750933744045,
+          "median": 84.294444081525,
+          "worst_10_pct": 215.3729076154289
+        },
+        "average_precision": {
+          "mean": 0.3608698092161834,
+          "std": 0.3424438180768141,
+          "median": 0.25,
+          "worst_10_pct": 0.041499999999999995
+        },
+        "correlation": {
+          "mean": 0.07548428648703095,
+          "std": 0.025242871562342166,
+          "median": 0.07717262006811144,
+          "worst_10_pct": 0.04424575813644029
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "Champagne",
+      "dataset_name": "multi_source",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 9.32549035460258,
+          "std": 7.73039244744019,
+          "median": 8.749017424429923,
+          "worst_10_pct": 19.575316556979747
+        },
+        "emd": {
+          "mean": 14.164096840167906,
+          "std": 13.078646006296603,
+          "median": 11.38788720502043,
+          "worst_10_pct": 32.74492890280473
+        },
+        "spatial_dispersion": {
+          "mean": 0.8981315310485121,
+          "std": 0.32102551819533276,
+          "median": 0.9929474250940806,
+          "worst_10_pct": 1.0232255202265084
+        },
+        "average_precision": {
+          "mean": 0.6785485659237166,
+          "std": 0.3176275854474992,
+          "median": 0.7109649122807018,
+          "worst_10_pct": 0.24901093699704313
+        },
+        "correlation": {
+          "mean": 0.6633458588850748,
+          "std": 0.3014481285085992,
+          "median": 0.6835933293727767,
+          "worst_10_pct": 0.2071252177086956
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "ESMV",
+      "dataset_name": "multi_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 16.800937510940425,
+          "std": 9.567628836735922,
+          "median": 15.988564358562039,
+          "worst_10_pct": 29.59493029524273
+        },
+        "emd": {
+          "mean": 29.366250101267752,
+          "std": 12.149601635002375,
+          "median": 28.418500535021543,
+          "worst_10_pct": 43.2495337960134
+        },
+        "spatial_dispersion": {
+          "mean": 2.3498547088223423,
+          "std": 2.3022203732360462,
+          "median": 1.3799579200151093,
+          "worst_10_pct": 5.193979402065652
+        },
+        "average_precision": {
+          "mean": 0.5598320609360373,
+          "std": 0.29916127556936345,
+          "median": 0.4519755931046253,
+          "worst_10_pct": 0.22395604395604393
+        },
+        "correlation": {
+          "mean": 0.3326042519546519,
+          "std": 0.18251434625084514,
+          "median": 0.24739328940008493,
+          "worst_10_pct": 0.16776655958314135
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "LCMV",
+      "dataset_name": "multi_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 14.959000092137883,
+          "std": 8.702158410923174,
+          "median": 13.009039911173756,
+          "worst_10_pct": 27.77122955834275
+        },
+        "emd": {
+          "mean": 49.42372120817917,
+          "std": 6.27511314830371,
+          "median": 49.90440135863081,
+          "worst_10_pct": 56.40494373490062
+        },
+        "spatial_dispersion": {
+          "mean": 46.8424310059212,
+          "std": 45.97534305425706,
+          "median": 29.556242263693115,
+          "worst_10_pct": 106.97546289309216
+        },
+        "average_precision": {
+          "mean": 0.637243187162668,
+          "std": 0.31139462740249924,
+          "median": 0.6757575757575758,
+          "worst_10_pct": 0.2533347207496482
+        },
+        "correlation": {
+          "mean": 0.09362021893953605,
+          "std": 0.0339341391579599,
+          "median": 0.08605902868088947,
+          "worst_10_pct": 0.05513580113848761
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "dSPM",
+      "dataset_name": "multi_source",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 29.26547908558995,
+          "std": 9.13165840308218,
+          "median": 27.68288937659468,
+          "worst_10_pct": 43.75736480288385
+        },
+        "emd": {
+          "mean": 53.295098945673345,
+          "std": 7.103606299101163,
+          "median": 53.08318155900104,
+          "worst_10_pct": 63.26641386100527
+        },
+        "spatial_dispersion": {
+          "mean": 191.43887354742085,
+          "std": 190.4129279413423,
+          "median": 131.22513439005718,
+          "worst_10_pct": 465.7413293889704
+        },
+        "average_precision": {
+          "mean": 0.059314488913476945,
+          "std": 0.05666715362828497,
+          "median": 0.036319553410411896,
+          "worst_10_pct": 0.014353363871673588
+        },
+        "correlation": {
+          "mean": 0.03991780863949586,
+          "std": 0.008167637721011896,
+          "median": 0.04079264237997572,
+          "worst_10_pct": 0.02813007774483254
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "eLORETA",
+      "dataset_name": "multi_source",
+      "category": "loreta",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 24.99217449576427,
+          "std": 10.121822860594262,
+          "median": 25.63932097626624,
+          "worst_10_pct": 37.5950692321801
+        },
+        "emd": {
+          "mean": 48.83702900153671,
+          "std": 5.678875160450906,
+          "median": 49.06546649715685,
+          "worst_10_pct": 57.53740186083767
+        },
+        "spatial_dispersion": {
+          "mean": 100.69463026814941,
+          "std": 52.322507667908425,
+          "median": 84.67621012001004,
+          "worst_10_pct": 174.92675089191965
+        },
+        "average_precision": {
+          "mean": 0.3629166692134067,
+          "std": 0.21919472615744875,
+          "median": 0.3466191391824303,
+          "worst_10_pct": 0.10658525731392703
+        },
+        "correlation": {
+          "mean": 0.07261173096871336,
+          "std": 0.008490251003338813,
+          "median": 0.0738061073585875,
+          "worst_10_pct": 0.05973764103456955
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "LORETA",
+      "dataset_name": "multi_source",
+      "category": "loreta",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 47.234949974265355,
+          "std": 12.960449616995202,
+          "median": 46.690465497035376,
+          "worst_10_pct": 60.521711414156044
+        },
+        "emd": {
+          "mean": 54.3693254661141,
+          "std": 6.417833058190082,
+          "median": 54.14150832639371,
+          "worst_10_pct": 64.05101299399236
+        },
+        "spatial_dispersion": {
+          "mean": 449.80640371395094,
+          "std": 171.8573961269102,
+          "median": 438.65712875607016,
+          "worst_10_pct": 692.9300552114325
+        },
+        "average_precision": {
+          "mean": 0.012237244746848968,
+          "std": 0.024898297642468942,
+          "median": 0.005285225375448817,
+          "worst_10_pct": 0.0019782644980589777
+        },
+        "correlation": {
+          "mean": 0.014608388753393993,
+          "std": 0.014053048742566533,
+          "median": 0.013051716646178269,
+          "worst_10_pct": -0.002119005166594054
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "sLORETA",
+      "dataset_name": "multi_source",
+      "category": "loreta",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 35.787892151641955,
+          "std": 8.632494250366852,
+          "median": 35.87803850232414,
+          "worst_10_pct": 47.107709509079584
+        },
+        "emd": {
+          "mean": 49.20932438776429,
+          "std": 5.746824257718599,
+          "median": 48.92874825835712,
+          "worst_10_pct": 57.100323233504454
+        },
+        "spatial_dispersion": {
+          "mean": 30.049594866796024,
+          "std": 27.24017804075657,
+          "median": 25.767137668294296,
+          "worst_10_pct": 58.88829682341797
+        },
+        "average_precision": {
+          "mean": 0.10756261017682112,
+          "std": 0.10625270501766919,
+          "median": 0.07666396103896103,
+          "worst_10_pct": 0.009574405417145682
+        },
+        "correlation": {
+          "mean": 0.06917590272989708,
+          "std": 0.021462212100107608,
+          "median": 0.06582923932859536,
+          "worst_10_pct": 0.041472618653430514
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "LAURA",
+      "dataset_name": "multi_source",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 40.40819939361141,
+          "std": 8.992608524142021,
+          "median": 41.67913541124453,
+          "worst_10_pct": 49.328865261138795
+        },
+        "emd": {
+          "mean": 47.997609708509906,
+          "std": 5.33098329293319,
+          "median": 48.64217219704338,
+          "worst_10_pct": 53.81123648816062
+        },
+        "spatial_dispersion": {
+          "mean": 15.403520849270755,
+          "std": 11.495487343160034,
+          "median": 12.295696748171679,
+          "worst_10_pct": 27.256603817392048
+        },
+        "average_precision": {
+          "mean": 0.053963324738850765,
+          "std": 0.09607007628962673,
+          "median": 0.01981211167029444,
+          "worst_10_pct": 0.003595986109932709
+        },
+        "correlation": {
+          "mean": 0.059205979014633404,
+          "std": 0.02223798478242513,
+          "median": 0.0617531945936354,
+          "worst_10_pct": 0.03182249242321721
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "MNE",
+      "dataset_name": "multi_source",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 35.787892151641955,
+          "std": 8.632494250366852,
+          "median": 35.87803850232414,
+          "worst_10_pct": 47.107709509079584
+        },
+        "emd": {
+          "mean": 49.20932438776429,
+          "std": 5.746824257718598,
+          "median": 48.92874825835713,
+          "worst_10_pct": 57.10032323350443
+        },
+        "spatial_dispersion": {
+          "mean": 30.049594866796024,
+          "std": 27.24017804075657,
+          "median": 25.767137668294296,
+          "worst_10_pct": 58.88829682341797
+        },
+        "average_precision": {
+          "mean": 0.10756261017682112,
+          "std": 0.10625270501766919,
+          "median": 0.07666396103896103,
+          "worst_10_pct": 0.009574405417145682
+        },
+        "correlation": {
+          "mean": 0.06917590272989708,
+          "std": 0.02146221210010758,
+          "median": 0.06582923932859544,
+          "worst_10_pct": 0.041472618653430667
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SMAP",
+      "dataset_name": "multi_source",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 47.234949974265355,
+          "std": 12.960449616995202,
+          "median": 46.690465497035376,
+          "worst_10_pct": 60.521711414156044
+        },
+        "emd": {
+          "mean": 54.3693254661141,
+          "std": 6.417833058190082,
+          "median": 54.14150832639371,
+          "worst_10_pct": 64.05101299399236
+        },
+        "spatial_dispersion": {
+          "mean": 449.80640371395094,
+          "std": 171.8573961269102,
+          "median": 438.65712875607016,
+          "worst_10_pct": 692.9300552114325
+        },
+        "average_precision": {
+          "mean": 0.012237244746848968,
+          "std": 0.024898297642468942,
+          "median": 0.005285225375448817,
+          "worst_10_pct": 0.0019782644980589777
+        },
+        "correlation": {
+          "mean": 0.014608388753393993,
+          "std": 0.014053048742566533,
+          "median": 0.013051716646178269,
+          "worst_10_pct": -0.002119005166594054
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "WMNE",
+      "dataset_name": "multi_source",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 30.552019548568364,
+          "std": 9.190419446946954,
+          "median": 30.389316430428135,
+          "worst_10_pct": 43.21887348308117
+        },
+        "emd": {
+          "mean": 48.508153448632854,
+          "std": 5.954854694990694,
+          "median": 48.40709355021961,
+          "worst_10_pct": 55.39819715600872
+        },
+        "spatial_dispersion": {
+          "mean": 61.412992284129686,
+          "std": 56.43136762225375,
+          "median": 39.74879663817772,
+          "worst_10_pct": 182.52200477189342
+        },
+        "average_precision": {
+          "mean": 0.18790137672439308,
+          "std": 0.14892270918996245,
+          "median": 0.16541109222853972,
+          "worst_10_pct": 0.03974151654796816
+        },
+        "correlation": {
+          "mean": 0.07100911594293173,
+          "std": 0.015823092902458022,
+          "median": 0.07392511957356554,
+          "worst_10_pct": 0.04887256757188192
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "Champagne",
+      "dataset_name": "extended_source",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 16.56286976546801,
+          "std": 6.0127543298365635,
+          "median": 15.489167397899939,
+          "worst_10_pct": 25.86024634061803
+        },
+        "emd": {
+          "mean": 24.9992662416765,
+          "std": 9.216642269234491,
+          "median": 23.052611464914136,
+          "worst_10_pct": 35.62785298644896
+        },
+        "spatial_dispersion": {
+          "mean": 0.971463680395733,
+          "std": 0.5775273587708435,
+          "median": 0.9294142983860569,
+          "worst_10_pct": 1.6107482958439838
+        },
+        "average_precision": {
+          "mean": 0.10528753287545968,
+          "std": 0.05526750706615888,
+          "median": 0.0994126985362587,
+          "worst_10_pct": 0.041567577473989786
+        },
+        "correlation": {
+          "mean": 0.17312826062194017,
+          "std": 0.16177748651862792,
+          "median": 0.13005058744289505,
+          "worst_10_pct": 0.020716934848050185
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "ESMV",
+      "dataset_name": "extended_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 23.65377334680575,
+          "std": 8.328301459391263,
+          "median": 21.834080643864343,
+          "worst_10_pct": 35.7334402881612
+        },
+        "emd": {
+          "mean": 29.712818881821608,
+          "std": 10.062420110425819,
+          "median": 28.25974196685535,
+          "worst_10_pct": 44.544381135672396
+        },
+        "spatial_dispersion": {
+          "mean": 3.5572009746501356,
+          "std": 2.6950779190537437,
+          "median": 2.881292918755868,
+          "worst_10_pct": 6.819173629820978
+        },
+        "average_precision": {
+          "mean": 0.16691123801428556,
+          "std": 0.09002382751956584,
+          "median": 0.14778470616808476,
+          "worst_10_pct": 0.0809905136121807
+        },
+        "correlation": {
+          "mean": 0.1917298563397492,
+          "std": 0.08609472205772566,
+          "median": 0.177485642081702,
+          "worst_10_pct": 0.10189494639580053
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "LCMV",
+      "dataset_name": "extended_source",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 22.59991827005071,
+          "std": 8.11306454316,
+          "median": 22.544000633776754,
+          "worst_10_pct": 34.92561003619284
+        },
+        "emd": {
+          "mean": 51.81780220599794,
+          "std": 9.50156306749716,
+          "median": 50.86135846032803,
+          "worst_10_pct": 64.2661607616974
+        },
+        "spatial_dispersion": {
+          "mean": 78.36559675699093,
+          "std": 67.76011154001169,
+          "median": 65.81200637932172,
+          "worst_10_pct": 150.38040702238175
+        },
+        "average_precision": {
+          "mean": 0.15398625757227247,
+          "std": 0.08997603818964156,
+          "median": 0.12036010334009528,
+          "worst_10_pct": 0.06619923619825199
+        },
+        "correlation": {
+          "mean": 0.08119351853111519,
+          "std": 0.029491372705026896,
+          "median": 0.07482521828456888,
+          "worst_10_pct": 0.049928687267763575
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "dSPM",
+      "dataset_name": "extended_source",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 30.39032251544019,
+          "std": 7.371394371240055,
+          "median": 31.921142992759567,
+          "worst_10_pct": 38.38826621053697
+        },
+        "emd": {
+          "mean": 54.32877054724603,
+          "std": 9.673225054127693,
+          "median": 53.42839901672603,
+          "worst_10_pct": 66.81677602489017
+        },
+        "spatial_dispersion": {
+          "mean": 123.10671198127584,
+          "std": 110.99548587078408,
+          "median": 72.15767066315725,
+          "worst_10_pct": 298.87506415292034
+        },
+        "average_precision": {
+          "mean": 0.10126707206260846,
+          "std": 0.04851792685899532,
+          "median": 0.0887529955853103,
+          "worst_10_pct": 0.0483053131554118
+        },
+        "correlation": {
+          "mean": 0.05741964322785947,
+          "std": 0.01385907991236703,
+          "median": 0.055514821582921495,
+          "worst_10_pct": 0.04061255717772456
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "eLORETA",
+      "dataset_name": "extended_source",
+      "category": "loreta",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 30.59386960913006,
+          "std": 10.383260698931249,
+          "median": 31.006532311417995,
+          "worst_10_pct": 45.102489340899936
+        },
+        "emd": {
+          "mean": 48.00191217387363,
+          "std": 6.704764485195181,
+          "median": 47.86039252788024,
+          "worst_10_pct": 58.06771285583371
+        },
+        "spatial_dispersion": {
+          "mean": 111.64983828800574,
+          "std": 56.429189352667095,
+          "median": 100.90739534996587,
+          "worst_10_pct": 190.58125491076203
+        },
+        "average_precision": {
+          "mean": 0.18223957776299826,
+          "std": 0.08070671443432433,
+          "median": 0.17757169481875829,
+          "worst_10_pct": 0.07976618645566332
+        },
+        "correlation": {
+          "mean": 0.1175829258420523,
+          "std": 0.021460914368358903,
+          "median": 0.1149444661014455,
+          "worst_10_pct": 0.09206262852126196
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "LORETA",
+      "dataset_name": "extended_source",
+      "category": "loreta",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 48.33780300131091,
+          "std": 12.476094396883544,
+          "median": 43.88018140103596,
+          "worst_10_pct": 68.47664335399458
+        },
+        "emd": {
+          "mean": 55.07431192877838,
+          "std": 9.676983973240139,
+          "median": 54.4415023693708,
+          "worst_10_pct": 67.91953135809783
+        },
+        "spatial_dispersion": {
+          "mean": 463.94127979001627,
+          "std": 148.35769889286826,
+          "median": 423.5161607124187,
+          "worst_10_pct": 664.8531302663163
+        },
+        "average_precision": {
+          "mean": 0.11840957726145143,
+          "std": 0.14896211920935234,
+          "median": 0.05268819149709161,
+          "worst_10_pct": 0.017420535892926945
+        },
+        "correlation": {
+          "mean": 0.055961800949661036,
+          "std": 0.03204288887310266,
+          "median": 0.05937544530467138,
+          "worst_10_pct": 0.013657870507512531
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "sLORETA",
+      "dataset_name": "extended_source",
+      "category": "loreta",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 33.518152955953404,
+          "std": 12.219836137168583,
+          "median": 33.70662750133806,
+          "worst_10_pct": 46.34788153513968
+        },
+        "emd": {
+          "mean": 45.02997731735221,
+          "std": 7.609169374456364,
+          "median": 44.386157920876855,
+          "worst_10_pct": 53.213580447032804
+        },
+        "spatial_dispersion": {
+          "mean": 23.381583827643766,
+          "std": 19.440078791506636,
+          "median": 17.710576691720178,
+          "worst_10_pct": 45.414103404783944
+        },
+        "average_precision": {
+          "mean": 0.14347238580973376,
+          "std": 0.1081653089818126,
+          "median": 0.12257338597461259,
+          "worst_10_pct": 0.04028547725771533
+        },
+        "correlation": {
+          "mean": 0.1136216974119671,
+          "std": 0.03776508333468951,
+          "median": 0.10807947414439029,
+          "worst_10_pct": 0.07501460091670176
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "LAURA",
+      "dataset_name": "extended_source",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 38.30264560453921,
+          "std": 10.735515574337231,
+          "median": 36.50896122042767,
+          "worst_10_pct": 51.1381148894141
+        },
+        "emd": {
+          "mean": 45.18456434536211,
+          "std": 6.138442262422445,
+          "median": 45.28959218489564,
+          "worst_10_pct": 53.527648945626595
+        },
+        "spatial_dispersion": {
+          "mean": 15.074897351956476,
+          "std": 8.733340006853883,
+          "median": 13.347664567280997,
+          "worst_10_pct": 26.632425219418103
+        },
+        "average_precision": {
+          "mean": 0.0982673309391554,
+          "std": 0.08002143127861948,
+          "median": 0.07775595463859,
+          "worst_10_pct": 0.028678654812576247
+        },
+        "correlation": {
+          "mean": 0.10678616037827718,
+          "std": 0.036101124551932234,
+          "median": 0.09914966665447417,
+          "worst_10_pct": 0.06261501685457024
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "MNE",
+      "dataset_name": "extended_source",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 33.518152955953404,
+          "std": 12.219836137168583,
+          "median": 33.70662750133806,
+          "worst_10_pct": 46.34788153513968
+        },
+        "emd": {
+          "mean": 45.0299773173522,
+          "std": 7.609169374456361,
+          "median": 44.38615792087683,
+          "worst_10_pct": 53.213580447032875
+        },
+        "spatial_dispersion": {
+          "mean": 23.381583827643766,
+          "std": 19.440078791506636,
+          "median": 17.710576691720178,
+          "worst_10_pct": 45.414103404783944
+        },
+        "average_precision": {
+          "mean": 0.14347238580973376,
+          "std": 0.1081653089818126,
+          "median": 0.12257338597461259,
+          "worst_10_pct": 0.04028547725771533
+        },
+        "correlation": {
+          "mean": 0.11362169741196705,
+          "std": 0.03776508333468952,
+          "median": 0.10807947414439027,
+          "worst_10_pct": 0.07501460091670166
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SMAP",
+      "dataset_name": "extended_source",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 48.33780300131091,
+          "std": 12.476094396883544,
+          "median": 43.88018140103596,
+          "worst_10_pct": 68.47664335399458
+        },
+        "emd": {
+          "mean": 55.07431192877838,
+          "std": 9.676983973240139,
+          "median": 54.4415023693708,
+          "worst_10_pct": 67.91953135809783
+        },
+        "spatial_dispersion": {
+          "mean": 463.94127979001627,
+          "std": 148.35769889286826,
+          "median": 423.5161607124187,
+          "worst_10_pct": 664.8531302663163
+        },
+        "average_precision": {
+          "mean": 0.11840957726145143,
+          "std": 0.14896211920935234,
+          "median": 0.05268819149709161,
+          "worst_10_pct": 0.017420535892926945
+        },
+        "correlation": {
+          "mean": 0.055961800949661036,
+          "std": 0.03204288887310266,
+          "median": 0.05937544530467138,
+          "worst_10_pct": 0.013657870507512531
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "WMNE",
+      "dataset_name": "extended_source",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 31.89072116300466,
+          "std": 9.891467408015249,
+          "median": 32.065710797203465,
+          "worst_10_pct": 43.761799852109554
+        },
+        "emd": {
+          "mean": 46.83782381180092,
+          "std": 6.1869798006369505,
+          "median": 46.546514559007804,
+          "worst_10_pct": 57.03455566915427
+        },
+        "spatial_dispersion": {
+          "mean": 61.383683626693326,
+          "std": 48.212422608863776,
+          "median": 45.850691082138766,
+          "worst_10_pct": 134.5147331561611
+        },
+        "average_precision": {
+          "mean": 0.168884353929743,
+          "std": 0.10158340973220066,
+          "median": 0.13829557755171962,
+          "worst_10_pct": 0.05447725520262627
+        },
+        "correlation": {
+          "mean": 0.11478653217721643,
+          "std": 0.029060469342577337,
+          "median": 0.11145434736353693,
+          "worst_10_pct": 0.07946135608240723
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "Champagne",
+      "dataset_name": "noisy",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 20.70896836220809,
+          "std": 10.810265651521703,
+          "median": 22.867353555063318,
+          "worst_10_pct": 33.21229062792621
+        },
+        "emd": {
+          "mean": 24.92681826857048,
+          "std": 18.03153947434585,
+          "median": 23.75223384347774,
+          "worst_10_pct": 48.297900189808544
+        },
+        "spatial_dispersion": {
+          "mean": 1.3966748052313318,
+          "std": 1.1662989868315896,
+          "median": 1.0,
+          "worst_10_pct": 3.1616897281348115
+        },
+        "average_precision": {
+          "mean": 0.33228065425217146,
+          "std": 0.35869610004154007,
+          "median": 0.1710699949678165,
+          "worst_10_pct": 0.02130961574339854
+        },
+        "correlation": {
+          "mean": 0.3983734571346143,
+          "std": 0.3431382692670663,
+          "median": 0.2841699697299363,
+          "worst_10_pct": 0.00041717541882088324
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "ESMV",
+      "dataset_name": "noisy",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 21.37085799248168,
+          "std": 10.46594206890729,
+          "median": 20.566703353760353,
+          "worst_10_pct": 37.422637541347356
+        },
+        "emd": {
+          "mean": 30.519494912954293,
+          "std": 12.786345505692557,
+          "median": 29.533869112568006,
+          "worst_10_pct": 49.17366150011787
+        },
+        "spatial_dispersion": {
+          "mean": 4.628082087970069,
+          "std": 6.209505350591307,
+          "median": 2.5008808331121517,
+          "worst_10_pct": 10.144992278593913
+        },
+        "average_precision": {
+          "mean": 0.3510951758409475,
+          "std": 0.3143099932420369,
+          "median": 0.2356381965811694,
+          "worst_10_pct": 0.0833174539567551
+        },
+        "correlation": {
+          "mean": 0.24953163617830437,
+          "std": 0.15644446134998058,
+          "median": 0.1988555448227941,
+          "worst_10_pct": 0.11157916175066837
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "LCMV",
+      "dataset_name": "noisy",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 25.839731884584406,
+          "std": 16.74752649128,
+          "median": 22.07121809057018,
+          "worst_10_pct": 42.32700995776127
+        },
+        "emd": {
+          "mean": 61.491245069723064,
+          "std": 11.03912753598757,
+          "median": 59.94138675723236,
+          "worst_10_pct": 76.22084218859145
+        },
+        "spatial_dispersion": {
+          "mean": 204.6635470205075,
+          "std": 229.94819733634995,
+          "median": 107.47617178778466,
+          "worst_10_pct": 459.8921766711311
+        },
+        "average_precision": {
+          "mean": 0.32679207501389157,
+          "std": 0.35512006494164383,
+          "median": 0.16164050714640388,
+          "worst_10_pct": 0.026454145979688946
+        },
+        "correlation": {
+          "mean": 0.059729907338459585,
+          "std": 0.02248226612993571,
+          "median": 0.05832656512508885,
+          "worst_10_pct": 0.03200308974463567
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "dSPM",
+      "dataset_name": "noisy",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 30.735448781827554,
+          "std": 11.532465237804297,
+          "median": 30.904949548785694,
+          "worst_10_pct": 45.07659822385379
+        },
+        "emd": {
+          "mean": 63.56459084231587,
+          "std": 10.927936105754851,
+          "median": 60.86482684923489,
+          "worst_10_pct": 77.2647072010403
+        },
+        "spatial_dispersion": {
+          "mean": 728.9575806470692,
+          "std": 426.170915399297,
+          "median": 611.914138618161,
+          "worst_10_pct": 1331.102981240698
+        },
+        "average_precision": {
+          "mean": 0.06439836312455091,
+          "std": 0.05420322819922345,
+          "median": 0.05054941883414691,
+          "worst_10_pct": 0.008645796875175945
+        },
+        "correlation": {
+          "mean": 0.026171371211702335,
+          "std": 0.008876815403084638,
+          "median": 0.02602990389055159,
+          "worst_10_pct": 0.01434988785229409
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "eLORETA",
+      "dataset_name": "noisy",
+      "category": "loreta",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 22.01198538679138,
+          "std": 11.633535204131757,
+          "median": 22.397059411839113,
+          "worst_10_pct": 38.84506626516984
+        },
+        "emd": {
+          "mean": 60.197658179621016,
+          "std": 8.956456816250945,
+          "median": 59.23865912886144,
+          "worst_10_pct": 72.99960123203302
+        },
+        "spatial_dispersion": {
+          "mean": 257.5595810161187,
+          "std": 198.19165352814935,
+          "median": 195.41032351045166,
+          "worst_10_pct": 581.6740106096287
+        },
+        "average_precision": {
+          "mean": 0.3385233928637107,
+          "std": 0.28073240776515673,
+          "median": 0.2373982240289645,
+          "worst_10_pct": 0.07882263760676471
+        },
+        "correlation": {
+          "mean": 0.06760363892666345,
+          "std": 0.017947075677378736,
+          "median": 0.06461335626796626,
+          "worst_10_pct": 0.04577333523694539
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "LORETA",
+      "dataset_name": "noisy",
+      "category": "loreta",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 65.31707244747052,
+          "std": 21.08396096679866,
+          "median": 62.256869571580914,
+          "worst_10_pct": 95.16157512914627
+        },
+        "emd": {
+          "mean": 64.36575943748889,
+          "std": 11.146977326974639,
+          "median": 62.413174625926416,
+          "worst_10_pct": 76.24021400640811
+        },
+        "spatial_dispersion": {
+          "mean": 854.275806942291,
+          "std": 377.35069279966484,
+          "median": 633.6748591115831,
+          "worst_10_pct": 1331.3262438255779
+        },
+        "average_precision": {
+          "mean": 0.01798763524166916,
+          "std": 0.05373334396534992,
+          "median": 0.007578843554357608,
+          "worst_10_pct": 0.002244634664059392
+        },
+        "correlation": {
+          "mean": 0.02373346147139981,
+          "std": 0.025249218377046637,
+          "median": 0.024145687890079155,
+          "worst_10_pct": -0.005086528840617123
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "sLORETA",
+      "dataset_name": "noisy",
+      "category": "loreta",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 32.883368956928194,
+          "std": 11.486446851638501,
+          "median": 32.62566399412294,
+          "worst_10_pct": 49.506679416608364
+        },
+        "emd": {
+          "mean": 58.01470341001643,
+          "std": 9.85670249508681,
+          "median": 55.336571351952216,
+          "worst_10_pct": 69.79504004538728
+        },
+        "spatial_dispersion": {
+          "mean": 119.91639131532446,
+          "std": 95.31503555659238,
+          "median": 90.58722346232656,
+          "worst_10_pct": 222.08704544097
+        },
+        "average_precision": {
+          "mean": 0.09304177718609036,
+          "std": 0.08456559468162658,
+          "median": 0.06739209147131525,
+          "worst_10_pct": 0.019766254344531293
+        },
+        "correlation": {
+          "mean": 0.07097043106443274,
+          "std": 0.021567854238023314,
+          "median": 0.06649626351672258,
+          "worst_10_pct": 0.04905139536587576
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "LAURA",
+      "dataset_name": "noisy",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 40.62463973914483,
+          "std": 13.287909398287571,
+          "median": 41.54478375285821,
+          "worst_10_pct": 57.219390749716815
+        },
+        "emd": {
+          "mean": 55.10472236332407,
+          "std": 7.03398038315801,
+          "median": 55.35969363285393,
+          "worst_10_pct": 62.98218590654247
+        },
+        "spatial_dispersion": {
+          "mean": 40.648126274945554,
+          "std": 29.01942029844777,
+          "median": 34.05125936392609,
+          "worst_10_pct": 81.93331241854864
+        },
+        "average_precision": {
+          "mean": 0.0393405691064268,
+          "std": 0.04999931303433822,
+          "median": 0.01602618216328416,
+          "worst_10_pct": 0.004725516120841702
+        },
+        "correlation": {
+          "mean": 0.06471950105967536,
+          "std": 0.033636007421661895,
+          "median": 0.06165068568397333,
+          "worst_10_pct": 0.029079584728106237
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "MNE",
+      "dataset_name": "noisy",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 32.883368956928194,
+          "std": 11.486446851638501,
+          "median": 32.62566399412294,
+          "worst_10_pct": 49.506679416608364
+        },
+        "emd": {
+          "mean": 58.01470341001643,
+          "std": 9.85670249508681,
+          "median": 55.3365713519522,
+          "worst_10_pct": 69.79504004538728
+        },
+        "spatial_dispersion": {
+          "mean": 119.91639131532446,
+          "std": 95.31503555659238,
+          "median": 90.58722346232656,
+          "worst_10_pct": 222.08704544097
+        },
+        "average_precision": {
+          "mean": 0.09304177718609036,
+          "std": 0.08456559468162658,
+          "median": 0.06739209147131525,
+          "worst_10_pct": 0.019766254344531293
+        },
+        "correlation": {
+          "mean": 0.07097043106443274,
+          "std": 0.021567854238023307,
+          "median": 0.06649626351672262,
+          "worst_10_pct": 0.04905139536587574
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "SMAP",
+      "dataset_name": "noisy",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 65.31707244747052,
+          "std": 21.08396096679866,
+          "median": 62.256869571580914,
+          "worst_10_pct": 95.16157512914627
+        },
+        "emd": {
+          "mean": 64.36575943748889,
+          "std": 11.146977326974639,
+          "median": 62.413174625926416,
+          "worst_10_pct": 76.24021400640811
+        },
+        "spatial_dispersion": {
+          "mean": 854.275806942291,
+          "std": 377.35069279966484,
+          "median": 633.6748591115831,
+          "worst_10_pct": 1331.3262438255779
+        },
+        "average_precision": {
+          "mean": 0.01798763524166916,
+          "std": 0.05373334396534992,
+          "median": 0.007578843554357608,
+          "worst_10_pct": 0.002244634664059392
+        },
+        "correlation": {
+          "mean": 0.02373346147139981,
+          "std": 0.025249218377046637,
+          "median": 0.024145687890079155,
+          "worst_10_pct": -0.005086528840617123
+        }
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "WMNE",
+      "dataset_name": "noisy",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 25.42574545095246,
+          "std": 12.301458389818562,
+          "median": 24.5467758565795,
+          "worst_10_pct": 43.615018794447046
+        },
+        "emd": {
+          "mean": 60.11269022595976,
+          "std": 9.007314107425012,
+          "median": 58.72204312161445,
+          "worst_10_pct": 72.52797241590109
+        },
+        "spatial_dispersion": {
+          "mean": 302.740420502607,
+          "std": 167.53434343874534,
+          "median": 280.2296933470001,
+          "worst_10_pct": 546.7091713379218
+        },
+        "average_precision": {
+          "mean": 0.25710347477579115,
+          "std": 0.25935556529149384,
+          "median": 0.1737162435794586,
+          "worst_10_pct": 0.042426136002969704
+        },
+        "correlation": {
+          "mean": 0.0696325379333514,
+          "std": 0.016110047300728483,
+          "median": 0.06536800612824237,
+          "worst_10_pct": 0.04976663897080274
+        }
+      },
+      "samples": []
+    }
+  ]
+}

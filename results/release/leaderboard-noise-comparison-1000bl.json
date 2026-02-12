@@ -1,0 +1,1274 @@
+{
+  "none_raw": {
+    "focal_source": {
+      "Champagne": {
+        "Mean_Localization_Error": 0.0,
+        "EMD": 0.0,
+        "sd": 1.0,
+        "average_precision": 1.0,
+        "correlation": 0.9999999999999997
+      },
+      "ESMV": {
+        "Mean_Localization_Error": 3.972325700224435,
+        "EMD": 1.083207764897175,
+        "sd": 1.0192407839400937,
+        "average_precision": 1.0,
+        "correlation": 0.9049421092197192
+      },
+      "LCMV": {
+        "Mean_Localization_Error": 17.733731050549313,
+        "EMD": 42.75704257795459,
+        "sd": 4.045473177294662,
+        "average_precision": 1.0,
+        "correlation": 0.18060780307720015
+      },
+      "dSPM": {
+        "Mean_Localization_Error": 20.14024910239749,
+        "EMD": 70.5659260345874,
+        "sd": 159.37884812719705,
+        "average_precision": 0.15187333467911027,
+        "correlation": 0.0388643398853606
+      },
+      "eLORETA": {
+        "Mean_Localization_Error": 8.79389484506675,
+        "EMD": 55.347457281782084,
+        "sd": 150.45278649760493,
+        "average_precision": 1.0,
+        "correlation": 0.07548084090281788
+      },
+      "LORETA": {
+        "Mean_Localization_Error": 52.95161501288064,
+        "EMD": 74.06381625473381,
+        "sd": 1136.2056904798003,
+        "average_precision": 0.012211557344356829,
+        "correlation": 0.012166573399864737
+      },
+      "sLORETA": {
+        "Mean_Localization_Error": 25.62803225312507,
+        "EMD": 54.4228984394273,
+        "sd": 60.15724662419351,
+        "average_precision": 0.22285989039985446,
+        "correlation": 0.07095449506630852
+      },
+      "LAURA": {
+        "Mean_Localization_Error": 32.89536538535871,
+        "EMD": 54.585844310808845,
+        "sd": 34.323243613875654,
+        "average_precision": 0.12695372243036285,
+        "correlation": 0.06399618008856285
+      },
+      "MNE": {
+        "Mean_Localization_Error": 25.62803225312507,
+        "EMD": 54.42289843942729,
+        "sd": 60.15724662419351,
+        "average_precision": 0.22285989039985446,
+        "correlation": 0.07095449506630849
+      },
+      "SMAP": {
+        "Mean_Localization_Error": 52.95161501288064,
+        "EMD": 74.06381625473381,
+        "sd": 1136.2056904798003,
+        "average_precision": 0.012211557344356829,
+        "correlation": 0.012166573399864737
+      },
+      "WMNE": {
+        "Mean_Localization_Error": 18.770162810092614,
+        "EMD": 56.357514200483635,
+        "sd": 114.60442754579877,
+        "average_precision": 0.37923316426311965,
+        "correlation": 0.07518014906048365
+      }
+    },
+    "multi_source": {
+      "Champagne": {
+        "Mean_Localization_Error": 8.671677890707853,
+        "EMD": 14.970077901371418,
+        "sd": 0.8276668980357661,
+        "average_precision": 0.703517981580894,
+        "correlation": 0.6899693596469558
+      },
+      "ESMV": {
+        "Mean_Localization_Error": 17.7450426352039,
+        "EMD": 28.42254760418554,
+        "sd": 2.608671872547434,
+        "average_precision": 0.5328171761323542,
+        "correlation": 0.33984852400469073
+      },
+      "LCMV": {
+        "Mean_Localization_Error": 15.345700770170229,
+        "EMD": 50.931746658977126,
+        "sd": 50.610109067812566,
+        "average_precision": 0.6299834288919643,
+        "correlation": 0.0915779032376362
+      },
+      "dSPM": {
+        "Mean_Localization_Error": 31.798066202641667,
+        "EMD": 55.426262420867175,
+        "sd": 222.28266982179758,
+        "average_precision": 0.04898997805636166,
+        "correlation": 0.03478286150697249
+      },
+      "eLORETA": {
+        "Mean_Localization_Error": 27.243876846974953,
+        "EMD": 49.98861141856607,
+        "sd": 104.38516994625893,
+        "average_precision": 0.327911255730944,
+        "correlation": 0.07095205269130835
+      },
+      "LORETA": {
+        "Mean_Localization_Error": 52.36764460547927,
+        "EMD": 56.42622740626907,
+        "sd": 495.61348284442226,
+        "average_precision": 0.013151816256212695,
+        "correlation": 0.013714767708354779
+      },
+      "sLORETA": {
+        "Mean_Localization_Error": 36.274574482818096,
+        "EMD": 48.832475778030755,
+        "sd": 25.113079224739145,
+        "average_precision": 0.09332357998235595,
+        "correlation": 0.06787219035439028
+      },
+      "LAURA": {
+        "Mean_Localization_Error": 40.19079105025727,
+        "EMD": 49.05540455606822,
+        "sd": 15.321393611564595,
+        "average_precision": 0.044993501548704504,
+        "correlation": 0.05621054075838617
+      },
+      "MNE": {
+        "Mean_Localization_Error": 36.274574482818096,
+        "EMD": 48.832475778030755,
+        "sd": 25.113079224739145,
+        "average_precision": 0.09332357998235595,
+        "correlation": 0.06787219035439031
+      },
+      "SMAP": {
+        "Mean_Localization_Error": 52.36764460547927,
+        "EMD": 56.42622740626907,
+        "sd": 495.61348284442226,
+        "average_precision": 0.013151816256212695,
+        "correlation": 0.013714767708354779
+      },
+      "WMNE": {
+        "Mean_Localization_Error": 32.779739664272356,
+        "EMD": 49.638089426934854,
+        "sd": 57.25304285475583,
+        "average_precision": 0.1535126964051722,
+        "correlation": 0.06840367448980507
+      }
+    },
+    "extended_source": {
+      "Champagne": {
+        "Mean_Localization_Error": 18.311199411173394,
+        "EMD": 25.694207107300926,
+        "sd": 1.0516636197914284,
+        "average_precision": 0.10799302157414571,
+        "correlation": 0.16787415296448152
+      },
+      "ESMV": {
+        "Mean_Localization_Error": 25.322084187501286,
+        "EMD": 32.51086559066877,
+        "sd": 4.659810002226036,
+        "average_precision": 0.13300824792619323,
+        "correlation": 0.16986393826175192
+      },
+      "LCMV": {
+        "Mean_Localization_Error": 23.5074217421075,
+        "EMD": 53.17217353676572,
+        "sd": 112.63894946618127,
+        "average_precision": 0.1131337040616126,
+        "correlation": 0.07378698317154173
+      },
+      "dSPM": {
+        "Mean_Localization_Error": 31.525241188800624,
+        "EMD": 54.705424626435594,
+        "sd": 109.5677536970165,
+        "average_precision": 0.0980769203849869,
+        "correlation": 0.05422470185199364
+      },
+      "eLORETA": {
+        "Mean_Localization_Error": 28.006856141373724,
+        "EMD": 48.112827545438165,
+        "sd": 105.28635039381105,
+        "average_precision": 0.18107933075238253,
+        "correlation": 0.11341204229931554
+      },
+      "LORETA": {
+        "Mean_Localization_Error": 47.22347783270364,
+        "EMD": 55.619310341555504,
+        "sd": 504.6602605765272,
+        "average_precision": 0.12915200952009318,
+        "correlation": 0.05743386168707684
+      },
+      "sLORETA": {
+        "Mean_Localization_Error": 34.83358513886157,
+        "EMD": 44.39286669016122,
+        "sd": 21.468724150008228,
+        "average_precision": 0.15325994270744298,
+        "correlation": 0.11375409427588673
+      },
+      "LAURA": {
+        "Mean_Localization_Error": 38.50623212400797,
+        "EMD": 46.66753925153242,
+        "sd": 18.034835920308804,
+        "average_precision": 0.09138334907862262,
+        "correlation": 0.10124727615178436
+      },
+      "MNE": {
+        "Mean_Localization_Error": 34.83358513886157,
+        "EMD": 44.39286669016123,
+        "sd": 21.468724150008228,
+        "average_precision": 0.15325994270744298,
+        "correlation": 0.11375409427588674
+      },
+      "SMAP": {
+        "Mean_Localization_Error": 47.22347783270364,
+        "EMD": 55.619310341555504,
+        "sd": 504.6602605765272,
+        "average_precision": 0.12915200952009318,
+        "correlation": 0.05743386168707684
+      },
+      "WMNE": {
+        "Mean_Localization_Error": 31.781405884587794,
+        "EMD": 47.09089535627381,
+        "sd": 54.71226095939954,
+        "average_precision": 0.17178744978368252,
+        "correlation": 0.11291189747640022
+      }
+    },
+    "noisy": {
+      "Champagne": {
+        "Mean_Localization_Error": 23.89589151105162,
+        "EMD": 28.39975873034787,
+        "sd": 1.9413989501682491,
+        "average_precision": 0.32340805208122775,
+        "correlation": 0.342556627150417
+      },
+      "ESMV": {
+        "Mean_Localization_Error": 17.106983799996765,
+        "EMD": 26.255010177225454,
+        "sd": 5.162775920996112,
+        "average_precision": 0.4026733777303258,
+        "correlation": 0.2816089089621987
+      },
+      "LCMV": {
+        "Mean_Localization_Error": 24.483308927774953,
+        "EMD": 62.564909377954216,
+        "sd": 209.3123513154159,
+        "average_precision": 0.3567901819466766,
+        "correlation": 0.06144917634770995
+      },
+      "dSPM": {
+        "Mean_Localization_Error": 28.495830592609217,
+        "EMD": 64.85081653339311,
+        "sd": 703.2334711346841,
+        "average_precision": 0.056458468866101015,
+        "correlation": 0.026991471317855686
+      },
+      "eLORETA": {
+        "Mean_Localization_Error": 19.097862370259307,
+        "EMD": 61.04881620554254,
+        "sd": 287.88221542934656,
+        "average_precision": 0.4070841287630168,
+        "correlation": 0.06720949992124672
+      },
+      "LORETA": {
+        "Mean_Localization_Error": 61.24555326212649,
+        "EMD": 65.34205743076065,
+        "sd": 869.6073847053253,
+        "average_precision": 0.02150591434721356,
+        "correlation": 0.023868656040763297
+      },
+      "sLORETA": {
+        "Mean_Localization_Error": 32.31768694604666,
+        "EMD": 57.36062939837716,
+        "sd": 146.32249705088176,
+        "average_precision": 0.14304995296843964,
+        "correlation": 0.07355928715071555
+      },
+      "LAURA": {
+        "Mean_Localization_Error": 39.77300918651534,
+        "EMD": 57.28949886082427,
+        "sd": 45.01357718116249,
+        "average_precision": 0.07173832191747312,
+        "correlation": 0.06678177866812658
+      },
+      "MNE": {
+        "Mean_Localization_Error": 32.31768694604666,
+        "EMD": 57.36062939837716,
+        "sd": 146.32249705088176,
+        "average_precision": 0.14304995296843964,
+        "correlation": 0.07355928715071557
+      },
+      "SMAP": {
+        "Mean_Localization_Error": 61.24555326212649,
+        "EMD": 65.34205743076065,
+        "sd": 869.6073847053253,
+        "average_precision": 0.02150591434721356,
+        "correlation": 0.023868656040763297
+      },
+      "WMNE": {
+        "Mean_Localization_Error": 21.43522071362044,
+        "EMD": 60.327542551890375,
+        "sd": 311.6089861422342,
+        "average_precision": 0.2913417564539689,
+        "correlation": 0.06979025435894229
+      }
+    }
+  },
+  "none_whitened": {
+    "focal_source": {
+      "Champagne": {
+        "Mean_Localization_Error": 0.0,
+        "EMD": 0.0,
+        "sd": 1.0,
+        "average_precision": 1.0,
+        "correlation": 0.9999999999999997
+      },
+      "ESMV": {
+        "Mean_Localization_Error": 3.972325700224435,
+        "EMD": 1.0822400228191287,
+        "sd": 1.0192407839400937,
+        "average_precision": 1.0,
+        "correlation": 0.905991006572693
+      },
+      "LCMV": {
+        "Mean_Localization_Error": 17.77704766787198,
+        "EMD": 42.63471525223886,
+        "sd": 7.22854450061917,
+        "average_precision": 1.0,
+        "correlation": 0.17827572621552248
+      },
+      "dSPM": {
+        "Mean_Localization_Error": 20.231433586465037,
+        "EMD": 70.54044447709862,
+        "sd": 160.18279427076797,
+        "average_precision": 0.15136328482144562,
+        "correlation": 0.038865045375823734
+      },
+      "eLORETA": {
+        "Mean_Localization_Error": 8.794470957151857,
+        "EMD": 55.36406004687952,
+        "sd": 150.62111870326032,
+        "average_precision": 1.0,
+        "correlation": 0.0754878081630894
+      },
+      "LORETA": {
+        "Mean_Localization_Error": 52.715113311234724,
+        "EMD": 74.07097420503067,
+        "sd": 1135.8093908515598,
+        "average_precision": 0.012001610855375091,
+        "correlation": 0.012079235757060058
+      },
+      "sLORETA": {
+        "Mean_Localization_Error": 25.671221090335347,
+        "EMD": 54.395873623870855,
+        "sd": 60.25380600818699,
+        "average_precision": 0.22268244656546604,
+        "correlation": 0.07091843828554442
+      },
+      "LAURA": {
+        "Mean_Localization_Error": 32.928285432956486,
+        "EMD": 54.548797001112135,
+        "sd": 34.29719809242,
+        "average_precision": 0.12704582915469545,
+        "correlation": 0.06396995343741886
+      },
+      "MNE": {
+        "Mean_Localization_Error": 25.671221090335347,
+        "EMD": 54.395873623870855,
+        "sd": 60.25380600818699,
+        "average_precision": 0.22268244656546604,
+        "correlation": 0.07091843828554442
+      },
+      "SMAP": {
+        "Mean_Localization_Error": 52.715113311234724,
+        "EMD": 74.07097420503067,
+        "sd": 1135.8093908515598,
+        "average_precision": 0.012001610855375091,
+        "correlation": 0.012079235757060058
+      },
+      "WMNE": {
+        "Mean_Localization_Error": 18.461101443524644,
+        "EMD": 56.323173077374975,
+        "sd": 114.58338504324273,
+        "average_precision": 0.3794422553809759,
+        "correlation": 0.07520111668998218
+      }
+    },
+    "multi_source": {
+      "Champagne": {
+        "Mean_Localization_Error": 8.588072645077624,
+        "EMD": 14.970986853459884,
+        "sd": 0.830659251030932,
+        "average_precision": 0.7048427801514152,
+        "correlation": 0.6904745372579337
+      },
+      "ESMV": {
+        "Mean_Localization_Error": 17.550550729433745,
+        "EMD": 28.745693547703024,
+        "sd": 2.6534853100224542,
+        "average_precision": 0.5303695080418906,
+        "correlation": 0.3376191002694363
+      },
+      "LCMV": {
+        "Mean_Localization_Error": 16.05254467809293,
+        "EMD": 51.062886160975125,
+        "sd": 56.949909230616576,
+        "average_precision": 0.6089989424912526,
+        "correlation": 0.08961399128719423
+      },
+      "dSPM": {
+        "Mean_Localization_Error": 32.065298445111296,
+        "EMD": 55.428293925357885,
+        "sd": 222.20544255076234,
+        "average_precision": 0.049144748041615324,
+        "correlation": 0.03477866942618881
+      },
+      "eLORETA": {
+        "Mean_Localization_Error": 27.30713259794011,
+        "EMD": 49.98563467893821,
+        "sd": 104.37482409343122,
+        "average_precision": 0.328616998770243,
+        "correlation": 0.07097578467527428
+      },
+      "LORETA": {
+        "Mean_Localization_Error": 52.948367804555126,
+        "EMD": 56.424344427118115,
+        "sd": 495.7340412130611,
+        "average_precision": 0.013993285255596408,
+        "correlation": 0.013702358941854287
+      },
+      "sLORETA": {
+        "Mean_Localization_Error": 36.18088229039319,
+        "EMD": 48.82524537590335,
+        "sd": 25.138619936552644,
+        "average_precision": 0.09324384200498713,
+        "correlation": 0.067878922666416
+      },
+      "LAURA": {
+        "Mean_Localization_Error": 39.9467916720818,
+        "EMD": 49.051471731676266,
+        "sd": 15.277847713268205,
+        "average_precision": 0.045092820612355033,
+        "correlation": 0.05622200470769917
+      },
+      "MNE": {
+        "Mean_Localization_Error": 36.18088229039319,
+        "EMD": 48.82524537590335,
+        "sd": 25.138619936552644,
+        "average_precision": 0.09324384200498713,
+        "correlation": 0.06787892266641599
+      },
+      "SMAP": {
+        "Mean_Localization_Error": 52.948367804555126,
+        "EMD": 56.424344427118115,
+        "sd": 495.7340412130611,
+        "average_precision": 0.013993285255596408,
+        "correlation": 0.013702358941854287
+      },
+      "WMNE": {
+        "Mean_Localization_Error": 32.66851382368603,
+        "EMD": 49.61276582005446,
+        "sd": 57.28363435616262,
+        "average_precision": 0.15328665558559654,
+        "correlation": 0.06840628654290265
+      }
+    },
+    "extended_source": {
+      "Champagne": {
+        "Mean_Localization_Error": 18.427173468237708,
+        "EMD": 25.72689364760483,
+        "sd": 1.0682411916167487,
+        "average_precision": 0.10796099760696903,
+        "correlation": 0.16889371244111806
+      },
+      "ESMV": {
+        "Mean_Localization_Error": 25.515382709937793,
+        "EMD": 32.55362241392646,
+        "sd": 4.487581562562411,
+        "average_precision": 0.13334812273169427,
+        "correlation": 0.17013446214367833
+      },
+      "LCMV": {
+        "Mean_Localization_Error": 24.177958989238146,
+        "EMD": 53.21846205828985,
+        "sd": 105.4889730406253,
+        "average_precision": 0.11596171614191121,
+        "correlation": 0.07511456231824672
+      },
+      "dSPM": {
+        "Mean_Localization_Error": 31.65308459870153,
+        "EMD": 54.70640646284467,
+        "sd": 108.51464872558097,
+        "average_precision": 0.09782239871955957,
+        "correlation": 0.05422714167602704
+      },
+      "eLORETA": {
+        "Mean_Localization_Error": 27.995699775966045,
+        "EMD": 48.1079905129268,
+        "sd": 105.23141576298367,
+        "average_precision": 0.1811457882681447,
+        "correlation": 0.11340794273104365
+      },
+      "LORETA": {
+        "Mean_Localization_Error": 47.529306306411954,
+        "EMD": 55.61077441426426,
+        "sd": 503.7655574186008,
+        "average_precision": 0.13071599946839693,
+        "correlation": 0.05712824440635245
+      },
+      "sLORETA": {
+        "Mean_Localization_Error": 34.62270495740656,
+        "EMD": 44.42127681394711,
+        "sd": 21.402226674608904,
+        "average_precision": 0.15378976923314702,
+        "correlation": 0.1138283133897553
+      },
+      "LAURA": {
+        "Mean_Localization_Error": 38.545515143297486,
+        "EMD": 46.68721188929215,
+        "sd": 18.03359059516456,
+        "average_precision": 0.09161954282955607,
+        "correlation": 0.10129043235678807
+      },
+      "MNE": {
+        "Mean_Localization_Error": 34.62270495740656,
+        "EMD": 44.42127681394711,
+        "sd": 21.402226674608904,
+        "average_precision": 0.15378976923314702,
+        "correlation": 0.11382831338975526
+      },
+      "SMAP": {
+        "Mean_Localization_Error": 47.529306306411954,
+        "EMD": 55.61077441426426,
+        "sd": 503.7655574186008,
+        "average_precision": 0.13071599946839693,
+        "correlation": 0.05712824440635245
+      },
+      "WMNE": {
+        "Mean_Localization_Error": 31.703435947420086,
+        "EMD": 47.06135982106517,
+        "sd": 54.70103582268771,
+        "average_precision": 0.17107415512898796,
+        "correlation": 0.11293057912617999
+      }
+    },
+    "noisy": {
+      "Champagne": {
+        "Mean_Localization_Error": 23.691321419756957,
+        "EMD": 28.253629693500724,
+        "sd": 1.9455887909110923,
+        "average_precision": 0.32342104528613924,
+        "correlation": 0.34327945369445056
+      },
+      "ESMV": {
+        "Mean_Localization_Error": 17.20592477584293,
+        "EMD": 26.40081659810616,
+        "sd": 5.609361934303287,
+        "average_precision": 0.3962069742864383,
+        "correlation": 0.2863257531013505
+      },
+      "LCMV": {
+        "Mean_Localization_Error": 24.300021911707425,
+        "EMD": 62.99851000571598,
+        "sd": 183.30653398957432,
+        "average_precision": 0.35441754248118,
+        "correlation": 0.0617860625710195
+      },
+      "dSPM": {
+        "Mean_Localization_Error": 28.673843587358935,
+        "EMD": 64.85347164735302,
+        "sd": 702.3959422533595,
+        "average_precision": 0.054813881296729,
+        "correlation": 0.026990764529317878
+      },
+      "eLORETA": {
+        "Mean_Localization_Error": 19.211148234799147,
+        "EMD": 61.02932611821332,
+        "sd": 287.8545993639937,
+        "average_precision": 0.40812850345803964,
+        "correlation": 0.06722849544262903
+      },
+      "LORETA": {
+        "Mean_Localization_Error": 61.181192487356896,
+        "EMD": 65.32799654141274,
+        "sd": 869.3393536498114,
+        "average_precision": 0.021506558070507432,
+        "correlation": 0.023736626477979222
+      },
+      "sLORETA": {
+        "Mean_Localization_Error": 32.34165316203344,
+        "EMD": 57.35007864753402,
+        "sd": 146.72387659972614,
+        "average_precision": 0.14309674406165399,
+        "correlation": 0.073508835099992
+      },
+      "LAURA": {
+        "Mean_Localization_Error": 39.636810345914476,
+        "EMD": 57.26260081921643,
+        "sd": 45.21511218638956,
+        "average_precision": 0.07181686919087663,
+        "correlation": 0.06678507385501746
+      },
+      "MNE": {
+        "Mean_Localization_Error": 32.34165316203344,
+        "EMD": 57.350078647534026,
+        "sd": 146.72387659972614,
+        "average_precision": 0.14309674406165399,
+        "correlation": 0.07350883509999198
+      },
+      "SMAP": {
+        "Mean_Localization_Error": 61.181192487356896,
+        "EMD": 65.32799654141274,
+        "sd": 869.3393536498114,
+        "average_precision": 0.021506558070507432,
+        "correlation": 0.023736626477979222
+      },
+      "WMNE": {
+        "Mean_Localization_Error": 21.424255737716322,
+        "EMD": 60.314865716369624,
+        "sd": 312.13595066775565,
+        "average_precision": 0.2918259845555293,
+        "correlation": 0.06977490359957518
+      }
+    }
+  },
+  "struct_raw": {
+    "focal_source": {
+      "Champagne": {
+        "Mean_Localization_Error": 11.876192704347588,
+        "EMD": 12.526428378959192,
+        "sd": 1.1236314953299391,
+        "average_precision": 0.9800215982721383,
+        "correlation": 0.8271866994985055
+      },
+      "ESMV": {
+        "Mean_Localization_Error": 3.5996221866372284,
+        "EMD": 0.9215187573074337,
+        "sd": 1.1309439680411602,
+        "average_precision": 1.0,
+        "correlation": 0.9020311375806216
+      },
+      "LCMV": {
+        "Mean_Localization_Error": 23.12422045122953,
+        "EMD": 52.52932852650366,
+        "sd": 81.9661255401301,
+        "average_precision": 0.9342626262626262,
+        "correlation": 0.13954783799747847
+      },
+      "dSPM": {
+        "Mean_Localization_Error": 18.583591826083282,
+        "EMD": 67.36965967551696,
+        "sd": 131.33289864100308,
+        "average_precision": 0.14955736149472565,
+        "correlation": 0.04092181844168053
+      },
+      "eLORETA": {
+        "Mean_Localization_Error": 10.945706317209034,
+        "EMD": 65.1270983986931,
+        "sd": 198.46906021101395,
+        "average_precision": 0.9269166666666667,
+        "correlation": 0.06025723053380935
+      },
+      "LORETA": {
+        "Mean_Localization_Error": 52.00798357143695,
+        "EMD": 72.48521557646156,
+        "sd": 1173.6294504992545,
+        "average_precision": 0.007759547901519939,
+        "correlation": 0.011327403407329815
+      },
+      "sLORETA": {
+        "Mean_Localization_Error": 29.45033359392759,
+        "EMD": 55.54163425560169,
+        "sd": 65.286774165584,
+        "average_precision": 0.1602189102519805,
+        "correlation": 0.06284578833278187
+      },
+      "LAURA": {
+        "Mean_Localization_Error": 32.271903989640364,
+        "EMD": 56.01222119488213,
+        "sd": 40.70970662307001,
+        "average_precision": 0.08416898917620458,
+        "correlation": 0.055677800239728674
+      },
+      "MNE": {
+        "Mean_Localization_Error": 29.45033359392759,
+        "EMD": 55.541634255601686,
+        "sd": 65.286774165584,
+        "average_precision": 0.1602189102519805,
+        "correlation": 0.06284578833278189
+      },
+      "SMAP": {
+        "Mean_Localization_Error": 52.00798357143695,
+        "EMD": 72.48521557646156,
+        "sd": 1173.6294504992545,
+        "average_precision": 0.007759547901519939,
+        "correlation": 0.011327403407329815
+      },
+      "WMNE": {
+        "Mean_Localization_Error": 20.548228662204647,
+        "EMD": 57.8023225973209,
+        "sd": 145.2088046483322,
+        "average_precision": 0.29648397830546114,
+        "correlation": 0.06786167527919151
+      }
+    },
+    "multi_source": {
+      "Champagne": {
+        "Mean_Localization_Error": 13.450113912993533,
+        "EMD": 17.801075348375594,
+        "sd": 1.2041698638139184,
+        "average_precision": 0.6360842950541907,
+        "correlation": 0.6176920324970425
+      },
+      "ESMV": {
+        "Mean_Localization_Error": 14.880245804848684,
+        "EMD": 25.27214890847904,
+        "sd": 2.521096917667248,
+        "average_precision": 0.5912377241027318,
+        "correlation": 0.38579149895279374
+      },
+      "LCMV": {
+        "Mean_Localization_Error": 17.629351262215287,
+        "EMD": 52.70669423611924,
+        "sd": 74.63511889305099,
+        "average_precision": 0.5907352509837129,
+        "correlation": 0.09254673166590405
+      },
+      "dSPM": {
+        "Mean_Localization_Error": 30.359922642781612,
+        "EMD": 56.47517170989168,
+        "sd": 173.23552297641996,
+        "average_precision": 0.055062316411557816,
+        "correlation": 0.03689496421754369
+      },
+      "eLORETA": {
+        "Mean_Localization_Error": 24.823064263416416,
+        "EMD": 50.548281407563856,
+        "sd": 125.9929446664181,
+        "average_precision": 0.3855719301321133,
+        "correlation": 0.07274506680874003
+      },
+      "LORETA": {
+        "Mean_Localization_Error": 47.06090537078619,
+        "EMD": 57.27980224132122,
+        "sd": 561.4480529719137,
+        "average_precision": 0.010871817813230702,
+        "correlation": 0.015262355385468511
+      },
+      "sLORETA": {
+        "Mean_Localization_Error": 33.98349301333778,
+        "EMD": 48.26067384000393,
+        "sd": 30.204759610481165,
+        "average_precision": 0.13090509198609543,
+        "correlation": 0.07115778868479161
+      },
+      "LAURA": {
+        "Mean_Localization_Error": 38.586668499779925,
+        "EMD": 48.91237800255459,
+        "sd": 17.937911694468955,
+        "average_precision": 0.08174878907899868,
+        "correlation": 0.06467978871369162
+      },
+      "MNE": {
+        "Mean_Localization_Error": 33.98349301333778,
+        "EMD": 48.26067384000393,
+        "sd": 30.204759610481165,
+        "average_precision": 0.13090509198609543,
+        "correlation": 0.07115778868479161
+      },
+      "SMAP": {
+        "Mean_Localization_Error": 47.06090537078619,
+        "EMD": 57.27980224132122,
+        "sd": 561.4480529719137,
+        "average_precision": 0.010871817813230702,
+        "correlation": 0.015262355385468511
+      },
+      "WMNE": {
+        "Mean_Localization_Error": 27.775273785964096,
+        "EMD": 49.616070820516846,
+        "sd": 69.0549621758824,
+        "average_precision": 0.22443175223876433,
+        "correlation": 0.07210816133220271
+      }
+    },
+    "extended_source": {
+      "Champagne": {
+        "Mean_Localization_Error": 20.26501323754353,
+        "EMD": 26.738395016475856,
+        "sd": 1.3633977297464306,
+        "average_precision": 0.10189730587788118,
+        "correlation": 0.18107199117488904
+      },
+      "ESMV": {
+        "Mean_Localization_Error": 24.58303011470541,
+        "EMD": 30.673128896065734,
+        "sd": 3.518824805897122,
+        "average_precision": 0.16666219608214586,
+        "correlation": 0.2082462648022004
+      },
+      "LCMV": {
+        "Mean_Localization_Error": 28.345026682770314,
+        "EMD": 52.5861020772367,
+        "sd": 111.28326180709817,
+        "average_precision": 0.12317964517061876,
+        "correlation": 0.07848454111693191
+      },
+      "dSPM": {
+        "Mean_Localization_Error": 30.4638496636654,
+        "EMD": 53.40379153841543,
+        "sd": 160.05111174277295,
+        "average_precision": 0.11608659023970753,
+        "correlation": 0.06453087509229953
+      },
+      "eLORETA": {
+        "Mean_Localization_Error": 28.363739200746135,
+        "EMD": 47.66771237453815,
+        "sd": 134.53714100474733,
+        "average_precision": 0.20561122410297333,
+        "correlation": 0.11868936773600701
+      },
+      "LORETA": {
+        "Mean_Localization_Error": 47.09442445834656,
+        "EMD": 54.98641873872109,
+        "sd": 578.196807537965,
+        "average_precision": 0.07661399881036435,
+        "correlation": 0.05608113809267661
+      },
+      "sLORETA": {
+        "Mean_Localization_Error": 37.00530218992629,
+        "EMD": 44.38201089931828,
+        "sd": 26.892643158683498,
+        "average_precision": 0.15147702959399204,
+        "correlation": 0.116000403591387
+      },
+      "LAURA": {
+        "Mean_Localization_Error": 41.33206945240441,
+        "EMD": 46.552934785985926,
+        "sd": 23.0185453637214,
+        "average_precision": 0.08506795481927835,
+        "correlation": 0.09769963963813973
+      },
+      "MNE": {
+        "Mean_Localization_Error": 37.00530218992629,
+        "EMD": 44.38201089931828,
+        "sd": 26.892643158683498,
+        "average_precision": 0.15147702959399204,
+        "correlation": 0.116000403591387
+      },
+      "SMAP": {
+        "Mean_Localization_Error": 47.09442445834656,
+        "EMD": 54.98641873872109,
+        "sd": 578.196807537965,
+        "average_precision": 0.07661399881036435,
+        "correlation": 0.05608113809267661
+      },
+      "WMNE": {
+        "Mean_Localization_Error": 32.849959525240344,
+        "EMD": 46.87364449287576,
+        "sd": 78.09078212447938,
+        "average_precision": 0.1805046180924487,
+        "correlation": 0.11668619689021162
+      }
+    },
+    "noisy": {
+      "Champagne": {
+        "Mean_Localization_Error": 28.568347159642713,
+        "EMD": 38.646395526299635,
+        "sd": 2.4619506548206367,
+        "average_precision": 0.30371088924598766,
+        "correlation": 0.3064761903571719
+      },
+      "ESMV": {
+        "Mean_Localization_Error": 17.727573798799316,
+        "EMD": 28.070011071176136,
+        "sd": 4.832478575748784,
+        "average_precision": 0.35618620641526044,
+        "correlation": 0.26867660203527755
+      },
+      "LCMV": {
+        "Mean_Localization_Error": 34.41553943909477,
+        "EMD": 63.674369232261405,
+        "sd": 251.14579594599863,
+        "average_precision": 0.18750276525061418,
+        "correlation": 0.05292837466408005
+      },
+      "dSPM": {
+        "Mean_Localization_Error": 32.31694957218925,
+        "EMD": 65.62304191922884,
+        "sd": 635.0754042798244,
+        "average_precision": 0.07334826733627202,
+        "correlation": 0.03110255161892331
+      },
+      "eLORETA": {
+        "Mean_Localization_Error": 33.21115273381085,
+        "EMD": 65.76850722765333,
+        "sd": 438.75602127323396,
+        "average_precision": 0.2504640896169688,
+        "correlation": 0.04975539941269311
+      },
+      "LORETA": {
+        "Mean_Localization_Error": 61.90226055196542,
+        "EMD": 66.1589522971912,
+        "sd": 977.7146744631896,
+        "average_precision": 0.015559158992138795,
+        "correlation": 0.020142083976557017
+      },
+      "sLORETA": {
+        "Mean_Localization_Error": 45.68531704727448,
+        "EMD": 62.13454234654103,
+        "sd": 43.33718390910977,
+        "average_precision": 0.08441095512708482,
+        "correlation": 0.05858454760907197
+      },
+      "LAURA": {
+        "Mean_Localization_Error": 46.7353874071984,
+        "EMD": 62.92454513170225,
+        "sd": 36.73121120927714,
+        "average_precision": 0.03598762001711015,
+        "correlation": 0.04665375738822696
+      },
+      "MNE": {
+        "Mean_Localization_Error": 45.68531704727448,
+        "EMD": 62.13454234654103,
+        "sd": 43.33718390910977,
+        "average_precision": 0.08441095512708482,
+        "correlation": 0.058584547609071974
+      },
+      "SMAP": {
+        "Mean_Localization_Error": 61.90226055196542,
+        "EMD": 66.1589522971912,
+        "sd": 977.7146744631896,
+        "average_precision": 0.015559158992138795,
+        "correlation": 0.020142083976557017
+      },
+      "WMNE": {
+        "Mean_Localization_Error": 30.924362763170592,
+        "EMD": 63.48096816352949,
+        "sd": 151.61845391341686,
+        "average_precision": 0.17058990974728558,
+        "correlation": 0.061578754860142214
+      }
+    }
+  },
+  "struct_whitened": {
+    "focal_source": {
+      "Champagne": {
+        "Mean_Localization_Error": 5.303859620627507,
+        "EMD": 4.660924323470486,
+        "sd": 1.0840156975209891,
+        "average_precision": 1.0,
+        "correlation": 0.935626462011062
+      },
+      "ESMV": {
+        "Mean_Localization_Error": 3.9654955822041966,
+        "EMD": 1.1176944247712863,
+        "sd": 1.125838481603659,
+        "average_precision": 1.0,
+        "correlation": 0.8947514871880061
+      },
+      "LCMV": {
+        "Mean_Localization_Error": 19.6317738915244,
+        "EMD": 48.88589725886414,
+        "sd": 35.41512510789417,
+        "average_precision": 0.97,
+        "correlation": 0.14798617977147513
+      },
+      "dSPM": {
+        "Mean_Localization_Error": 18.222697482773935,
+        "EMD": 68.4083955419308,
+        "sd": 157.90859670093906,
+        "average_precision": 0.14586693707944776,
+        "correlation": 0.04022142109806502
+      },
+      "eLORETA": {
+        "Mean_Localization_Error": 8.52340445873162,
+        "EMD": 55.785012367547395,
+        "sd": 157.20276691383327,
+        "average_precision": 1.0,
+        "correlation": 0.07208165653676811
+      },
+      "LORETA": {
+        "Mean_Localization_Error": 51.73548171714205,
+        "EMD": 72.62711886927232,
+        "sd": 1181.6935738032648,
+        "average_precision": 0.01046558956898738,
+        "correlation": 0.011657314032317054
+      },
+      "sLORETA": {
+        "Mean_Localization_Error": 29.856530507621425,
+        "EMD": 57.76098658433047,
+        "sd": 57.752939035592114,
+        "average_precision": 0.1393524679187025,
+        "correlation": 0.05996384968245136
+      },
+      "LAURA": {
+        "Mean_Localization_Error": 35.14019316634392,
+        "EMD": 57.985951795749635,
+        "sd": 37.62681887875253,
+        "average_precision": 0.09057171285837887,
+        "correlation": 0.054797680150981416
+      },
+      "MNE": {
+        "Mean_Localization_Error": 29.856530507621425,
+        "EMD": 57.760986584330475,
+        "sd": 57.752939035592114,
+        "average_precision": 0.1393524679187025,
+        "correlation": 0.05996384968245133
+      },
+      "SMAP": {
+        "Mean_Localization_Error": 51.73548171714205,
+        "EMD": 72.62711886927232,
+        "sd": 1181.6935738032648,
+        "average_precision": 0.01046558956898738,
+        "correlation": 0.011657314032317054
+      },
+      "WMNE": {
+        "Mean_Localization_Error": 21.40690717396935,
+        "EMD": 59.26482104422231,
+        "sd": 128.1294755985612,
+        "average_precision": 0.2847333802304002,
+        "correlation": 0.06594279320745663
+      }
+    },
+    "multi_source": {
+      "Champagne": {
+        "Mean_Localization_Error": 11.691809596789911,
+        "EMD": 14.191703963915524,
+        "sd": 1.1311746754884757,
+        "average_precision": 0.6602244512668198,
+        "correlation": 0.6593277452483258
+      },
+      "ESMV": {
+        "Mean_Localization_Error": 14.581612750231242,
+        "EMD": 26.61600794371384,
+        "sd": 2.880628184554332,
+        "average_precision": 0.6058370563004414,
+        "correlation": 0.3919302790389459
+      },
+      "LCMV": {
+        "Mean_Localization_Error": 16.518772975646833,
+        "EMD": 52.67928771290362,
+        "sd": 62.98480107816493,
+        "average_precision": 0.6021422997371878,
+        "correlation": 0.09157786216000126
+      },
+      "dSPM": {
+        "Mean_Localization_Error": 29.993055148279197,
+        "EMD": 56.64139952146756,
+        "sd": 209.02091814830473,
+        "average_precision": 0.05627108110745483,
+        "correlation": 0.03628849877138774
+      },
+      "eLORETA": {
+        "Mean_Localization_Error": 24.691554298001957,
+        "EMD": 50.5533419714611,
+        "sd": 115.22376786831494,
+        "average_precision": 0.39168855852780815,
+        "correlation": 0.07315067755489563
+      },
+      "LORETA": {
+        "Mean_Localization_Error": 48.29271596807914,
+        "EMD": 57.308689299953954,
+        "sd": 567.4217335569606,
+        "average_precision": 0.017543745822515458,
+        "correlation": 0.015583613633212291
+      },
+      "sLORETA": {
+        "Mean_Localization_Error": 34.23941263221635,
+        "EMD": 49.262321533477206,
+        "sd": 28.770300203903865,
+        "average_precision": 0.1201249282318681,
+        "correlation": 0.0700996232833152
+      },
+      "LAURA": {
+        "Mean_Localization_Error": 39.823532434656485,
+        "EMD": 49.429358210166725,
+        "sd": 16.59297843216746,
+        "average_precision": 0.0852954012331088,
+        "correlation": 0.06412765867144274
+      },
+      "MNE": {
+        "Mean_Localization_Error": 34.23941263221635,
+        "EMD": 49.262321533477206,
+        "sd": 28.770300203903865,
+        "average_precision": 0.1201249282318681,
+        "correlation": 0.07009962328331518
+      },
+      "SMAP": {
+        "Mean_Localization_Error": 48.29271596807914,
+        "EMD": 57.308689299953954,
+        "sd": 567.4217335569606,
+        "average_precision": 0.017543745822515458,
+        "correlation": 0.015583613633212291
+      },
+      "WMNE": {
+        "Mean_Localization_Error": 27.57043227738552,
+        "EMD": 50.33268717842972,
+        "sd": 66.7773910163663,
+        "average_precision": 0.22011574720982924,
+        "correlation": 0.0712879639498753
+      }
+    },
+    "extended_source": {
+      "Champagne": {
+        "Mean_Localization_Error": 19.41094632143941,
+        "EMD": 25.375793859079362,
+        "sd": 1.3388465904381086,
+        "average_precision": 0.10799531826293936,
+        "correlation": 0.2009090739485306
+      },
+      "ESMV": {
+        "Mean_Localization_Error": 24.634100110633344,
+        "EMD": 30.05322101708449,
+        "sd": 3.8271937878937035,
+        "average_precision": 0.17462540529075865,
+        "correlation": 0.21659048759556954
+      },
+      "LCMV": {
+        "Mean_Localization_Error": 26.030254013597542,
+        "EMD": 52.51903642110856,
+        "sd": 106.73873022596355,
+        "average_precision": 0.13695421468112015,
+        "correlation": 0.07730337888838153
+      },
+      "dSPM": {
+        "Mean_Localization_Error": 29.966478060112728,
+        "EMD": 53.41277061156981,
+        "sd": 193.44128846451358,
+        "average_precision": 0.11784778867594017,
+        "correlation": 0.06392139015741476
+      },
+      "eLORETA": {
+        "Mean_Localization_Error": 28.1014337602743,
+        "EMD": 47.585429879922174,
+        "sd": 127.31284864711623,
+        "average_precision": 0.21138986893948733,
+        "correlation": 0.11982911554117644
+      },
+      "LORETA": {
+        "Mean_Localization_Error": 48.763038745019685,
+        "EMD": 55.07180384749965,
+        "sd": 579.0505650226042,
+        "average_precision": 0.07769062321100617,
+        "correlation": 0.05810693611912506
+      },
+      "sLORETA": {
+        "Mean_Localization_Error": 37.619703371670454,
+        "EMD": 45.05321845131317,
+        "sd": 25.996487960539977,
+        "average_precision": 0.15289412779532463,
+        "correlation": 0.11353379074857947
+      },
+      "LAURA": {
+        "Mean_Localization_Error": 42.040063773885656,
+        "EMD": 47.31256354251644,
+        "sd": 21.411742881008095,
+        "average_precision": 0.08629129922689024,
+        "correlation": 0.09556668475125686
+      },
+      "MNE": {
+        "Mean_Localization_Error": 37.619703371670454,
+        "EMD": 45.05321845131317,
+        "sd": 25.996487960539977,
+        "average_precision": 0.15289412779532463,
+        "correlation": 0.1135337907485795
+      },
+      "SMAP": {
+        "Mean_Localization_Error": 48.763038745019685,
+        "EMD": 55.07180384749965,
+        "sd": 579.0505650226042,
+        "average_precision": 0.07769062321100617,
+        "correlation": 0.05810693611912506
+      },
+      "WMNE": {
+        "Mean_Localization_Error": 32.170636600821055,
+        "EMD": 47.26555561304545,
+        "sd": 72.56662613393969,
+        "average_precision": 0.18552006814201277,
+        "correlation": 0.11480272758432453
+      }
+    },
+    "noisy": {
+      "Champagne": {
+        "Mean_Localization_Error": 30.858467566377488,
+        "EMD": 39.515671428248154,
+        "sd": 2.4998859433719223,
+        "average_precision": 0.27638068101203933,
+        "correlation": 0.28109225097928103
+      },
+      "ESMV": {
+        "Mean_Localization_Error": 17.304306653156278,
+        "EMD": 24.76696490221101,
+        "sd": 4.420478394524334,
+        "average_precision": 0.37825772423309595,
+        "correlation": 0.2850225638690317
+      },
+      "LCMV": {
+        "Mean_Localization_Error": 29.00823948192839,
+        "EMD": 63.50498081795827,
+        "sd": 211.52438765082832,
+        "average_precision": 0.2843827062892537,
+        "correlation": 0.05967200172025643
+      },
+      "dSPM": {
+        "Mean_Localization_Error": 32.83518104169061,
+        "EMD": 65.7722857927511,
+        "sd": 714.6746335647291,
+        "average_precision": 0.0676706947277314,
+        "correlation": 0.030410687784825724
+      },
+      "eLORETA": {
+        "Mean_Localization_Error": 19.353485529527884,
+        "EMD": 63.10262974332227,
+        "sd": 299.2386596188773,
+        "average_precision": 0.3519261339193622,
+        "correlation": 0.06429834715458811
+      },
+      "LORETA": {
+        "Mean_Localization_Error": 59.8642023488594,
+        "EMD": 66.30850337690661,
+        "sd": 984.4040555045733,
+        "average_precision": 0.014293775722802849,
+        "correlation": 0.018974955405224068
+      },
+      "sLORETA": {
+        "Mean_Localization_Error": 48.156407616496345,
+        "EMD": 64.22411189385272,
+        "sd": 44.72544652810915,
+        "average_precision": 0.07767209443797114,
+        "correlation": 0.054596836936022484
+      },
+      "LAURA": {
+        "Mean_Localization_Error": 51.36936834531642,
+        "EMD": 64.8716653265306,
+        "sd": 33.08438715897603,
+        "average_precision": 0.03343383243374618,
+        "correlation": 0.043297484413776226
+      },
+      "MNE": {
+        "Mean_Localization_Error": 48.156407616496345,
+        "EMD": 64.22411189385271,
+        "sd": 44.72544652810915,
+        "average_precision": 0.07767209443797114,
+        "correlation": 0.05459683693602246
+      },
+      "SMAP": {
+        "Mean_Localization_Error": 59.8642023488594,
+        "EMD": 66.30850337690661,
+        "sd": 984.4040555045733,
+        "average_precision": 0.014293775722802849,
+        "correlation": 0.018974955405224068
+      },
+      "WMNE": {
+        "Mean_Localization_Error": 33.70536052277251,
+        "EMD": 64.8524503891953,
+        "sd": 167.0636723671306,
+        "average_precision": 0.14605573044206926,
+        "correlation": 0.0568632801876084
+      }
+    }
+  }
+}

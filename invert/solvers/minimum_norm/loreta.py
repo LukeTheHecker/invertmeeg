@@ -32,11 +32,30 @@ class SolverLORETA(BaseSolver):
         ],
     )
 
-    def __init__(self, name="Low Resolution Tomography", **kwargs):
+    def __init__(
+        self,
+        name="Low Resolution Tomography",
+        use_noise_whitener: bool = True,
+        use_trace_normalization: bool = True,
+        rank_tol: float = 1e-12,
+        eps: float = 1e-15,
+        **kwargs,
+    ):
         self.name = name
-        return super().__init__(**kwargs)
+        self.use_noise_whitener = bool(use_noise_whitener)
+        self.use_trace_normalization = bool(use_trace_normalization)
+        self.rank_tol = float(rank_tol)
+        self.eps = float(eps)
+        super().__init__(**kwargs)
 
-    def make_inverse_operator(self, forward, *args, alpha="auto", **kwargs):
+    def make_inverse_operator(
+        self,
+        forward,
+        *args,
+        alpha="auto",
+        noise_cov=None,
+        **kwargs,
+    ):
         """Calculate inverse operator.
 
         Parameters
@@ -51,7 +70,31 @@ class SolverLORETA(BaseSolver):
         self : object returns itself for convenience
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
-        leadfield = self.leadfield
+
+        if self.use_noise_whitener:
+            n_chans = self.leadfield.shape[0]
+            if noise_cov is None:
+                noise_cov = np.eye(n_chans, dtype=float)
+            wf = self.prepare_whitened_forward(
+                noise_cov,
+                trace_normalize=self.use_trace_normalization,
+                rank_tol=self.rank_tol,
+                eps=self.eps,
+            )
+        else:
+            wf = self.prepare_whitened_forward(
+                None,
+                trace_normalize=self.use_trace_normalization,
+                rank_tol=self.rank_tol,
+                eps=self.eps,
+            )
+        if wf.whitener_mode not in ("projected", "none"):
+            logger.warning("LORETA whitener fallback used: %s", wf.whitener_mode)
+
+        leadfield = wf.A if wf.A is not None else wf.G_white
+        leadfield_scale = wf.trace_scale
+        sensor_transform = wf.sensor_transform
+
         LTL = leadfield.T @ leadfield
         B = np.eye(leadfield.shape[1])
         adjacency = mne.spatial_src_adjacency(
@@ -71,8 +114,8 @@ class SolverLORETA(BaseSolver):
 
         inverse_operators = []
         for alpha in self.alphas:
-            inverse_operator = np.linalg.inv(LTL + (alpha) * BLapTLapB) @ leadfield.T
-            inverse_operators.append(inverse_operator)
+            kernel_eff = np.linalg.solve(LTL + float(alpha) * BLapTLapB, leadfield.T)
+            inverse_operators.append((float(leadfield_scale) * kernel_eff) @ sensor_transform)
 
         self.inverse_operators = [
             InverseOperator(inverse_operator, self.name)

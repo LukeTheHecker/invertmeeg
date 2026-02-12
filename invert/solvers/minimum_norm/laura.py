@@ -47,15 +47,23 @@ class SolverLAURA(BaseSolver):
         name="LAURA",
         depth_weight=0.5,
         use_mesh_adjacency=True,
+        use_noise_whitener: bool = True,
+        use_trace_normalization: bool = True,
+        rank_tol: float = 1e-12,
+        eps: float = 1e-15,
         **kwargs,
     ):
         self.name = name
         self.depth_weight = depth_weight
         self.use_mesh_adjacency = use_mesh_adjacency
+        self.use_noise_whitener = bool(use_noise_whitener)
+        self.use_trace_normalization = bool(use_trace_normalization)
+        self.rank_tol = float(rank_tol)
+        self.eps = float(eps)
         # LAURA handles depth weighting internally via W_j, so disable base class
         # depth weighting to avoid double compensation
         kwargs.setdefault("prep_leadfield", False)
-        return super().__init__(**kwargs)
+        super().__init__(**kwargs)
 
     def make_inverse_operator(
         self,
@@ -92,7 +100,37 @@ class SolverLAURA(BaseSolver):
         pos = pos_from_forward(forward, verbose=verbose)
 
         if noise_cov is None:
-            noise_cov = np.identity(n_chans)
+            noise_cov = np.eye(n_chans, dtype=float)
+        noise_cov = np.asarray(noise_cov, dtype=float)
+        if noise_cov.shape != (n_chans, n_chans):
+            msg = f"noise_cov has shape {noise_cov.shape}, expected {(n_chans, n_chans)}"
+            raise ValueError(msg)
+        noise_cov = 0.5 * (noise_cov + noise_cov.T)
+
+        if self.use_noise_whitener:
+            wf = self.prepare_whitened_forward(
+                noise_cov,
+                trace_normalize=self.use_trace_normalization,
+                rank_tol=self.rank_tol,
+                eps=self.eps,
+            )
+            noise_cov_eff = np.eye(wf.n_eff, dtype=float)
+        else:
+            wf = self.prepare_whitened_forward(
+                None,
+                trace_normalize=self.use_trace_normalization,
+                rank_tol=self.rank_tol,
+                eps=self.eps,
+            )
+            noise_cov_eff = wf.projector @ noise_cov @ wf.projector.T
+            noise_cov_eff = 0.5 * (noise_cov_eff + noise_cov_eff.T)
+        if wf.whitener_mode not in ("projected", "none"):
+            logger.warning("LAURA whitener fallback used: %s", wf.whitener_mode)
+
+        leadfield = wf.A if wf.A is not None else wf.G_white
+        leadfield_scale = wf.trace_scale
+        sensor_transform = wf.sensor_transform
+        n_eff = wf.n_eff
 
         # Compute spatial distance matrix
         d = cdist(pos, pos)
@@ -134,15 +172,23 @@ class SolverLAURA(BaseSolver):
         # (W matrix is identity in standard LAURA formulation)
         M_j = A
 
-        # Compute spatial prior covariance (source space metric)
-        # This is positive definite by construction
-        W_j = np.linalg.inv(M_j.T @ M_j)
+        # Compute spatial prior covariance (source space metric). Use explicit
+        # regularization and pseudo-inverse fallback to handle rank-deficient
+        # neighborhood operators.
+        metric = M_j.T @ M_j
+        metric = 0.5 * (metric + metric.T)
+        metric_scale = max(float(np.trace(metric)) / max(n_dipoles, 1), self.eps)
+        metric += 1e-8 * metric_scale * np.identity(n_dipoles)
+        try:
+            W_j = np.linalg.inv(metric)
+        except np.linalg.LinAlgError:
+            W_j = np.linalg.pinv(metric)
 
         # Apply depth weighting to correct for depth bias
         # Key fix: Use NEGATIVE exponent to down-weight superficial sources
         if self.depth_weight > 0:
             # Compute source strengths (leadfield norms)
-            source_norms = np.linalg.norm(self.leadfield, axis=0)
+            source_norms = np.linalg.norm(leadfield, axis=0)
             # Avoid division by zero
             source_norms = np.maximum(source_norms, 1e-12)
 
@@ -170,31 +216,37 @@ class SolverLAURA(BaseSolver):
 
         # Noise covariance in sensor space
         # Ensure it's symmetric and positive definite
-        noise_cov = (noise_cov + noise_cov.T) / 2
-        noise_cov += 1e-12 * np.trace(noise_cov) / n_chans * np.identity(n_chans)
+        if not self.use_noise_whitener:
+            noise_cov_eff += (
+                1e-12 * np.trace(noise_cov_eff) / max(n_eff, 1) * np.identity(n_eff)
+            )
 
         # LAURA inverse operator formula:
         # T = W_j @ L.T @ (L @ W_j @ L.T + alpha * Sigma_noise)^(-1)
-        LW = self.leadfield @ W_j
-        LWLT = LW @ self.leadfield.T
+        LW = leadfield @ W_j
+        LWLT = LW @ leadfield.T
 
         # Scale alphas relative to LWLT
         self.get_alphas(reference=LWLT)
 
         inverse_operators = []
+        I = np.identity(n_eff)
         for alpha in self.alphas:
+            C = LWLT + float(alpha) * (I if self.use_noise_whitener else noise_cov_eff)
             # Inverse of regularized data covariance
             try:
-                C_inv = np.linalg.inv(LWLT + alpha * noise_cov)
+                C_inv = np.linalg.inv(C)
             except np.linalg.LinAlgError:
                 if verbose > 0:
                     logger.warning(
                         f"Singular matrix for alpha={alpha}, using pseudo-inverse"
                     )
-                C_inv = np.linalg.pinv(LWLT + alpha * noise_cov)
+                C_inv = np.linalg.pinv(C)
 
             # Final inverse operator
-            inverse_operator = W_j @ self.leadfield.T @ C_inv
+            inverse_operator = (
+                float(leadfield_scale) * (W_j @ leadfield.T @ C_inv)
+            ) @ sensor_transform
             inverse_operators.append(inverse_operator)
 
         self.inverse_operators = [

@@ -116,14 +116,14 @@ _SOLVER_REGISTRY: dict[str, tuple[str, str]] = {
     "SSP-ESMV": ("invert.solvers.beamformers.ssp_esmv", "SolverSSPESMV"),
     "IR-ESMV": ("invert.solvers.beamformers.iresmv", "SolverIRESMV"),
     "SSP-IR-ESMV": ("invert.solvers.beamformers.ssp_iresmv", "SolverSSPIRESMV"),
-    # "ReciPSIICOS-Plain": (
-    #     "invert.solvers.beamformers.recipsiicos_plain",
-    #     "SolverReciPSIICOSPlain",
-    # ),
-    # "ReciPSIICOS-Whitened": (
-    #     "invert.solvers.beamformers.recipsiicos_whitened",
-    #     "SolverReciPSIICOSWhitened",
-    # ),
+    "ReciPSIICOS-Plain": (
+        "invert.solvers.beamformers.recipsiicos_plain",
+        "SolverReciPSIICOSPlain",
+    ),
+    "ReciPSIICOS-Whitened": (
+        "invert.solvers.beamformers.recipsiicos_whitened",
+        "SolverReciPSIICOSWhitened",
+    ),
     # Empirical Bayes
     "Champagne": ("invert.solvers.bayesian.champagne", "SolverChampagne"),
     "NLChampagne": ("invert.solvers.bayesian.nl_champagne", "SolverNLChampagne"),
@@ -451,6 +451,7 @@ def _compute_and_apply_worker(
     adjacency,
     pos: np.ndarray,
     require_data: bool,
+    noise_cov: np.ndarray | None = None,
 ) -> tuple[int, dict]:
     """Worker for computing fresh inverse operator per sample.
 
@@ -464,9 +465,9 @@ def _compute_and_apply_worker(
 
     evoked = mne.EvokedArray(x_sample, info, tmin=0.0, verbose=0)
     if require_data:
-        solver.make_inverse_operator(forward, evoked, alpha="auto")
+        solver.make_inverse_operator(forward, evoked, alpha="auto", noise_cov=noise_cov)
     else:
-        solver.make_inverse_operator(forward, alpha="auto")
+        solver.make_inverse_operator(forward, alpha="auto", noise_cov=noise_cov)
     stc = solver.apply_inverse_operator(evoked)
     y_pred = stc.data
     metrics = evaluate_all(y_sample, y_pred, adjacency, adjacency, pos, pos)
@@ -559,9 +560,15 @@ class BenchmarkRunner:
                     snr_range=ds_config.snr_range,
                     n_timepoints=ds_config.n_timepoints,
                     random_seed=self.random_seed,
+                    estimate_noise_cov=True,
+                    return_noise_cov=True,
                 )
                 gen = SimulationGenerator(self.forward, config=sim_config)
-                x_batch, y_batch, _ = next(gen.generate())
+                x_batch, y_batch, sim_info = next(gen.generate())
+                noise_cov = np.mean(
+                    [sim_info.iloc[j]["noise_cov_est"] for j in range(len(sim_info))],
+                    axis=0,
+                )
 
                 for solver_name in self.solvers:
                     logger.info("  Solver: %s", solver_name)
@@ -623,10 +630,10 @@ class BenchmarkRunner:
                                 x_batch[0], self.info, tmin=0.0, verbose=0
                             )
                             solver.make_inverse_operator(
-                                self.forward, evoked, alpha="auto"
+                                self.forward, evoked, alpha="auto", noise_cov=noise_cov
                             )
                         else:
-                            solver.make_inverse_operator(self.forward, alpha="auto")
+                            solver.make_inverse_operator(self.forward, alpha="auto", noise_cov=noise_cov)
 
                         # Check if solver has inverse_operators attribute
                         # Some solvers (e.g., SolverRandomNoise) don't create inverse operators
@@ -680,6 +687,7 @@ class BenchmarkRunner:
                             solver.require_data,
                             ds_name,
                             solver_name,
+                            noise_cov,
                         )
 
                     result = self._aggregate(solver_name, ds_name, sample_metrics)
@@ -769,6 +777,7 @@ class BenchmarkRunner:
         require_data: bool,
         ds_name: str,
         solver_name: str,
+        noise_cov: np.ndarray | None = None,
     ) -> list[SampleMetrics]:
         """Parallelize full computation (require_recompute=True)."""
         if self.n_jobs == 1:
@@ -790,6 +799,7 @@ class BenchmarkRunner:
                     adjacency,
                     pos,
                     require_data,
+                    noise_cov,
                 )
                 sample_metrics.append(self._metrics_from_dict(metrics))
             return sample_metrics
@@ -809,6 +819,7 @@ class BenchmarkRunner:
                     adjacency,
                     pos,
                     require_data,
+                    noise_cov,
                 ): i
                 for i in range(self.n_samples)
             }

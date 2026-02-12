@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import logging
+
 import numpy as np
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
+
+logger = logging.getLogger(__name__)
 
 
 class SolverDSPMMNE(BaseSolver):
@@ -107,69 +111,40 @@ class SolverDSPMMNE(BaseSolver):
     ):
         """Calculate inverse operators for a lambda2 grid."""
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
-
-        G = np.asarray(self.leadfield, dtype=float)
-        n_chans, n_sources = G.shape
+        n_chans = self.leadfield.shape[0]
 
         if noise_cov is None:
             noise_cov = np.eye(n_chans, dtype=float)
-        noise_cov = np.asarray(noise_cov, dtype=float)
 
-        P = self.compute_sensor_projector(forward_or_info=self.forward, n_chans=n_chans)
-        W = self.compute_sensor_whitener(
+        wf = self.prepare_whitened_forward(
             noise_cov,
-            projector=P,
+            source_cov=source_cov,
+            depth=self.depth if self.use_depth_weighting else None,
+            depth_limit=self.depth_limit,
+            trace_normalize=True,
+            precompute_svd=True,
             rank_tol=self.rank_tol,
             eps=self.eps,
         )
-        self._projector = P
-        self._whitener = W
-        self._whiten_rank = int(W.shape[0])
+        self._projector = wf.projector
+        self._whitener = wf.sensor_transform
+        self._whiten_rank = wf.n_eff
 
-        if W.shape[0] == 0:
-            raise ValueError(
-                "Whitening rank is zero (noise_cov/proj rejected all dimensions)."
-            )
-
-        # Operate entirely in whitened + projected sensor space.
-        W_P = W @ P  # (rank, n_chans)
-        G_white = W_P @ G  # (rank, n_sources)
-
-        # Source prior (diagonal).
-        prior_diag = self.coerce_diag_source_prior(source_cov, n_sources)
-        if self.use_depth_weighting:
-            prior_diag = prior_diag * self.compute_depth_prior_whitened(
-                G_white,
-                depth=self.depth,
-                depth_limit=self.depth_limit,
-                eps=self.eps,
-            )
-        prior_diag = np.maximum(prior_diag, self.eps)
-        R_sqrt = np.sqrt(prior_diag)
-
-        # Trace normalization: trace(A A^T) == n_channels_effective.
-        A = G_white * R_sqrt[np.newaxis, :]
-        n_eff = int(W.shape[0])
-        A, scale = self.trace_normalize_operator(A, target_rank=n_eff, eps=self.eps)
-        R_sqrt = R_sqrt * scale
-
-        svd = np.linalg.svd(A, full_matrices=False)
+        if wf.whitener_mode != "projected" and wf.whitener_mode != "none":
+            logger.warning("dSPM-MNE whitener fallback used: %s", wf.whitener_mode)
 
         inverse_operators = []
         for lambda2 in self.alphas:
             lambda2 = float(lambda2)
             K_white = self.solve_tikhonov_svd(
-                A,
+                wf.A,
                 lambda2,
-                left_scale=R_sqrt,
-                svd=svd,
+                left_scale=wf.R_sqrt,
+                svd=wf.svd,
                 eps=self.eps,
             )
 
-            # Full operator maps raw sensor data -> sources (and projects/whitens internally).
-            K_full = K_white @ W_P  # (n_sources, n_chans)
-
-            # dSPM noise normalization (whitened noise cov is I).
+            K_full = K_white @ wf.sensor_transform
             K_dspm, _noise_std = self.noise_normalize_rows(
                 K_white,
                 K_full=K_full,

@@ -44,8 +44,10 @@ class SolverChampagne(BaseSolver):
         beta_init=0.5,
         beta_lr=0.01,
         theta=0.01,
-        noise_learning="diagonal",
+        noise_learning="fixed",
         noise_learning_mode="fixed",
+        rank_tol: float = 1e-12,
+        eps: float = 1e-15,
         **kwargs,
     ):
         """
@@ -78,6 +80,8 @@ class SolverChampagne(BaseSolver):
         self.beta_init = beta_init
         self.beta_lr = beta_lr
         self.theta = theta
+        self.rank_tol = float(rank_tol)
+        self.eps = float(eps)
 
         # Handle noise learning aliases
         if noise_learning.lower() == "fun":
@@ -142,33 +146,59 @@ class SolverChampagne(BaseSolver):
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
 
-        # Store attributes
         n_chans = self.leadfield.shape[0]
         if noise_cov is None:
-            noise_cov = np.identity(n_chans)
-        self.noise_cov = noise_cov
+            noise_cov = np.identity(n_chans, dtype=float)
+        noise_cov = np.asarray(noise_cov, dtype=float)
+        if noise_cov.shape != (n_chans, n_chans):
+            msg = f"noise_cov has shape {noise_cov.shape}, expected {(n_chans, n_chans)}"
+            raise ValueError(msg)
+        noise_cov = 0.5 * (noise_cov + noise_cov.T)
+
+        # SSP projection via standard pipeline (no whitening — Champagne
+        # handles noise_cov internally in its EM updates).
+        wf = self.prepare_whitened_forward(None)
+        self._sensor_projector = wf.projector
 
         self.max_iter = max_iter
         self.prune = prune
         self.pruning_thresh = pruning_thresh
         self.convergence_criterion = convergence_criterion
-        # Historically this solver used an additional alpha scaling factor to bring values
-        # into a workable range. With consistent reference scaling (data covariance) this
-        # should not be necessary.
         self.alpha_scaler = 1.0
 
         data = self.unpack_data_obj(mne_obj)
+        data_projected = wf.sensor_transform @ np.asarray(data, dtype=float)
+        noise_cov_projected = wf.projector @ noise_cov @ wf.projector.T
+        noise_cov_projected = 0.5 * (noise_cov_projected + noise_cov_projected.T)
+        # Use a normalized shape matrix so alpha controls the noise scale.
+        # This keeps noise_cov = alpha * shape_cov dimensionally coherent when
+        # alpha is scaled from data covariance.
+        noise_eigs = np.linalg.svd(noise_cov_projected, compute_uv=False)
+        noise_scale = float(np.max(noise_eigs)) if noise_eigs.size else 1.0
+        if not np.isfinite(noise_scale) or noise_scale <= self.eps:
+            noise_scale = 1.0
+        self.noise_cov_scale = noise_scale
+        self.noise_cov_raw = noise_cov_projected
+        self.noise_cov = noise_cov_projected / noise_scale
 
-        data_cov = self.data_covariance(data, center=True, ddof=1)
+        data_cov = self.data_covariance(data_projected, center=True, ddof=1)
         self.get_alphas(reference=data_cov)
         inverse_operators = []
-        for alpha in self.alphas:
-            inverse_operator = self.make_champagne(
-                data,
-                float(alpha) * float(self.alpha_scaler),
-                pruning_thresh=pruning_thresh,
-            )
-            inverse_operators.append(inverse_operator)
+        original_leadfield = self.leadfield
+        self.leadfield = wf.G_white
+        try:
+            for alpha in self.alphas:
+                inverse_operator_projected = self.make_champagne(
+                    data_projected,
+                    float(alpha) * float(self.alpha_scaler),
+                    pruning_thresh=pruning_thresh,
+                )
+                inverse_operators.append(
+                    inverse_operator_projected @ wf.sensor_transform
+                )
+        finally:
+            self.leadfield = original_leadfield
+
         self.inverse_operators = [
             InverseOperator(inverse_operator, self.name)
             for inverse_operator in inverse_operators
@@ -193,8 +223,10 @@ class SolverChampagne(BaseSolver):
         """
         n_chans, n_dipoles = self.leadfield.shape
         _, n_times = Y.shape
-        L = deepcopy(self.leadfield)
-        L /= np.linalg.norm(L, axis=0)
+        L_orig = np.asarray(self.leadfield, dtype=float)
+        L_norms = np.maximum(np.linalg.norm(L_orig, axis=0), self.eps)
+        L_full_scaled = L_orig / L_norms
+        L = deepcopy(L_full_scaled)
 
         # re-reference data for noise learning modes (FUN/HSChampagne requirement)
         if self.noise_learning == "learn":
@@ -439,10 +471,15 @@ class SolverChampagne(BaseSolver):
                 gammas_full = np.zeros(n_dipoles)
                 gammas_full[active_set] = gammas
                 Gamma_full = diags(gammas_full, 0)
-                L_full = deepcopy(self.leadfield)
-                mu_x_full = Gamma_full @ L_full.T @ Sigma_y_inv @ Y_scaled
+                mu_x_full = Gamma_full @ L_full_scaled.T @ Sigma_y_inv @ Y_scaled
                 noise_cov = self._update_noise_covariance(
-                    Y_scaled, L_full, mu_x_full, gammas_full, noise_cov, n_times, scaler
+                    Y_scaled,
+                    L_full_scaled,
+                    mu_x_full,
+                    gammas_full,
+                    noise_cov,
+                    n_times,
+                    scaler,
                 )
 
             # update rest
@@ -489,10 +526,10 @@ class SolverChampagne(BaseSolver):
                         f"Iteration {i_iter}: loss = {loss:.6f}, Active set size = {len(active_set)}"
                     )
 
-        # Final inverse operator construction
-        L = deepcopy(self.leadfield)
-        gammas_final = np.zeros(n_dipoles)
-        gammas_final[active_set] = gammas
+        # Final inverse operator construction in original source units.
+        gammas_scaled = np.zeros(n_dipoles)
+        gammas_scaled[active_set] = gammas
+        gammas_final = gammas_scaled / (L_norms**2)
         Gamma = diags(gammas_final, 0)
 
         # Scale noise covariance back if learning was enabled
@@ -501,9 +538,9 @@ class SolverChampagne(BaseSolver):
         else:
             noise_cov_final = noise_cov
 
-        Sigma_y = noise_cov_final + L @ Gamma @ L.T
+        Sigma_y = noise_cov_final + L_orig @ Gamma @ L_orig.T
         Sigma_y_inv = self.robust_inverse(Sigma_y)
-        inverse_operator = Gamma @ L.T @ Sigma_y_inv
+        inverse_operator = Gamma @ L_orig.T @ Sigma_y_inv
 
         # Store learned noise covariance
         if self.noise_learning == "learn":

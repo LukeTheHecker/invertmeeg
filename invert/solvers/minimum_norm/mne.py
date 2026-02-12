@@ -37,13 +37,31 @@ class SolverMNE(BaseSolver):
         ],
     )
 
-    def __init__(self, name="Minimum Norm Estimate", **kwargs):
+    def __init__(
+        self,
+        name="Minimum Norm Estimate",
+        use_noise_whitener: bool = True,
+        rank_tol: float = 1e-12,
+        eps: float = 1e-15,
+        **kwargs,
+    ):
         self.name = name
+        self.use_noise_whitener = bool(use_noise_whitener)
+        self.rank_tol = float(rank_tol)
+        self.eps = float(eps)
         super().__init__(**kwargs)
         self.require_recompute = False
         self.require_data = False
 
-    def make_inverse_operator(self, forward, *args, alpha="auto", verbose=0, **kwargs):
+    def make_inverse_operator(
+        self,
+        forward,
+        *args,
+        alpha="auto",
+        noise_cov=None,
+        verbose=0,
+        **kwargs,
+    ):
         """Calculate inverse operator.
 
         Parameters
@@ -53,6 +71,9 @@ class SolverMNE(BaseSolver):
         alpha : float
             The regularization parameter. When set to a float, it is scaled
             by the largest eigenvalue of L @ L.T.
+        noise_cov : numpy.ndarray | None
+            Optional sensor noise covariance used for whitening when
+            ``use_noise_whitener=True``.
 
         Return
         ------
@@ -62,16 +83,45 @@ class SolverMNE(BaseSolver):
             forward, *args, reference=None, alpha=alpha, **kwargs
         )
 
-        leadfield = self.leadfield
-        n_chans, _ = leadfield.shape
+        if self.use_noise_whitener:
+            n_chans = self.leadfield.shape[0]
+            if noise_cov is None:
+                noise_cov = np.eye(n_chans, dtype=float)
+            wf = self.prepare_whitened_forward(
+                noise_cov,
+                rank_tol=self.rank_tol,
+                eps=self.eps,
+            )
+        else:
+            wf = self.prepare_whitened_forward(None)
+        if wf.whitener_mode not in ("projected", "none"):
+            logger.warning("MNE whitener fallback used: %s", wf.whitener_mode)
 
-        LLT = leadfield @ leadfield.T
+        leadfield_sensor = wf.G_white
+        sensor_transform = wf.sensor_transform
+
+        # Keep alpha scaling consistent with the actual leadfield used to build K.
+        self.get_alphas(reference=leadfield_sensor @ leadfield_sensor.T)
+
         inverse_operators = []
-        for alpha in self.alphas:
-            inverse_operator = np.linalg.solve(
-                LLT + alpha * np.identity(n_chans), leadfield
-            ).T
-            inverse_operators.append(inverse_operator)
+        if self.use_noise_whitener:
+            svd = np.linalg.svd(leadfield_sensor, full_matrices=False)
+            for alpha in self.alphas:
+                kernel_eff = self.solve_tikhonov_svd(
+                    leadfield_sensor,
+                    float(alpha),
+                    svd=svd,
+                    eps=self.eps,
+                )
+                inverse_operators.append(kernel_eff @ sensor_transform)
+        else:
+            LLT = leadfield_sensor @ leadfield_sensor.T
+            I = np.identity(int(leadfield_sensor.shape[0]))
+            for alpha in self.alphas:
+                kernel_eff = np.linalg.solve(
+                    LLT + float(alpha) * I, leadfield_sensor
+                ).T
+                inverse_operators.append(kernel_eff @ sensor_transform)
 
         self.inverse_operators = [
             InverseOperator(inverse_operator, self.name)

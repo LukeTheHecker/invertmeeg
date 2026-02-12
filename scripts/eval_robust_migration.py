@@ -98,6 +98,41 @@ def _parse_csv_arg(value: str | None) -> list[str] | None:
     return [item for item in items if item]
 
 
+def _parse_solver_overrides_json(value: str | None) -> dict[str, dict[str, Any]]:
+    if value is None:
+        return {}
+    try:
+        payload = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid JSON for --solver-overrides-json: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError("--solver-overrides-json must decode to an object/dict.")
+    overrides: dict[str, dict[str, Any]] = {}
+    for solver_name, solver_kwargs in payload.items():
+        if not isinstance(solver_name, str):
+            raise ValueError("Solver override keys must be solver-name strings.")
+        if not isinstance(solver_kwargs, dict):
+            raise ValueError(
+                f"Override for {solver_name!r} must be a dict of constructor kwargs."
+            )
+        overrides[solver_name] = dict(solver_kwargs)
+    return overrides
+
+
+def _instantiate_solver(
+    solver_cls: type[Any],
+    solver_name: str,
+    solver_overrides: dict[str, dict[str, Any]],
+) -> Any:
+    kwargs = solver_overrides.get(solver_name, {})
+    try:
+        return solver_cls(**kwargs)
+    except TypeError as exc:
+        raise TypeError(
+            f"Failed to instantiate solver {solver_name!r} with overrides {kwargs}: {exc}"
+        ) from exc
+
+
 def _get_solver_capabilities(solver_cls: type[Any]) -> SolverCapabilities:
     try:
         sig = inspect.signature(solver_cls.make_inverse_operator)
@@ -194,7 +229,16 @@ def _select_covariance(
     if cov_source == "none" or cov_mode == "none":
         return None
 
-    column = "noise_cov_est" if cov_source == "estimated" else "noise_cov_true"
+    if cov_source == "estimated":
+        column = "noise_cov_est"
+    elif cov_source == "estimated_scaled":
+        column = "noise_cov_est_scaled"
+    elif cov_source == "true":
+        column = "noise_cov_true"
+    elif cov_source == "model":
+        column = "noise_cov_model"
+    else:
+        raise ValueError(f"Unknown cov_source: {cov_source!r}")
 
     if cov_mode == "dataset_mean":
         return dataset_cov
@@ -432,7 +476,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--montage", type=str, default="biosemi32")
     parser.add_argument(
         "--cov-source",
-        choices=["none", "estimated", "true"],
+        choices=["none", "estimated", "estimated_scaled", "true", "model"],
         default="estimated",
     )
     parser.add_argument(
@@ -468,6 +512,15 @@ def parse_args() -> argparse.Namespace:
         default=0.02,
         help="Relative tolerance for regression alerts in comparison report.",
     )
+    parser.add_argument(
+        "--solver-overrides-json",
+        type=str,
+        default=None,
+        help=(
+            "JSON mapping solver name -> constructor kwargs, "
+            'e.g. \'{"ESMV":{"use_robust_covariance":true}}\''
+        ),
+    )
     parser.add_argument("--verbose", action="store_true")
     return parser.parse_args()
 
@@ -483,6 +536,7 @@ def main() -> None:
     categories = _parse_csv_arg(args.categories)
     exclude = _parse_csv_arg(args.exclude_solvers)
     datasets = _parse_csv_arg(args.datasets) or []
+    solver_overrides = _parse_solver_overrides_json(args.solver_overrides_json)
 
     if args.cov_source == "none":
         args.cov_mode = "none"
@@ -530,7 +584,16 @@ def main() -> None:
         sim_gen = SimulationGenerator(forward, config=sim_cfg)
         x_batch, y_batch, info_df = next(sim_gen.generate())
 
-        cov_column = "noise_cov_est" if args.cov_source == "estimated" else "noise_cov_true"
+        if args.cov_source == "estimated":
+            cov_column = "noise_cov_est"
+        elif args.cov_source == "estimated_scaled":
+            cov_column = "noise_cov_est_scaled"
+        elif args.cov_source == "true":
+            cov_column = "noise_cov_true"
+        elif args.cov_source == "model":
+            cov_column = "noise_cov_model"
+        else:
+            cov_column = ""
         cov_values = _extract_matrix_column(info_df, cov_column)
         proj_values = _extract_matrix_column(info_df, "projector")
         dataset_cov = _robust_mean_matrix(cov_values)
@@ -554,11 +617,13 @@ def main() -> None:
             dynamic_inputs = args.cov_mode == "per_sample" or args.projector_mode == "per_sample"
 
             # Use a temporary instance to query recomputation behavior.
-            probe_solver = solver_cls()
+            probe_solver = _instantiate_solver(
+                solver_cls, solver_name, solver_overrides
+            )
             can_reuse = (not dynamic_inputs) and (not getattr(probe_solver, "require_recompute", True))
 
             if can_reuse:
-                solver = solver_cls()
+                solver = _instantiate_solver(solver_cls, solver_name, solver_overrides)
                 cov0 = _select_covariance(
                     cov_source=args.cov_source,
                     cov_mode=args.cov_mode,
@@ -641,7 +706,7 @@ def main() -> None:
 
             # Per-sample compute path (for dynamic inputs or recompute-required solvers)
             for i in range(len(x_batch)):
-                solver = solver_cls()
+                solver = _instantiate_solver(solver_cls, solver_name, solver_overrides)
                 cov_i = _select_covariance(
                     cov_source=args.cov_source,
                     cov_mode=args.cov_mode,
@@ -722,6 +787,7 @@ def main() -> None:
         "cov_source": args.cov_source,
         "cov_mode": args.cov_mode,
         "projector_mode": args.projector_mode,
+        "solver_overrides": solver_overrides,
         "realism": args.realism,
         "solver_categories_available": sorted(SOLVER_CATEGORIES.keys()),
     }

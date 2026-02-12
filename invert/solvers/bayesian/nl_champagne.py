@@ -80,19 +80,26 @@ class SolverNLChampagne(BaseSolver):
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
         data = self.unpack_data_obj(mne_obj)
 
-        n_chans = self.leadfield.shape[0]
-        if noise_cov is None:
-            noise_cov = np.identity(n_chans)
-        self.noise_cov = noise_cov
+        # SSP projection via standard pipeline (no whitening — NL-Champagne
+        # learns its own noise parameters internally).
+        wf = self.prepare_whitened_forward(None)
+        data_projected = wf.sensor_transform @ np.asarray(data, dtype=float)
 
-        inverse_operator = self.nl_champagne(
-            data,
-            alpha=0.01,
-            max_iter=max_iter,
-            prune=prune,
-            pruning_thresh=pruning_thresh,
-            convergence_criterion=convergence_criterion,
-        )
+        original_leadfield = self.leadfield
+        self.leadfield = wf.G_white
+        try:
+            inverse_operator_projected = self.nl_champagne(
+                data_projected,
+                alpha=0.01,
+                max_iter=max_iter,
+                prune=prune,
+                pruning_thresh=pruning_thresh,
+                convergence_criterion=convergence_criterion,
+            )
+        finally:
+            self.leadfield = original_leadfield
+
+        inverse_operator = inverse_operator_projected @ wf.sensor_transform
         self.inverse_operators = [InverseOperator(inverse_operator, self.name)]
         return self
 

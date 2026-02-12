@@ -47,6 +47,29 @@ class SolverMeta:
             self.slug = _slugify(str(self.acronym))
 
 
+@dataclass
+class WhitenedForward:
+    """Preprocessed forward model with optional whitening, priors, and normalization."""
+
+    # Always populated
+    G_white: np.ndarray            # (n_eff, n_sources) — whitened+projected leadfield
+    sensor_transform: np.ndarray   # (n_eff, n_chans)   — W @ P (or just P if no noise_cov)
+    projector: np.ndarray          # (n_chans, n_chans)  — SSP projector
+    whitener_mode: str             # "projected" | "identity_projector" | "identity_projector+jitter" | "none"
+    n_eff: int                     # effective sensor rank (= rows of sensor_transform)
+
+    # Populated when source_cov or depth is given
+    prior_diag: np.ndarray | None = None   # (n_sources,)
+    R_sqrt: np.ndarray | None = None       # sqrt(prior_diag), trace-scaled if requested
+
+    # Populated when trace_normalize=True
+    A: np.ndarray | None = None            # effective operator for regularized inversion
+    trace_scale: float = 1.0               # scale factor applied by trace normalization
+
+    # Populated when precompute_svd=True
+    svd: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None
+
+
 class InverseOperator:
     """Container for precomputed inverse operators.
 
@@ -98,6 +121,8 @@ class BaseSolver:
         Can be either
             "GCV"       -> generalized cross validation
             "MGCV"      -> modified GCV (GCV with a gamma correction factor)
+            "RGCV"      -> robust GCV (penalises leverage concentration)
+            "R1GCV"     -> strong robust GCV (penalises solution variance)
             "L"         -> L-Curve method using triangle method
             "Product"   -> Minimal product method
     n_reg_params : int
@@ -118,6 +143,12 @@ class BaseSolver:
     mgcv_gamma : float
         Gamma factor used when `regularisation_method="MGCV"`. Values slightly
         above 1.0 typically bias toward more regularization.
+    rgcv_gamma : float
+        Mixing parameter γ ∈ (0, 1) for RGCV. ``V_RGCV = [γ + (1-γ)·μ₂] · V_GCV``
+        where μ₂ = tr(A²)/n penalises leverage concentration. Default 0.5.
+    r1gcv_gamma : float
+        Mixing parameter γ ∈ (0, 1) for R1GCV. ``V_R1GCV = [γ + (1-γ)·μ₁₂] · V_GCV``
+        where μ₁₂ = -dμ₁/dα penalises solution variance amplification. Default 0.5.
 
     """
 
@@ -137,12 +168,15 @@ class BaseSolver:
         common_average_reference: bool = False,
         gcv_gamma: float = 1.0,
         mgcv_gamma: float = 1.05,
+        rgcv_gamma: float = 0.5,
+        r1gcv_gamma: float = 0.5,
         verbose: int = 0,
         **kwargs: Any,
     ) -> None:
         self.verbose = verbose
 
         self.r_values = np.logspace(-10, 1, n_reg_params)
+        # self.r_values = np.logspace(7, 9, n_reg_params)
 
         self.n_reg_params = n_reg_params
         self.regularisation_method = regularisation_method
@@ -159,6 +193,8 @@ class BaseSolver:
         self.common_average_reference = common_average_reference
         self.gcv_gamma = gcv_gamma
         self.mgcv_gamma = mgcv_gamma
+        self.rgcv_gamma = rgcv_gamma
+        self.r1gcv_gamma = r1gcv_gamma
         self.require_recompute = True
         self.require_data = True
 
@@ -231,14 +267,20 @@ class BaseSolver:
             if self.regularisation_method.lower() == "l":
                 source_mat, idx = self.regularise_lcurve(data, plot=self.plot_reg)
                 self.last_reg_idx = idx
-            elif self.regularisation_method.lower() in {"gcv", "mgcv"}:
-                gamma = (
-                    self.gcv_gamma
-                    if self.regularisation_method.lower() == "gcv"
-                    else self.mgcv_gamma
-                )
+            elif self.regularisation_method.lower() in {
+                "gcv", "mgcv", "rgcv", "r1gcv", "composite",
+            }:
+                method = self.regularisation_method.lower()
+                if method == "gcv":
+                    gamma = self.gcv_gamma
+                elif method == "mgcv":
+                    gamma = self.mgcv_gamma
+                elif method in {"rgcv", "composite"}:
+                    gamma = self.rgcv_gamma
+                else:  # r1gcv
+                    gamma = self.r1gcv_gamma
                 source_mat, idx = self.regularise_gcv(
-                    data, plot=self.plot_reg, gamma=gamma
+                    data, plot=self.plot_reg, gamma=gamma, method=method
                 )
                 self.last_reg_idx = idx
             elif self.regularisation_method.lower() == "product":
@@ -580,6 +622,59 @@ class BaseSolver:
 
         return np.asarray((eigvecs[:, mask] / np.sqrt(eigvals[mask])).T, dtype=float)
 
+    @classmethod
+    def compute_sensor_whitener_robust(
+        cls,
+        noise_cov: np.ndarray,
+        projector: np.ndarray | None = None,
+        *,
+        rank_tol: float = 1e-12,
+        eps: float = 1e-15,
+    ) -> tuple[np.ndarray, str]:
+        """Compute a sensor whitener with fallback strategies."""
+        noise_cov = np.asarray(noise_cov, dtype=float)
+        if noise_cov.ndim != 2 or noise_cov.shape[0] != noise_cov.shape[1]:
+            msg = (
+                "noise_cov must be a square 2D array, "
+                f"got shape {noise_cov.shape}"
+            )
+            raise ValueError(msg)
+
+        W = cls.compute_sensor_whitener(
+            noise_cov,
+            projector=projector,
+            rank_tol=rank_tol,
+            eps=eps,
+        )
+        if W.shape[0] > 0:
+            return W, "projected"
+
+        n_chans = int(noise_cov.shape[0])
+        W = cls.compute_sensor_whitener(
+            noise_cov,
+            projector=np.eye(n_chans, dtype=float),
+            rank_tol=rank_tol,
+            eps=eps,
+        )
+        if W.shape[0] > 0:
+            return W, "identity_projector"
+
+        Cn = 0.5 * (noise_cov + noise_cov.T)
+        diag_abs = np.abs(np.diag(Cn))
+        scale = float(np.max(diag_abs)) if diag_abs.size else 1.0
+        jitter = max(rank_tol * max(scale, 1.0), eps)
+        Cn_reg = Cn + jitter * np.eye(n_chans, dtype=float)
+        W = cls.compute_sensor_whitener(
+            Cn_reg,
+            projector=np.eye(n_chans, dtype=float),
+            rank_tol=rank_tol,
+            eps=eps,
+        )
+        if W.shape[0] > 0:
+            return W, "identity_projector+jitter"
+
+        return W, "failed"
+
     @staticmethod
     def compute_depth_prior_whitened(
         G_white: np.ndarray,
@@ -691,6 +786,118 @@ class BaseSolver:
         noise_std = np.sqrt(np.maximum(noise_var, eps))
         return K_full / noise_std[:, np.newaxis], noise_std
 
+    def prepare_whitened_forward(
+        self,
+        noise_cov: np.ndarray | None = None,
+        *,
+        source_cov: np.ndarray | None = None,
+        depth: float | None = None,
+        depth_limit: float = 10.0,
+        trace_normalize: bool = False,
+        precompute_svd: bool = False,
+        rank_tol: float = 1e-12,
+        eps: float = 1e-15,
+    ) -> WhitenedForward:
+        """Pipeline: SSP projection, whitening, source prior, trace norm, SVD.
+
+        Parameters
+        ----------
+        noise_cov : array (n_chans, n_chans) or None
+            Noise covariance. If *None*, no whitening is applied.
+        source_cov : array or None
+            Diagonal source prior (1D or 2D diagonal).
+        depth : float or None
+            Depth-weighting exponent. *None* disables depth weighting.
+        depth_limit : float
+            Maximum depth-weight ratio (squared).
+        trace_normalize : bool
+            Scale the effective operator so trace(A A^T) == n_eff.
+        precompute_svd : bool
+            Store economy SVD of the effective operator.
+        rank_tol : float
+            Relative eigenvalue threshold for whitener rank truncation.
+        eps : float
+            Numerical floor.
+
+        Returns
+        -------
+        WhitenedForward
+        """
+        G = np.asarray(self.leadfield, dtype=float)
+        n_chans, n_sources = G.shape
+
+        # --- SSP projector ---
+        P = self.compute_sensor_projector(forward_or_info=self.forward)
+
+        # --- Sensor whitening ---
+        if noise_cov is not None:
+            noise_cov = np.asarray(noise_cov, dtype=float)
+            if noise_cov.shape != (n_chans, n_chans):
+                msg = (
+                    f"noise_cov has shape {noise_cov.shape}, "
+                    f"expected {(n_chans, n_chans)}"
+                )
+                raise ValueError(msg)
+            noise_cov = 0.5 * (noise_cov + noise_cov.T)
+
+            W, whitener_mode = self.compute_sensor_whitener_robust(
+                noise_cov, projector=P, rank_tol=rank_tol, eps=eps,
+            )
+            if W.shape[0] == 0:
+                raise ValueError(
+                    "Whitening rank is zero after projected/identity/jitter "
+                    "fallbacks. Check noise covariance channel alignment and "
+                    "positivity."
+                )
+            sensor_transform = W @ P        # (n_eff, n_chans)
+            G_white = sensor_transform @ G  # (n_eff, n_sources)
+            n_eff = int(W.shape[0])
+        else:
+            sensor_transform = P            # (n_chans, n_chans)
+            G_white = P @ G                 # (n_chans, n_sources)
+            n_eff = n_chans
+            whitener_mode = "none"
+
+        # --- Source prior ---
+        prior_diag = None
+        R_sqrt = None
+        if source_cov is not None or depth is not None:
+            prior_diag = self.coerce_diag_source_prior(source_cov, n_sources)
+            if depth is not None:
+                prior_diag = prior_diag * self.compute_depth_prior_whitened(
+                    G_white, depth=depth, depth_limit=depth_limit, eps=eps,
+                )
+            prior_diag = np.maximum(prior_diag, eps)
+            R_sqrt = np.sqrt(prior_diag)
+
+        # --- Trace normalization ---
+        A = None
+        trace_scale = 1.0
+        if trace_normalize:
+            A = G_white * R_sqrt[np.newaxis, :] if R_sqrt is not None else G_white.copy()
+            A, trace_scale = self.trace_normalize_operator(A, target_rank=n_eff, eps=eps)
+            if R_sqrt is not None:
+                R_sqrt = R_sqrt * trace_scale
+
+        # --- SVD ---
+        svd = None
+        if precompute_svd:
+            svd_target = A if A is not None else G_white
+            svd = np.linalg.svd(svd_target, full_matrices=False)
+
+        return WhitenedForward(
+            G_white=G_white,
+            sensor_transform=sensor_transform,
+            projector=P,
+            whitener_mode=whitener_mode,
+            n_eff=n_eff,
+            prior_diag=prior_diag,
+            R_sqrt=R_sqrt,
+            A=A,
+            trace_scale=trace_scale,
+            svd=svd,
+        )
+
     def regularise_lcurve(self, M, plot=False):
         """Find optimally regularized inverse solution using the L-Curve method [1].
 
@@ -754,49 +961,86 @@ class BaseSolver:
 
         return curvature_val
 
-    def regularise_gcv(self, M, plot: bool = False, gamma: float | None = None):
-        """Find optimally regularized inverse solution using the generalized
-        cross-validation method [1].
+    def regularise_gcv(
+        self,
+        M,
+        plot: bool = False,
+        gamma: float | None = None,
+        method: str = "gcv",
+    ):
+        """Find optimally regularized inverse solution using GCV or a variant.
 
-        The GCV criterion is defined as:
-        GCV(α) = ||M - H_α M||² / (n - γ·trace(H_α))²
+        Supported methods
+        -----------------
+        ``"gcv"``
+            Classical Generalized Cross-Validation [1].
+            ``V(α) = ||r||² / (n − tr(A))²``
 
-        Where H_α is the hat matrix (influence matrix) for regularization parameter α.
-        For Tikhonov regularized minimum norm estimation:
-        H_α = L @ (L^T @ L + α*I)^(-1) @ L^T
+        ``"mgcv"``
+            Modified GCV – uses ``γ > 1`` in the denominator to bias toward
+            more regularization when the forward model is rank-deficient.
+            ``V(α) = ||r||² / (n − γ·tr(A))²``
 
-        Setting γ>1 (Modified GCV / "MGCV") biases selection toward slightly
-        larger α, which can be helpful when the forward model is rank-deficient
-        (e.g., due to common-average referencing) and plain GCV tends to
-        under-regularize.
+        ``"rgcv"``
+            Robust GCV [2] – penalises leverage concentration via ``μ₂``.
+            ``V_RGCV(α) = [γ + (1−γ)·μ₂(α)] · V_GCV(α)``
+            where ``μ₂ = tr(A²)/n``.
+
+        ``"r1gcv"``
+            Strong robust GCV [2] – penalises solution variance amplification.
+            ``V_R1GCV(α) = [γ + (1−γ)·μ₁₂(α)] · V_GCV(α)``
+            where ``μ₁₂ = [tr(A) − tr(A²)] / (n·α)``, which is ``−dμ₁/dα``
+            for Tikhonov-type influence matrices.
+
+        ``"composite"``
+            Geometric mean of GCV and RGCV scores.
+            ``V_comp(α) = sqrt(V_GCV · V_RGCV) = sqrt(γ+(1−γ)μ₂) · V_GCV``
+            A milder version of RGCV that balances spatial precision (favoured
+            by GCV) and noise robustness (favoured by RGCV).
 
         Parameters
         ----------
         M : numpy.ndarray
-            The M/EEG data matrix (n_channels, n_timepoints)
+            The M/EEG data matrix (n_channels, n_timepoints).
         gamma : float | None
-            GCV correction factor γ. If None, uses `self.gcv_gamma`.
+            Method-specific parameter.  For ``"gcv"``/``"mgcv"`` this is the
+            denominator correction factor.  For ``"rgcv"``/``"r1gcv"`` this is
+            the mixing parameter γ ∈ (0, 1).  If *None*, falls back to the
+            instance attribute for the chosen method.
+        method : str
+            One of ``"gcv"``, ``"mgcv"``, ``"rgcv"``, ``"r1gcv"``.
 
-        Return
-        ------
+        Returns
+        -------
         source_mat : numpy.ndarray
-            The inverse solution  (dipoles x time points)
+            The inverse solution (n_dipoles, n_timepoints).
         optimum_idx : int
-            The index of the selected (optimal) regularization parameter
+            Index of the selected regularization parameter.
 
         References
         ----------
-        [1] Grech, R., Cassar, T., Muscat, J., Camilleri, K. P., Fabri, S. G.,
-        Zervakis, M., ... & Vanrumste, B. (2008). Review on solving the inverse
-        problem in EEG source analysis. Journal of neuroengineering and
-        rehabilitation, 5(1), 1-33.
-
+        [1] Grech et al. (2008). Review on solving the inverse problem in EEG
+            source analysis.  J Neuroeng Rehab, 5(1), 1–33.
+        [2] Lukas, M. A. (2006/2010). Robust GCV choice of the regularization
+            parameter for correlated data; Comparing parameter choice methods
+            for regularization of ill-posed problems.
         """
+        method = method.lower()
         n_chans = self.leadfield.shape[0]
+        L = self.leadfield
+
+        # Resolve default gamma per method
         if gamma is None:
-            gamma = self.gcv_gamma
-        if gamma <= 0:
-            raise ValueError(f"gamma must be > 0, got {gamma}")
+            if method == "mgcv":
+                gamma = self.mgcv_gamma
+            elif method in {"rgcv", "composite"}:
+                gamma = self.rgcv_gamma
+            elif method == "r1gcv":
+                gamma = self.r1gcv_gamma
+            else:
+                gamma = self.gcv_gamma
+
+        need_trace_A2 = method in {"rgcv", "r1gcv", "composite"}
 
         gcv_values = []
         for _i, inverse_operator in enumerate(self.inverse_operators):  # type: ignore[attr-defined]
@@ -804,28 +1048,56 @@ class BaseSolver:
             x = inverse_operator.apply(M)
 
             # Calculate reconstructed data
-            M_hat = self.leadfield @ x
+            M_hat = L @ x
 
             W = inverse_operator.data[0]  # Get the actual matrix
             # trace(H) = trace(L @ W) = sum(L * W.T), avoid forming H explicitly
-            trace_H = float(np.sum(self.leadfield * W.T))
+            trace_H = float(np.sum(L * W.T))
 
-            # Calculate residual sum of squares
-            residual = M - M_hat
-            # Default norm is Euclidean (1D) / Frobenius (2D), which is what we want here.
-            residual_ss = float(np.linalg.norm(np.asarray(residual)) ** 2)
+            # Residual sum of squares
+            residual_ss = float(np.linalg.norm(np.asarray(M - M_hat)) ** 2)
 
-            # Calculate effective degrees of freedom
-            effective_dof = n_chans - gamma * trace_H
+            # ------ plain / modified GCV score ------
+            if method in {"gcv", "mgcv"}:
+                effective_dof = n_chans - gamma * trace_H
+                if effective_dof <= 0 or abs(effective_dof) < 1e-10:
+                    gcv_values.append(np.inf)
+                else:
+                    gcv_values.append(residual_ss / (effective_dof**2))
+                continue
 
-            # Calculate GCV value
-            # Handle case where effective_dof is near zero to avoid division issues
+            # ------ base GCV (γ=1) for RGCV / R1GCV / composite ------
+            effective_dof = n_chans - trace_H
             if effective_dof <= 0 or abs(effective_dof) < 1e-10:
-                gcv_value = np.inf
-            else:
-                gcv_value = residual_ss / (effective_dof**2)
+                gcv_values.append(np.inf)
+                continue
+            V_gcv = residual_ss / (effective_dof**2)
 
-            gcv_values.append(gcv_value)
+            if need_trace_A2:
+                # A = L @ W  (n_chans × n_chans — small matrix, e.g. 32×32)
+                A = L @ W
+                trace_A2 = float(np.sum(A * A))  # ||A||_F² = tr(A²) since A symmetric
+
+            if method == "rgcv":
+                mu2 = trace_A2 / n_chans
+                weight = gamma + (1 - gamma) * mu2
+            elif method == "r1gcv":
+                # μ₁₂ = [tr(A) − tr(A²)] / (n·α)
+                alpha = self.alphas[_i]
+                if alpha <= 0 or abs(alpha) < 1e-30:
+                    gcv_values.append(np.inf)
+                    continue
+                mu12 = (trace_H - trace_A2) / (n_chans * alpha)
+                weight = gamma + (1 - gamma) * mu12
+            else:  # composite — geometric mean of GCV and RGCV
+                mu2 = trace_A2 / n_chans
+                rgcv_weight = gamma + (1 - gamma) * mu2
+                weight = np.sqrt(max(rgcv_weight, 0.0))
+
+            if weight <= 0:
+                gcv_values.append(np.inf)
+            else:
+                gcv_values.append(weight * V_gcv)
 
         # Find optimal regularization parameter
         gcv_values = np.array(gcv_values)  # type: ignore[assignment]
@@ -833,18 +1105,19 @@ class BaseSolver:
         # Filter out invalid values (inf, nan)
         valid_indices = np.isfinite(gcv_values)
         if not np.any(valid_indices):
-            # If all values are invalid, use the middle index
             optimum_idx = len(gcv_values) // 2
         else:
-            # Find minimum among valid values
             valid_gcv = gcv_values[valid_indices]
             valid_idx_positions = np.where(valid_indices)[0]
             min_pos = np.argmin(valid_gcv)
             optimum_idx = valid_idx_positions[min_pos]
 
         if plot and len(self.alphas) == len(gcv_values):
+            print(f"Alphas and {method.upper()} values:")
+            print(self.alphas)
+            print(gcv_values)
             plt.figure()
-            plt.semilogx(self.alphas, gcv_values, "o-", label="GCV values")
+            plt.semilogx(self.alphas, gcv_values, "o-", label=f"{method.upper()} values")
             plt.semilogx(
                 self.alphas[optimum_idx],
                 gcv_values[optimum_idx],
@@ -853,11 +1126,10 @@ class BaseSolver:
                 label=f"Optimal α = {self.alphas[optimum_idx]:.2e}",
             )
             plt.xlabel("Regularization parameter α")
-            plt.ylabel("GCV value")
-            title = f"GCV: Optimal α = {self.alphas[optimum_idx]:.2e}"
-            if gamma != 1.0:
-                title = f"Modified GCV (γ={gamma:g}): Optimal α = {self.alphas[optimum_idx]:.2e}"
-            plt.title(title)
+            plt.ylabel(f"{method.upper()} value")
+            plt.title(
+                f"{method.upper()} (γ={gamma:g}): Optimal α = {self.alphas[optimum_idx]:.2e}"
+            )
             plt.legend()
             plt.grid(True)
 

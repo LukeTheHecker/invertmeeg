@@ -33,12 +33,30 @@ class SolverWMNE(BaseSolver):
         ],
     )
 
-    def __init__(self, name="Weighted Minimum Norm Estimate", **kwargs):
+    def __init__(
+        self,
+        name="Weighted Minimum Norm Estimate",
+        use_noise_whitener: bool = True,
+        rank_tol: float = 1e-12,
+        eps: float = 1e-15,
+        **kwargs,
+    ):
         self.name = name
+        self.use_noise_whitener = bool(use_noise_whitener)
+        self.rank_tol = float(rank_tol)
+        self.eps = float(eps)
         kwargs.setdefault("depth_weighting", 0.5)
-        return super().__init__(**kwargs)
+        super().__init__(**kwargs)
 
-    def make_inverse_operator(self, forward, *args, alpha="auto", verbose=0, **kwargs):
+    def make_inverse_operator(
+        self,
+        forward,
+        *args,
+        alpha="auto",
+        noise_cov=None,
+        verbose=0,
+        **kwargs,
+    ):
         """Calculate inverse operator.
 
         Parameters
@@ -47,30 +65,49 @@ class SolverWMNE(BaseSolver):
             The mne-python Forward model instance.
         alpha : float
             The regularization parameter.
+        noise_cov : numpy.ndarray | None
+            Optional sensor noise covariance used for whitening when
+            ``use_noise_whitener=True``.
 
         Return
         ------
         self : object returns itself for convenience
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
-        eps = 1e-12
-        col_norms = np.linalg.norm(self.leadfield, axis=0) ** float(
-            self.depth_weighting
-        )
-        col_norms = np.maximum(col_norms, eps)
+
+        if self.use_noise_whitener:
+            n_chans = self.leadfield.shape[0]
+            if noise_cov is None:
+                noise_cov = np.eye(n_chans, dtype=float)
+            wf = self.prepare_whitened_forward(
+                noise_cov,
+                rank_tol=self.rank_tol,
+                eps=self.eps,
+            )
+        else:
+            wf = self.prepare_whitened_forward(None)
+        if wf.whitener_mode not in ("projected", "none"):
+            logger.warning("wMNE whitener fallback used: %s", wf.whitener_mode)
+
+        leadfield = wf.G_white
+        sensor_transform = wf.sensor_transform
+
+        # Keep alpha scaling consistent with the transformed leadfield.
+        self.get_alphas(reference=leadfield @ leadfield.T)
+
+        col_norms = np.linalg.norm(leadfield, axis=0) ** float(self.depth_weighting)
+        col_norms = np.maximum(col_norms, self.eps)
         WTW = np.diag(1.0 / (col_norms**2))
-        LWTWL = self.leadfield @ WTW @ self.leadfield.T
-        n_chans, _ = self.leadfield.shape
+        LWTWL = leadfield @ WTW @ leadfield.T
+        n_eff = int(leadfield.shape[0])
 
         inverse_operators = []
         for alpha in self.alphas:
             inverse_operator = (
                 WTW
-                @ np.linalg.solve(
-                    LWTWL + alpha * np.identity(n_chans), self.leadfield
-                ).T
+                @ np.linalg.solve(LWTWL + float(alpha) * np.identity(n_eff), leadfield).T
             )
-            inverse_operators.append(inverse_operator)
+            inverse_operators.append(inverse_operator @ sensor_transform)
 
         self.inverse_operators = [
             InverseOperator(inverse_operator, self.name)
