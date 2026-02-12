@@ -22,6 +22,7 @@ import numpy as np
 
 from invert import Solver
 from invert.benchmark.datasets import BENCHMARK_DATASETS
+from invert.benchmark.runner import _make_mne_covariance
 from invert.forward import create_forward_model, get_info
 from invert.simulate import SimulationConfig, SimulationGenerator
 from invert.util.util import pos_from_forward
@@ -165,11 +166,12 @@ def main() -> Path:
                     x_batch[sample_idx], info.copy(), tmin=0.0, verbose=0
                 )
                 noise_cov_est = sim_info.iloc[sample_idx]["noise_cov_est"]
+                noise_cov = _make_mne_covariance(
+                    noise_cov_est, info, nfree=sim_config.noise_cov_n_baseline
+                )
 
                 solver = Solver(solver_name)
-                solver.make_inverse_operator(
-                    forward, alpha="auto", noise_cov=noise_cov_est
-                )
+                solver.make_inverse_operator(forward, alpha="auto", noise_cov=noise_cov)
                 stc = solver.apply_inverse_operator(evoked)
 
                 metrics = evaluate_all(
@@ -210,4 +212,3 @@ def main() -> Path:
 
 if __name__ == "__main__":
     main()
-

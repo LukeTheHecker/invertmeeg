@@ -51,6 +51,7 @@ import pandas as pd
 from invert.benchmark.datasets import BENCHMARK_DATASETS, DatasetConfig
 from invert.benchmark.runner import (
     SOLVER_CATEGORIES,
+    _make_mne_covariance,
     get_solver_category,
     get_solver_class,
     resolve_solvers,
@@ -73,7 +74,9 @@ FAST_DEFAULT_SOLVERS = [
 
 
 def _load_evaluate_all():
-    eval_path = Path(__file__).resolve().parents[1] / "invert" / "evaluate" / "evaluate.py"
+    eval_path = (
+        Path(__file__).resolve().parents[1] / "invert" / "evaluate" / "evaluate.py"
+    )
     spec = spec_from_file_location("invert.evaluate.evaluate", str(eval_path))
     if spec is None or spec.loader is None:
         raise RuntimeError(f"Could not load evaluate module from {eval_path}")
@@ -251,6 +254,17 @@ def _select_covariance(
     return None
 
 
+def _to_mne_covariance(
+    cov: np.ndarray | None,
+    *,
+    info: mne.Info,
+    nfree: int,
+) -> mne.Covariance | None:
+    if cov is None:
+        return None
+    return _make_mne_covariance(cov, info, nfree=nfree)
+
+
 def _select_projector(
     *,
     projector_mode: str,
@@ -327,7 +341,9 @@ def _summarize(
     )
     summary = summary.merge(fail_counts, on=["solver", "dataset"], how="left")
     summary["n_failures"] = summary["n_failures"].fillna(0).astype(int)
-    summary["failure_rate"] = summary["n_failures"] / np.maximum(summary["n_samples"], 1)
+    summary["failure_rate"] = summary["n_failures"] / np.maximum(
+        summary["n_samples"], 1
+    )
     return summary
 
 
@@ -614,13 +630,17 @@ def main() -> None:
                 continue
 
             # Reuse fast path is only valid when per-sample inputs are not required.
-            dynamic_inputs = args.cov_mode == "per_sample" or args.projector_mode == "per_sample"
+            dynamic_inputs = (
+                args.cov_mode == "per_sample" or args.projector_mode == "per_sample"
+            )
 
             # Use a temporary instance to query recomputation behavior.
             probe_solver = _instantiate_solver(
                 solver_cls, solver_name, solver_overrides
             )
-            can_reuse = (not dynamic_inputs) and (not getattr(probe_solver, "require_recompute", True))
+            can_reuse = (not dynamic_inputs) and (
+                not getattr(probe_solver, "require_recompute", True)
+            )
 
             if can_reuse:
                 solver = _instantiate_solver(solver_cls, solver_name, solver_overrides)
@@ -641,7 +661,9 @@ def main() -> None:
                 evoked0 = mne.EvokedArray(x_batch[0], info, tmin=0.0, verbose=0)
                 make_kwargs = {}
                 if caps.supports_noise_cov and cov0 is not None:
-                    make_kwargs["noise_cov"] = cov0
+                    make_kwargs["noise_cov"] = _to_mne_covariance(
+                        cov0, info=info, nfree=int(args.n_samples)
+                    )
 
                 try:
                     fit_t0 = time.perf_counter()
@@ -724,7 +746,9 @@ def main() -> None:
                 evoked_i = mne.EvokedArray(x_batch[i], info, tmin=0.0, verbose=0)
                 make_kwargs = {}
                 if caps.supports_noise_cov and cov_i is not None:
-                    make_kwargs["noise_cov"] = cov_i
+                    make_kwargs["noise_cov"] = _to_mne_covariance(
+                        cov_i, info=info, nfree=int(args.n_samples)
+                    )
 
                 try:
                     fit_t0 = time.perf_counter()
@@ -803,11 +827,25 @@ def main() -> None:
     fail_df.to_csv(out_dir / "failures.csv", index=False)
     skipped_df.to_csv(out_dir / "skipped.csv", index=False)
     if not raw_df.empty:
-        timing_cols = ["solver", "dataset", "sample_idx", "fit_time_ms", "apply_time_ms", "total_time_ms"]
+        timing_cols = [
+            "solver",
+            "dataset",
+            "sample_idx",
+            "fit_time_ms",
+            "apply_time_ms",
+            "total_time_ms",
+        ]
         raw_df[timing_cols].to_csv(out_dir / "timing.csv", index=False)
     else:
         pd.DataFrame(
-            columns=["solver", "dataset", "sample_idx", "fit_time_ms", "apply_time_ms", "total_time_ms"]
+            columns=[
+                "solver",
+                "dataset",
+                "sample_idx",
+                "fit_time_ms",
+                "apply_time_ms",
+                "total_time_ms",
+            ]
         ).to_csv(out_dir / "timing.csv", index=False)
 
     # A concise report file that can be copied into journal updates.
@@ -829,7 +867,9 @@ def main() -> None:
             baseline_summary_path=args.baseline_summary,
         )
         comparison_df.to_csv(out_dir / "comparison_pre_post.csv", index=False)
-        _print_comparison_report(comparison_df, tolerance=float(args.regression_tolerance))
+        _print_comparison_report(
+            comparison_df, tolerance=float(args.regression_tolerance)
+        )
 
     print(f"\nArtifacts written to: {out_dir}")
 
