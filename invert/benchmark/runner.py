@@ -451,7 +451,7 @@ def _compute_and_apply_worker(
     adjacency,
     pos: np.ndarray,
     require_data: bool,
-    noise_cov: np.ndarray | None = None,
+    noise_cov: mne.Covariance | None = None,
 ) -> tuple[int, dict]:
     """Worker for computing fresh inverse operator per sample.
 
@@ -464,14 +464,59 @@ def _compute_and_apply_worker(
     solver = solver_cls()
 
     evoked = mne.EvokedArray(x_sample, info, tmin=0.0, verbose=0)
-    if require_data:
-        solver.make_inverse_operator(forward, evoked, alpha="auto", noise_cov=noise_cov)
-    else:
-        solver.make_inverse_operator(forward, alpha="auto", noise_cov=noise_cov)
+    _make_inverse_operator_with_covariance(
+        solver=solver,
+        forward=forward,
+        require_data=require_data,
+        evoked=evoked,
+        alpha="auto",
+        noise_cov=noise_cov,
+    )
     stc = solver.apply_inverse_operator(evoked)
     y_pred = stc.data
     metrics = evaluate_all(y_sample, y_pred, adjacency, adjacency, pos, pos)
     return idx, metrics
+
+
+def _make_mne_covariance(
+    noise_cov: np.ndarray,
+    info: mne.Info,
+    *,
+    nfree: int = 1,
+) -> mne.Covariance:
+    """Build an MNE covariance with channel metadata from info."""
+    cov = np.asarray(noise_cov, dtype=float)
+    ch_names = list(info["ch_names"])
+    if cov.ndim != 2 or cov.shape[0] != cov.shape[1]:
+        msg = f"noise_cov must be square, got shape {cov.shape}"
+        raise ValueError(msg)
+    if cov.shape[0] != len(ch_names):
+        msg = f"noise_cov has shape {cov.shape}, but info has {len(ch_names)} channels"
+        raise ValueError(msg)
+    return mne.Covariance(
+        data=cov,
+        names=ch_names,
+        bads=list(info.get("bads", [])),
+        projs=list(info.get("projs", [])),
+        nfree=int(max(nfree, 1)),
+    )
+
+
+def _make_inverse_operator_with_covariance(
+    *,
+    solver: BaseSolver,
+    forward: mne.Forward,
+    require_data: bool,
+    evoked: mne.Evoked | None,
+    alpha: str | float,
+    noise_cov: mne.Covariance | None,
+) -> None:
+    """Compute an inverse operator using an MNE covariance object."""
+    if require_data:
+        assert evoked is not None
+        solver.make_inverse_operator(forward, evoked, alpha=alpha, noise_cov=noise_cov)
+    else:
+        solver.make_inverse_operator(forward, alpha=alpha, noise_cov=noise_cov)
 
 
 class SampleMetrics(BaseModel):
@@ -565,9 +610,12 @@ class BenchmarkRunner:
                 )
                 gen = SimulationGenerator(self.forward, config=sim_config)
                 x_batch, y_batch, sim_info = next(gen.generate())
-                noise_cov = np.mean(
+                noise_cov_array = np.mean(
                     [sim_info.iloc[j]["noise_cov_est"] for j in range(len(sim_info))],
                     axis=0,
+                )
+                noise_cov = _make_mne_covariance(
+                    noise_cov_array, self.info, nfree=len(sim_info)
                 )
 
                 for solver_name in self.solvers:
@@ -625,15 +673,19 @@ class BenchmarkRunner:
                     # Parallelize based on require_recompute
                     elif not solver.require_recompute:
                         # Compute inverse operator once, then parallelize application
+                        evoked = None
                         if solver.require_data:
                             evoked = mne.EvokedArray(
                                 x_batch[0], self.info, tmin=0.0, verbose=0
                             )
-                            solver.make_inverse_operator(
-                                self.forward, evoked, alpha="auto", noise_cov=noise_cov
-                            )
-                        else:
-                            solver.make_inverse_operator(self.forward, alpha="auto", noise_cov=noise_cov)
+                        _make_inverse_operator_with_covariance(
+                            solver=solver,
+                            forward=self.forward,
+                            require_data=bool(solver.require_data),
+                            evoked=evoked,
+                            alpha="auto",
+                            noise_cov=noise_cov,
+                        )
 
                         # Check if solver has inverse_operators attribute
                         # Some solvers (e.g., SolverRandomNoise) don't create inverse operators
@@ -777,7 +829,7 @@ class BenchmarkRunner:
         require_data: bool,
         ds_name: str,
         solver_name: str,
-        noise_cov: np.ndarray | None = None,
+        noise_cov: mne.Covariance | None = None,
     ) -> list[SampleMetrics]:
         """Parallelize full computation (require_recompute=True)."""
         if self.n_jobs == 1:
