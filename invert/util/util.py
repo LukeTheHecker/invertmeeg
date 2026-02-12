@@ -201,7 +201,9 @@ def calc_area_tri(AB, AC, CB):
     """Calculates area of a triangle given the length of each side."""
 
     s = (AB + AC + CB) / 2
-    area = (s * (s - AB) * (s - AC) * (s - CB)) ** 0.5
+    # Numerical precision can produce a tiny negative radicand for collinear points.
+    radicand = s * (s - AB) * (s - AC) * (s - CB)
+    area = np.sqrt(np.clip(radicand, 0.0, None))
     return area
 
 
