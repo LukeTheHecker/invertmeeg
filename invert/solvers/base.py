@@ -52,22 +52,44 @@ class WhitenedForward:
     """Preprocessed forward model with optional whitening, priors, and normalization."""
 
     # Always populated
-    G_white: np.ndarray            # (n_eff, n_sources) — whitened+projected leadfield
-    sensor_transform: np.ndarray   # (n_eff, n_chans)   — W @ P (or just P if no noise_cov)
-    projector: np.ndarray          # (n_chans, n_chans)  — SSP projector
-    whitener_mode: str             # "projected" | "identity_projector" | "identity_projector+jitter" | "none"
-    n_eff: int                     # effective sensor rank (= rows of sensor_transform)
+    G_white: np.ndarray  # (n_eff, n_sources) — whitened+projected leadfield
+    sensor_transform: (
+        np.ndarray
+    )  # (n_eff, n_chans)   — W @ P (or just P if no noise_cov)
+    projector: np.ndarray  # (n_chans, n_chans)  — SSP projector
+    whitener_mode: (
+        str  # "projected" | "identity_projector" | "identity_projector+jitter" | "none"
+    )
+    n_eff: int  # effective sensor rank (= rows of sensor_transform)
 
     # Populated when source_cov or depth is given
-    prior_diag: np.ndarray | None = None   # (n_sources,)
-    R_sqrt: np.ndarray | None = None       # sqrt(prior_diag), trace-scaled if requested
+    prior_diag: np.ndarray | None = None  # (n_sources,)
+    R_sqrt: np.ndarray | None = None  # sqrt(prior_diag), trace-scaled if requested
 
     # Populated when trace_normalize=True
-    A: np.ndarray | None = None            # effective operator for regularized inversion
-    trace_scale: float = 1.0               # scale factor applied by trace normalization
+    A: np.ndarray | None = None  # effective operator for regularized inversion
+    trace_scale: float = 1.0  # scale factor applied by trace normalization
 
     # Populated when precompute_svd=True
     svd: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None
+
+
+@dataclass
+class ChannelAlignmentReport:
+    """Channel alignment result across forward/data/noise covariance."""
+
+    context: str
+    kept_ch_names: list[str]
+    dropped_from_forward: list[str] = field(default_factory=list)
+    dropped_from_data: list[str] = field(default_factory=list)
+    dropped_from_noise_cov: list[str] = field(default_factory=list)
+
+    def has_drops(self) -> bool:
+        return bool(
+            self.dropped_from_forward
+            or self.dropped_from_data
+            or self.dropped_from_noise_cov
+        )
 
 
 class InverseOperator:
@@ -231,6 +253,12 @@ class BaseSolver:
         """
         self.forward = deepcopy(forward)
         self.prepare_forward()
+        # Reset whitening state — will be set by prepare_whitened_forward()
+        self._leadfield_orig = None
+        self._sensor_transform = None
+        self._operator_ch_names = tuple(self.forward.ch_names)
+        self._last_data_ch_names = None
+        self._last_input_data_ch_names = None
         self.alpha = alpha
         self.alphas = self.get_alphas(reference=reference)
         self.made_inverse_operator = True
@@ -259,6 +287,7 @@ class BaseSolver:
         """
 
         data = self.unpack_data_obj(mne_obj)
+        self.validate_operator_data_compatibility(data)
 
         if self.use_last_alpha and self.last_reg_idx is not None:
             source_mat = self.inverse_operators[self.last_reg_idx].apply(data)
@@ -268,7 +297,11 @@ class BaseSolver:
                 source_mat, idx = self.regularise_lcurve(data, plot=self.plot_reg)
                 self.last_reg_idx = idx
             elif self.regularisation_method.lower() in {
-                "gcv", "mgcv", "rgcv", "r1gcv", "composite",
+                "gcv",
+                "mgcv",
+                "rgcv",
+                "r1gcv",
+                "composite",
             }:
                 method = self.regularisation_method.lower()
                 if method == "gcv":
@@ -305,6 +338,202 @@ class BaseSolver:
 
         return mne_obj
 
+    def validate_operator_data_compatibility(self, data: np.ndarray) -> None:
+        """Ensure operator input dimension matches apply-time data channels."""
+        inverse_ops = getattr(self, "inverse_operators", None)
+        expected_chans: int | None = None
+        if inverse_ops:
+            try:
+                op_mat = np.asarray(inverse_ops[0].data[0], dtype=float)
+            except Exception:
+                op_mat = None
+            if op_mat is not None and op_mat.ndim == 2:
+                expected_chans = int(op_mat.shape[1])
+
+        op_ch_names = list(getattr(self, "_operator_ch_names", ()) or [])
+        if expected_chans is None and op_ch_names:
+            expected_chans = len(op_ch_names)
+        if expected_chans is None:
+            return
+
+        got_chans = int(np.asarray(data).shape[0])
+        data_ch_names = list(
+            getattr(self, "_last_input_data_ch_names", ())
+            or getattr(self, "_last_data_ch_names", ())
+            or []
+        )
+        missing_in_data: list[str] = []
+        extra_in_data: list[str] = []
+        if op_ch_names and data_ch_names:
+            data_set = set(data_ch_names)
+            op_set = set(op_ch_names)
+            missing_in_data = [ch for ch in op_ch_names if ch not in data_set]
+            extra_in_data = [ch for ch in data_ch_names if ch not in op_set]
+
+        if expected_chans == got_chans and not (missing_in_data or extra_in_data):
+            return
+
+        msg = (
+            "Data channels do not match the inverse operator input dimension "
+            f"(operator expects {expected_chans}, data has {got_chans}). "
+            "Recompute the inverse operator on the current data channel set."
+        )
+        if missing_in_data or extra_in_data:
+            msg = (
+                f"{msg} Missing in data: {len(missing_in_data)}"
+                f"{self._format_channel_list(missing_in_data, max_items=None)}. "
+                f"Extra in data: {len(extra_in_data)}"
+                f"{self._format_channel_list(extra_in_data, max_items=None)}."
+            )
+        raise ValueError(msg)
+
+    @staticmethod
+    def _validate_unique_channel_names(ch_names: list[str], *, label: str) -> None:
+        if len(ch_names) != len(set(ch_names)):
+            msg = f"{label} contains duplicate channel names."
+            raise ValueError(msg)
+
+    @staticmethod
+    def _format_channel_list(ch_names: list[str], *, max_items: int | None = 8) -> str:
+        if not ch_names:
+            return ""
+        if max_items is None:
+            head = ", ".join(ch_names)
+            return f" [{head}]"
+        head = ", ".join(ch_names[:max_items])
+        if len(ch_names) > max_items:
+            head = f"{head}, ..."
+        return f" [{head}]"
+
+    def log_channel_alignment(self, report: ChannelAlignmentReport) -> None:
+        if not report.has_drops():
+            return
+        logger.info(
+            "%s channel alignment: kept=%d, dropped_from_forward=%d%s, dropped_from_data=%d%s, dropped_from_noise_cov=%d%s",
+            report.context,
+            len(report.kept_ch_names),
+            len(report.dropped_from_forward),
+            self._format_channel_list(report.dropped_from_forward, max_items=None),
+            len(report.dropped_from_data),
+            self._format_channel_list(report.dropped_from_data, max_items=None),
+            len(report.dropped_from_noise_cov),
+            self._format_channel_list(report.dropped_from_noise_cov, max_items=None),
+        )
+
+    def log_regularisation_edge_choice(self, *, optimum_idx: int, method: str) -> None:
+        """Warn when alpha selection falls on the boundary of the search grid."""
+        n_alphas = len(getattr(self, "alphas", []) or [])
+        if n_alphas <= 1:
+            return
+        if optimum_idx not in (0, n_alphas - 1):
+            return
+
+        edge = "lowest" if optimum_idx == 0 else "highest"
+        alpha = self.alphas[optimum_idx]
+        logger.warning(
+            "%s selected the %s regularization parameter in the search range "
+            "(idx=%d of %d, alpha=%.6e). Consider widening or shifting `r_values`.",
+            method,
+            edge,
+            optimum_idx,
+            n_alphas - 1,
+            float(alpha),
+        )
+
+    def align_channel_sets(
+        self,
+        *,
+        forward_ch_names: list[str],
+        data_ch_names: list[str] | None = None,
+        noise_cov_ch_names: list[str] | None = None,
+        context: str = "BaseSolver",
+    ) -> ChannelAlignmentReport:
+        """Align channel names using forward order as the canonical order."""
+        forward_ch_names = list(forward_ch_names)
+        self._validate_unique_channel_names(forward_ch_names, label="forward")
+
+        kept_ch_names = list(forward_ch_names)
+
+        if data_ch_names is not None:
+            data_ch_names = list(data_ch_names)
+            self._validate_unique_channel_names(data_ch_names, label="data")
+            data_set = set(data_ch_names)
+            kept_ch_names = [ch for ch in kept_ch_names if ch in data_set]
+
+        if noise_cov_ch_names is not None:
+            noise_cov_ch_names = list(noise_cov_ch_names)
+            self._validate_unique_channel_names(noise_cov_ch_names, label="noise_cov")
+            cov_set = set(noise_cov_ch_names)
+            kept_ch_names = [ch for ch in kept_ch_names if ch in cov_set]
+
+        kept_set = set(kept_ch_names)
+        dropped_from_forward = [ch for ch in forward_ch_names if ch not in kept_set]
+        dropped_from_data: list[str] = []
+        dropped_from_noise_cov: list[str] = []
+
+        if data_ch_names is not None:
+            dropped_from_data = [ch for ch in data_ch_names if ch not in kept_set]
+
+        if noise_cov_ch_names is not None:
+            dropped_from_noise_cov = [
+                ch for ch in noise_cov_ch_names if ch not in kept_set
+            ]
+
+        return ChannelAlignmentReport(
+            context=context,
+            kept_ch_names=kept_ch_names,
+            dropped_from_forward=dropped_from_forward,
+            dropped_from_data=dropped_from_data,
+            dropped_from_noise_cov=dropped_from_noise_cov,
+        )
+
+    @staticmethod
+    def coerce_noise_cov(
+        noise_cov: mne.Covariance,
+    ) -> tuple[np.ndarray, list[str]]:
+        """Return covariance matrix and channel names from an MNE covariance."""
+        if not isinstance(noise_cov, mne.Covariance):
+            msg = f"noise_cov must be an mne.Covariance or None. Got {type(noise_cov)}."
+            raise TypeError(msg)
+
+        cov_mat = np.asarray(noise_cov["data"], dtype=float)
+        cov_names = list(noise_cov.get("names", noise_cov.get("ch_names", [])))
+        if cov_mat.ndim != 2 or cov_mat.shape[0] != cov_mat.shape[1]:
+            msg = f"noise_cov must be a square 2D array, got shape {cov_mat.shape}"
+            raise ValueError(msg)
+        if len(cov_names) != cov_mat.shape[0]:
+            msg = (
+                "noise_cov channel-name length does not match covariance shape: "
+                f"{len(cov_names)} names vs {cov_mat.shape}"
+            )
+            raise ValueError(msg)
+        return cov_mat, cov_names
+
+    @staticmethod
+    def reorder_covariance_to_channels(
+        noise_cov: np.ndarray,
+        noise_cov_ch_names: list[str],
+        target_ch_names: list[str],
+    ) -> np.ndarray:
+        index_map = {ch: idx for idx, ch in enumerate(noise_cov_ch_names)}
+        picks = [index_map[ch] for ch in target_ch_names]
+        return np.asarray(noise_cov[np.ix_(picks, picks)], dtype=float)
+
+    @staticmethod
+    def make_identity_noise_cov(
+        ch_names: list[str],
+        *,
+        nfree: int = 1,
+    ) -> mne.Covariance:
+        n_chans = len(ch_names)
+        return mne.Covariance(
+            data=np.eye(n_chans, dtype=float),
+            names=list(ch_names),
+            bads=[],
+            projs=[],
+            nfree=int(max(nfree, 1)),
+        )
+
     def unpack_data_obj(self, mne_obj, pick_types=None):
         """Unpacks the mne data object and returns the data.
 
@@ -335,11 +564,27 @@ class BaseSolver:
 
         # Prepare Data
         mne_obj = self.prep_data(mne_obj)
+        channels_before_pick = list(mne_obj.ch_names)
         mne_obj_meeg = mne_obj.copy().pick(pick_types)
+        channels_after_pick = list(mne_obj_meeg.ch_names)
+        self._last_input_data_ch_names = tuple(channels_after_pick)
+        dropped_by_pick_type = [
+            ch for ch in channels_before_pick if ch not in set(channels_after_pick)
+        ]
+        if dropped_by_pick_type:
+            logger.info(
+                "unpack_data_obj type filter: dropped=%d%s",
+                len(dropped_by_pick_type),
+                self._format_channel_list(dropped_by_pick_type),
+            )
 
-        channels_in_fwd = self.forward.ch_names
-        channels_in_mne_obj = mne_obj_meeg.ch_names
-        picks = self.select_list_intersection(channels_in_fwd, channels_in_mne_obj)
+        alignment = self.align_channel_sets(
+            forward_ch_names=list(self.forward.ch_names),
+            data_ch_names=channels_after_pick,
+            context="unpack_data_obj",
+        )
+        self.log_channel_alignment(alignment)
+        picks = alignment.kept_ch_names
 
         # Select only data channels in mne_obj
         mne_obj_meeg.pick(picks)
@@ -348,18 +593,14 @@ class BaseSolver:
         self.forward_original = deepcopy(self.forward)
 
         # Select only available data channels in forward
-        self.forward = self.forward.pick_channels(picks)
-
-        # Prepare the potentially new forward model
-        self.prepare_forward()
+        self.forward = self.forward.pick_channels(picks, ordered=True)
 
         # Test if ch_names in forward model and mne_obj_meeg are equal
-        assert self.forward.ch_names == mne_obj_meeg.ch_names, (
-            "channels available in mne object are not equal to those present in the forward model."
-        )
-        assert len(self.forward.ch_names) > 1, (
-            "forward model contains only a single channel"
-        )
+        if self.forward.ch_names != mne_obj_meeg.ch_names:
+            msg = "channels available in mne object are not equal to those present in the forward model."
+            raise ValueError(msg)
+        if len(self.forward.ch_names) <= 1:
+            raise ValueError("forward model contains only a single channel")
 
         # check if the object is an evoked object
         if isinstance(mne_obj, (mne.Evoked, mne.EvokedArray)):
@@ -392,20 +633,15 @@ class BaseSolver:
         if self.reduce_rank:
             data = self.select_signal_subspace(data, rank=self.rank)
 
-        # Restore the original forward model and leadfield so they match
-        # what the inverse operators were built with.
+        self._last_data_ch_names = tuple(mne_obj_meeg.ch_names)
+
+        # Restore the original forward model so it matches what the
+        # inverse operators were built with.  Do NOT call prepare_forward()
+        # here — it would overwrite self.leadfield, clobbering any whitened
+        # or otherwise transformed leadfield set up by make_inverse_operator.
         self.forward = self.forward_original
-        self.prepare_forward()
 
         return data
-
-    @staticmethod
-    def select_list_intersection(list1, list2):
-        new_list = []
-        for element in list1:
-            if element in list2:
-                new_list.append(element)
-        return new_list
 
     def get_alphas(self, reference=None):
         """Create list of regularization parameters (alphas) based on the
@@ -487,8 +723,7 @@ class BaseSolver:
         if source_cov.ndim == 1:
             if source_cov.shape[0] != n_sources:
                 msg = (
-                    f"source_cov has length {source_cov.shape[0]}, "
-                    f"expected {n_sources}"
+                    f"source_cov has length {source_cov.shape[0]}, expected {n_sources}"
                 )
                 raise ValueError(msg)
             return source_cov
@@ -589,10 +824,7 @@ class BaseSolver:
         """Compute PCA-space sensor whitener with rank truncation."""
         noise_cov = np.asarray(noise_cov, dtype=float)
         if noise_cov.ndim != 2 or noise_cov.shape[0] != noise_cov.shape[1]:
-            msg = (
-                "noise_cov must be a square 2D array, "
-                f"got shape {noise_cov.shape}"
-            )
+            msg = f"noise_cov must be a square 2D array, got shape {noise_cov.shape}"
             raise ValueError(msg)
         n_chans = int(noise_cov.shape[0])
 
@@ -600,7 +832,9 @@ class BaseSolver:
             projector = np.eye(n_chans, dtype=float)
         projector = np.asarray(projector, dtype=float)
         if projector.shape != (n_chans, n_chans):
-            msg = f"projector has shape {projector.shape}, expected {(n_chans, n_chans)}"
+            msg = (
+                f"projector has shape {projector.shape}, expected {(n_chans, n_chans)}"
+            )
             raise ValueError(msg)
 
         Cn = 0.5 * (noise_cov + noise_cov.T)
@@ -634,10 +868,7 @@ class BaseSolver:
         """Compute a sensor whitener with fallback strategies."""
         noise_cov = np.asarray(noise_cov, dtype=float)
         if noise_cov.ndim != 2 or noise_cov.shape[0] != noise_cov.shape[1]:
-            msg = (
-                "noise_cov must be a square 2D array, "
-                f"got shape {noise_cov.shape}"
-            )
+            msg = f"noise_cov must be a square 2D array, got shape {noise_cov.shape}"
             raise ValueError(msg)
 
         W = cls.compute_sensor_whitener(
@@ -752,9 +983,7 @@ class BaseSolver:
 
         left_scale = np.asarray(left_scale, dtype=float)
         if left_scale.ndim != 1 or left_scale.shape[0] != kernel.shape[0]:
-            msg = (
-                f"left_scale has shape {left_scale.shape}, expected {(kernel.shape[0],)}"
-            )
+            msg = f"left_scale has shape {left_scale.shape}, expected {(kernel.shape[0],)}"
             raise ValueError(msg)
         return kernel * left_scale[:, np.newaxis]
 
@@ -788,8 +1017,9 @@ class BaseSolver:
 
     def prepare_whitened_forward(
         self,
-        noise_cov: np.ndarray | None = None,
+        noise_cov: mne.Covariance | None = None,
         *,
+        apply_projector_when_no_cov: bool = True,
         source_cov: np.ndarray | None = None,
         depth: float | None = None,
         depth_limit: float = 10.0,
@@ -802,8 +1032,13 @@ class BaseSolver:
 
         Parameters
         ----------
-        noise_cov : array (n_chans, n_chans) or None
-            Noise covariance. If *None*, no whitening is applied.
+        noise_cov : mne.Covariance | None
+            Noise covariance. Channels are aligned by name. If *None*, no
+            whitening is applied.
+        apply_projector_when_no_cov : bool
+            If ``True`` and ``noise_cov`` is ``None``, still apply the SSP
+            projector from the forward model. If ``False``, use identity in
+            that case.
         source_cov : array or None
             Diagonal source prior (1D or 2D diagonal).
         depth : float or None
@@ -823,25 +1058,72 @@ class BaseSolver:
         -------
         WhitenedForward
         """
-        G = np.asarray(self.leadfield, dtype=float)
-        n_chans, n_sources = G.shape
+        # Save original leadfield (before any whitening) for regularization trace.
+        # If already saved (repeated call without intervening make_inverse_operator),
+        # keep the original to prevent double-whitening.
+        if self._leadfield_orig is None:
+            self._leadfield_orig = np.array(self.leadfield, dtype=float)
+        G = np.asarray(self._leadfield_orig, dtype=float)
+        forward_ch_names = list(self.forward.ch_names)
+        n_sources = int(G.shape[1])
+        noise_cov_mat: np.ndarray | None = None
 
-        # --- SSP projector ---
-        P = self.compute_sensor_projector(forward_or_info=self.forward)
-
-        # --- Sensor whitening ---
         if noise_cov is not None:
-            noise_cov = np.asarray(noise_cov, dtype=float)
-            if noise_cov.shape != (n_chans, n_chans):
+            noise_cov_mat, noise_cov_ch_names = self.coerce_noise_cov(noise_cov)
+            alignment = self.align_channel_sets(
+                forward_ch_names=forward_ch_names,
+                noise_cov_ch_names=noise_cov_ch_names,
+                context="prepare_whitened_forward",
+            )
+            self.log_channel_alignment(alignment)
+            if len(alignment.kept_ch_names) <= 1:
                 msg = (
-                    f"noise_cov has shape {noise_cov.shape}, "
-                    f"expected {(n_chans, n_chans)}"
+                    "forward/noise_cov channel intersection has <= 1 channel. "
+                    "Check channel naming and montage consistency."
                 )
                 raise ValueError(msg)
-            noise_cov = 0.5 * (noise_cov + noise_cov.T)
+
+            if len(alignment.kept_ch_names) != len(forward_ch_names):
+                fwd_idx_map = {ch: idx for idx, ch in enumerate(forward_ch_names)}
+                keep_idx = [fwd_idx_map[ch] for ch in alignment.kept_ch_names]
+                G = G[keep_idx, :]
+                self._leadfield_orig = G.copy()
+                self.forward = self.forward.pick_channels(
+                    alignment.kept_ch_names, ordered=True
+                )
+                forward_ch_names = alignment.kept_ch_names
+                n_sources = int(G.shape[1])
+
+            noise_cov_mat = self.reorder_covariance_to_channels(
+                noise_cov_mat, noise_cov_ch_names, forward_ch_names
+            )
+        n_chans = int(G.shape[0])
+
+        # --- SSP projector ---
+        if noise_cov_mat is None and not apply_projector_when_no_cov:
+            P = np.eye(n_chans, dtype=float)
+        else:
+            P = self.compute_sensor_projector(
+                forward_or_info=self.forward,
+                n_chans=n_chans,
+            )
+
+        # --- Sensor whitening ---
+        if noise_cov_mat is not None:
+            noise_cov_mat = np.asarray(noise_cov_mat, dtype=float)
+            if noise_cov_mat.shape != (n_chans, n_chans):
+                msg = (
+                    f"noise_cov has shape {noise_cov_mat.shape}, expected {(n_chans, n_chans)}. "
+                    "Pass noise_cov with channel names to allow automatic alignment."
+                )
+                raise ValueError(msg)
+            noise_cov_mat = 0.5 * (noise_cov_mat + noise_cov_mat.T)
 
             W, whitener_mode = self.compute_sensor_whitener_robust(
-                noise_cov, projector=P, rank_tol=rank_tol, eps=eps,
+                noise_cov_mat,
+                projector=P,
+                rank_tol=rank_tol,
+                eps=eps,
             )
             if W.shape[0] == 0:
                 raise ValueError(
@@ -849,12 +1131,12 @@ class BaseSolver:
                     "fallbacks. Check noise covariance channel alignment and "
                     "positivity."
                 )
-            sensor_transform = W @ P        # (n_eff, n_chans)
+            sensor_transform = W @ P  # (n_eff, n_chans)
             G_white = sensor_transform @ G  # (n_eff, n_sources)
             n_eff = int(W.shape[0])
         else:
-            sensor_transform = P            # (n_chans, n_chans)
-            G_white = P @ G                 # (n_chans, n_sources)
+            sensor_transform = P  # (n_chans, n_chans)
+            G_white = P @ G  # (n_chans, n_sources)
             n_eff = n_chans
             whitener_mode = "none"
 
@@ -865,7 +1147,10 @@ class BaseSolver:
             prior_diag = self.coerce_diag_source_prior(source_cov, n_sources)
             if depth is not None:
                 prior_diag = prior_diag * self.compute_depth_prior_whitened(
-                    G_white, depth=depth, depth_limit=depth_limit, eps=eps,
+                    G_white,
+                    depth=depth,
+                    depth_limit=depth_limit,
+                    eps=eps,
                 )
             prior_diag = np.maximum(prior_diag, eps)
             R_sqrt = np.sqrt(prior_diag)
@@ -874,8 +1159,14 @@ class BaseSolver:
         A = None
         trace_scale = 1.0
         if trace_normalize:
-            A = G_white * R_sqrt[np.newaxis, :] if R_sqrt is not None else G_white.copy()
-            A, trace_scale = self.trace_normalize_operator(A, target_rank=n_eff, eps=eps)
+            A = (
+                G_white * R_sqrt[np.newaxis, :]
+                if R_sqrt is not None
+                else G_white.copy()
+            )
+            A, trace_scale = self.trace_normalize_operator(
+                A, target_rank=n_eff, eps=eps
+            )
             if R_sqrt is not None:
                 R_sqrt = R_sqrt * trace_scale
 
@@ -884,6 +1175,11 @@ class BaseSolver:
         if precompute_svd:
             svd_target = A if A is not None else G_white
             svd = np.linalg.svd(svd_target, full_matrices=False)
+
+        # Install whitened state so regularisation methods work in whitened space
+        self.leadfield = G_white
+        self._sensor_transform = sensor_transform
+        self._operator_ch_names = tuple(self.forward.ch_names)
 
         return WhitenedForward(
             G_white=G_white,
@@ -922,15 +1218,18 @@ class BaseSolver:
 
         """
 
-        leadfield = self.leadfield
+        L_resid = self.leadfield  # G_white if whitened, else original
+        _st = getattr(self, "_sensor_transform", None)
+
         source_mats = [
             inverse_operator.apply(M) for inverse_operator in self.inverse_operators
         ]
 
         l2_norms = [np.linalg.norm(source_mat) for source_mat in source_mats]
 
+        M_eff = _st @ M if _st is not None else M
         residual_norms = [
-            np.linalg.norm(leadfield @ source_mat - M) for source_mat in source_mats
+            np.linalg.norm(L_resid @ source_mat - M_eff) for source_mat in source_mats
         ]
 
         optimum_idx = self.find_corner(l2_norms, residual_norms)
@@ -943,6 +1242,10 @@ class BaseSolver:
             alpha = self.alphas[optimum_idx]
             plt.title(f"L-Curve: {alpha}")
 
+        self.log_regularisation_edge_choice(
+            optimum_idx=optimum_idx,
+            method="L-curve",
+        )
         return source_mat, optimum_idx
 
     @staticmethod
@@ -1026,8 +1329,13 @@ class BaseSolver:
             for regularization of ill-posed problems.
         """
         method = method.lower()
-        n_chans = self.leadfield.shape[0]
-        L = self.leadfield
+        # Trace: use ORIGINAL leadfield (correct by cyclic property of trace)
+        _lo = getattr(self, "_leadfield_orig", None)
+        L_orig = _lo if _lo is not None else self.leadfield
+        # Residual: use whitened space if whitening was applied
+        L_resid = self.leadfield  # G_white if whitened, else original
+        n_eff = L_resid.shape[0]
+        _st = getattr(self, "_sensor_transform", None)
 
         # Resolve default gamma per method
         if gamma is None:
@@ -1047,19 +1355,18 @@ class BaseSolver:
             # Apply inverse operator to get source estimate
             x = inverse_operator.apply(M)
 
-            # Calculate reconstructed data
-            M_hat = L @ x
-
+            # Trace with original G (correct by cyclic property of trace)
             W = inverse_operator.data[0]  # Get the actual matrix
-            # trace(H) = trace(L @ W) = sum(L * W.T), avoid forming H explicitly
-            trace_H = float(np.sum(L * W.T))
+            trace_H = float(np.sum(L_orig * W.T))
 
-            # Residual sum of squares
-            residual_ss = float(np.linalg.norm(np.asarray(M - M_hat)) ** 2)
+            # Residual in whitened space
+            M_hat = L_resid @ x
+            M_eff = _st @ M if _st is not None else M
+            residual_ss = float(np.linalg.norm(np.asarray(M_eff - M_hat)) ** 2)
 
             # ------ plain / modified GCV score ------
             if method in {"gcv", "mgcv"}:
-                effective_dof = n_chans - gamma * trace_H
+                effective_dof = n_eff - gamma * trace_H
                 if effective_dof <= 0 or abs(effective_dof) < 1e-10:
                     gcv_values.append(np.inf)
                 else:
@@ -1067,19 +1374,19 @@ class BaseSolver:
                 continue
 
             # ------ base GCV (γ=1) for RGCV / R1GCV / composite ------
-            effective_dof = n_chans - trace_H
+            effective_dof = n_eff - trace_H
             if effective_dof <= 0 or abs(effective_dof) < 1e-10:
                 gcv_values.append(np.inf)
                 continue
             V_gcv = residual_ss / (effective_dof**2)
 
             if need_trace_A2:
-                # A = L @ W  (n_chans × n_chans — small matrix, e.g. 32×32)
-                A = L @ W
+                # A = L_orig @ W  (n_chans × n_chans — small matrix, e.g. 32×32)
+                A = L_orig @ W
                 trace_A2 = float(np.sum(A * A))  # ||A||_F² = tr(A²) since A symmetric
 
             if method == "rgcv":
-                mu2 = trace_A2 / n_chans
+                mu2 = trace_A2 / n_eff
                 weight = gamma + (1 - gamma) * mu2
             elif method == "r1gcv":
                 # μ₁₂ = [tr(A) − tr(A²)] / (n·α)
@@ -1087,10 +1394,10 @@ class BaseSolver:
                 if alpha <= 0 or abs(alpha) < 1e-30:
                     gcv_values.append(np.inf)
                     continue
-                mu12 = (trace_H - trace_A2) / (n_chans * alpha)
+                mu12 = (trace_H - trace_A2) / (n_eff * alpha)
                 weight = gamma + (1 - gamma) * mu12
             else:  # composite — geometric mean of GCV and RGCV
-                mu2 = trace_A2 / n_chans
+                mu2 = trace_A2 / n_eff
                 rgcv_weight = gamma + (1 - gamma) * mu2
                 weight = np.sqrt(max(rgcv_weight, 0.0))
 
@@ -1117,7 +1424,9 @@ class BaseSolver:
             print(self.alphas)
             print(gcv_values)
             plt.figure()
-            plt.semilogx(self.alphas, gcv_values, "o-", label=f"{method.upper()} values")
+            plt.semilogx(
+                self.alphas, gcv_values, "o-", label=f"{method.upper()} values"
+            )
             plt.semilogx(
                 self.alphas[optimum_idx],
                 gcv_values[optimum_idx],
@@ -1133,6 +1442,10 @@ class BaseSolver:
             plt.legend()
             plt.grid(True)
 
+        self.log_regularisation_edge_choice(
+            optimum_idx=optimum_idx,
+            method=method.upper(),
+        )
         source_mat = self.inverse_operators[optimum_idx].apply(M)  # type: ignore[attr-defined]
         return source_mat, optimum_idx
 
@@ -1160,13 +1473,17 @@ class BaseSolver:
 
         """
 
+        L_resid = self.leadfield  # G_white if whitened, else original
+        _st = getattr(self, "_sensor_transform", None)
+
         product_values = []
 
         for inverse_operator in self.inverse_operators:
             x = inverse_operator.apply(M)
 
-            M_hat = self.leadfield @ x
-            residual_norm = np.linalg.norm(M_hat - M)
+            M_hat = L_resid @ x
+            M_eff = _st @ M if _st is not None else M
+            residual_norm = np.linalg.norm(M_hat - M_eff)
             semi_norm = np.linalg.norm(x)
             product_value = semi_norm * residual_norm
             product_values.append(product_value)
@@ -1180,6 +1497,10 @@ class BaseSolver:
             alpha = self.alphas[optimum_idx]
             plt.title(f"Product: {alpha}")
 
+        self.log_regularisation_edge_choice(
+            optimum_idx=optimum_idx,
+            method="Product",
+        )
         source_mat = self.inverse_operators[optimum_idx].apply(M)
         return source_mat, optimum_idx
 
