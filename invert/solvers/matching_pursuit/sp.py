@@ -107,6 +107,7 @@ class SolverSP(BaseSolver):
             The data matrix (channels,).
         K : ["auto", int]
             The number of atoms to select per iteration.
+            If "auto", set to min(8, max(2, n_chans // 10)).
 
         Return
         ------
@@ -117,7 +118,10 @@ class SolverSP(BaseSolver):
         _, n_dipoles = self.leadfield.shape
 
         if K == "auto":
-            K = int(n_chans / 2)
+            K = min(8, max(2, n_chans // 10))
+        K = int(K)
+        if K <= 0:
+            raise ValueError("K must be positive")
 
         # Use robust residual from base class
         def resid(y, phi):

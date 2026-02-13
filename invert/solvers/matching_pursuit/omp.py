@@ -117,11 +117,16 @@ class SolverOMP(BaseSolver):
         x_hat : numpy.ndarray
             The inverse solution (dipoles,)
         """
+        n_chans = len(y)
         if K == "auto":
-            K = int(len(y) / 2)
+            # Classic OMP selects a single atom per iteration.
+            K = 1
+        K = int(K)
+        if K <= 0:
+            raise ValueError("K must be positive")
 
         if max_iter is None:
-            max_iter = len(y)
+            max_iter = n_chans
         _, n_dipoles = self.leadfield.shape
 
         x_hat = np.zeros(n_dipoles)

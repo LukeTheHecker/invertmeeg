@@ -5,8 +5,6 @@ import mne
 import numpy as np
 
 from ...util import (
-    calc_residual_variance,
-    find_corner,
     thresholding,
 )
 from ..base import BaseSolver, SolverMeta
@@ -77,7 +75,9 @@ class SolverREMBO(BaseSolver):
         self.inverse_operators = []
         return self
 
-    def apply_inverse_operator(self, mne_obj, K="auto") -> mne.SourceEstimate:  # type: ignore
+    def apply_inverse_operator(
+        self, mne_obj, K="auto", max_boost_iter=None, fit_tol="auto"
+    ) -> mne.SourceEstimate:  # type: ignore
         """Apply the REMBO inverse solution.
 
         Parameters
@@ -85,7 +85,13 @@ class SolverREMBO(BaseSolver):
         mne_obj : [mne.Evoked, mne.Epochs, mne.io.Raw]
             The MNE data object.
         K : ["auto", int]
-            The number of atoms to select per iteration.
+            Maximum support size (sparsity budget) for the SMV solve.
+            If "auto", uses a small adaptive budget based on channel count.
+        max_boost_iter : [None, int]
+            Maximum number of boost iterations. If None, defaults to 50.
+        fit_tol : ["auto", float]
+            Relative SMV fit tolerance used by the boosting acceptance check.
+            If "auto", defaults to 1e-3.
 
         Return
         ------
@@ -95,11 +101,13 @@ class SolverREMBO(BaseSolver):
         data = self.unpack_data_obj(mne_obj)
         self.validate_operator_data_compatibility(data)
         data = self._sensor_transform @ data
-        source_mat = self.calc_rembo_solution(data, K=K)
+        source_mat = self.calc_rembo_solution(
+            data, K=K, max_boost_iter=max_boost_iter, fit_tol=fit_tol
+        )
         stc = self.source_to_object(source_mat)
         return stc
 
-    def calc_rembo_solution(self, y, K="auto"):
+    def calc_rembo_solution(self, y, K="auto", max_boost_iter=None, fit_tol="auto"):
         """Calculate the REMBO inverse solution based on the measurement vector
             y.
 
@@ -108,79 +116,73 @@ class SolverREMBO(BaseSolver):
         y : numpy.ndarray
             The EEG matrix (channels, time)
         K : ["auto", int]
-            The number of atoms to select per iteration.
+            Maximum support size (sparsity budget) for the SMV step.
+            If "auto", set to min(8, max(2, n_chans // 10)).
+        max_boost_iter : [None, int]
+            Maximum number of random MMV->SMV reductions to try.
+            If None, defaults to 50.
+        fit_tol : ["auto", float]
+            Relative SMV fit tolerance. Candidate supports satisfy
+            ||y_vec - L x_hat||_2 / ||y_vec||_2 <= fit_tol.
+            If "auto", defaults to 1e-3.
 
         Return
         ------
         x_hat : numpy.ndarray
             The source matrix (dipoles, time)
         """
-
-        rand = np.random.rand
         n_chans, n_time = y.shape
         if K == "auto":
-            K = int(n_chans / 2)
-        max_iter = int(n_chans / 2)
+            # Adaptive default: avoid single-source bias while keeping sparsity tight.
+            K = min(8, max(2, n_chans // 10))
+        K = int(K)
+        if K <= 0:
+            raise ValueError("K must be positive")
+
+        if max_boost_iter is None:
+            max_boost_iter = 50
+        max_boost_iter = int(max_boost_iter)
+        if max_boost_iter <= 0:
+            raise ValueError("max_boost_iter must be positive")
+
+        if fit_tol == "auto":
+            fit_tol = 1e-3
+        fit_tol = float(fit_tol)
+        if fit_tol < 0:
+            raise ValueError("fit_tol must be non-negative")
+
         n_dipoles = self.leadfield.shape[1]
+        y_norm_eps = 1e-15
+        best_support = np.array([], dtype=int)
+        best_rel_resid = np.inf
 
-        unexplained_variance = np.array(
-            [
-                calc_residual_variance(np.zeros(y.shape), y),
-            ]
-        )
-        n_sources = np.array(
-            [
-                0,
-            ]
-        )
-        x_hats = [np.zeros((n_dipoles, n_time))]
+        for _ in range(max_boost_iter):
+            # Random merge vector from an absolutely continuous distribution.
+            # Use NumPy's global RNG so benchmark seeds control reproducibility.
+            a = np.random.standard_normal(n_time)
+            y_vec = y @ a
+            x_vec = self.calc_omp_solution(y_vec, K=K)
+            S_hat = np.where(x_vec != 0)[0].astype(int)
 
-        for _i in range(max_iter):
-            a = rand(n_time)
-            y_vec = y @ a  # sample randomly from the measurement matrix
-            x_hat = self.calc_omp_solution(y_vec, K=K)
-            S_hat = np.where(x_hat != 0)[0].astype(int)
-            As_pinv = np.linalg.pinv(self.leadfield[:, S_hat])
+            if len(S_hat) == 0 or len(S_hat) > K:
+                continue
 
-            x_hat = np.zeros((n_dipoles, n_time))
-            x_hat[S_hat, :] = As_pinv @ y
-            x_hats.append(x_hat)
-
-            unexplained_variance = np.append(
-                unexplained_variance, calc_residual_variance(self.leadfield @ x_hat, y)
+            rel_resid = np.linalg.norm(y_vec - self.leadfield @ x_vec) / max(
+                np.linalg.norm(y_vec), y_norm_eps
             )
-            n_sources = np.append(n_sources, len(S_hat)).astype(float)
+            if rel_resid < best_rel_resid:
+                best_rel_resid = rel_resid
+                best_support = S_hat
 
-        idc = np.argsort(n_sources)
-        n_sources = n_sources[idc]
-        unexplained_variance = unexplained_variance[idc]
+            if rel_resid <= fit_tol:
+                break
 
-        # REFACTOR THIS:
-        unique_sources = np.sort(np.unique(n_sources))
-        n_sources_new = []
-        unexp_new = []
-        x_hats_new = []
-        for k in unique_sources:
-            idc = np.where(n_sources == k)[0]
-            values = unexplained_variance[idc]
-            min_sidx = np.argmin(values)
-            good_index = idc[min_sidx]
+        x_hat = np.zeros((n_dipoles, n_time))
+        if len(best_support) == 0:
+            return x_hat
 
-            n_sources_new.append(k)
-            unexp_new.append(values.min())
-            x_hats_new.append(x_hats[good_index])
-        n_sources = np.array(n_sources_new)[1:]
-        unexplained_variance = np.array(unexp_new)[1:]
-        x_hats = x_hats_new[1:]
-        corner_idx = find_corner(n_sources, unexplained_variance)
-
-        # corner_idx = find_corner(n_sources[1:], unexplained_variance[1:])+1
-        # corner_idx = idc[corner_idx]
-        x_hat = x_hats[corner_idx]
-        # import matplotlib.pyplot as plt
-        # plt.figure()
-        # plt.plot(n_sources, unexplained_variance, 'k*')
-        # plt.plot(n_sources[corner_idx], unexplained_variance[corner_idx], 'ro')
+        As_pinv = np.linalg.pinv(self.leadfield[:, best_support])
+        x_hat[best_support, :] = As_pinv @ y
 
         return x_hat
 
@@ -193,7 +195,7 @@ class SolverREMBO(BaseSolver):
         y : numpy.ndarray
             The data matrix (channels,).
         K : ["auto", int]
-            The number of atoms to select per iteration.
+            Maximum number of nonzero atoms.
 
         Return
         ------
@@ -204,31 +206,23 @@ class SolverREMBO(BaseSolver):
         _, n_dipoles = self.leadfield.shape
 
         if K == "auto":
-            K = int(n_chans / 2)
+            K = 1
+        K = int(K)
+        if K <= 0:
+            raise ValueError("K must be positive")
 
         x_hat = np.zeros(n_dipoles)
         x_hats = [deepcopy(x_hat)]
-        source_norms = np.array(
-            [
-                0,
-            ]
-        )
 
         omega = np.array([])
         r = deepcopy(y)
-        residuals = np.array(
-            [
-                np.linalg.norm(y - self.leadfield_original @ x_hat),
-            ]
-        )
-        x_hats = [
-            deepcopy(x_hat),
-        ]
+        residuals = np.array([np.linalg.norm(r)])
 
-        for _i in range(n_chans):
-            # Use original leadfield for both selection and estimation (REMBO variant)
-            b = self.leadfield_original.T @ r
-            b_thresh = thresholding(b, K)
+        max_iter = min(n_chans, K)
+        for _ in range(max_iter):
+            # Use normalized atoms for selection to avoid superficial/high-norm bias.
+            b = self.leadfield_normed.T @ r
+            b_thresh = thresholding(b, 1)
             new_atoms = np.where(b_thresh != 0)[0]
             omega = np.append(omega, new_atoms)
             omega = np.unique(omega.astype(int))
@@ -241,14 +235,11 @@ class SolverREMBO(BaseSolver):
             r = y - self.leadfield_original @ x_hat
 
             residuals = np.append(residuals, np.linalg.norm(r))
-            source_norms = np.append(source_norms, np.sum(x_hat**2))
             x_hats.append(deepcopy(x_hat))
 
             # Early stopping if residual starts increasing
             if len(residuals) > 1 and residuals[-1] > residuals[-2]:
                 break
 
-        iters = np.arange(len(residuals)).astype(float)
-        corner_idx = find_corner(iters, residuals)
-        x_hat = x_hats[corner_idx]
+        x_hat = x_hats[int(np.argmin(residuals))]
         return x_hat

@@ -118,7 +118,7 @@ class SolverCOSAMP(BaseSolver):
             The data matrix (channels, time).
         K : ["auto", int]
             Positive integer determining the sparsity of the reconstructed
-            signal.
+            signal. If "auto", set to min(8, max(2, n_chans // 10)).
         rv_thresh : float
             The residual variance threshold as a stopping criterion. The
             smaller, the sooner the atom search is considered complete, i.e.,
@@ -134,7 +134,10 @@ class SolverCOSAMP(BaseSolver):
         _, n_dipoles = self.leadfield.shape
 
         if K == "auto":
-            K = int(n_chans / 2)
+            K = min(8, max(2, n_chans // 10))
+        K = int(K)
+        if K <= 0:
+            raise ValueError("K must be positive")
 
         x_hat = np.zeros(n_dipoles)
         x_hats = [deepcopy(x_hat)]
