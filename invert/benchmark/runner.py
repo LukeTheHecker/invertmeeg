@@ -440,6 +440,24 @@ def _apply_inverse_worker(
     return idx, metrics
 
 
+def _split_solver_params(
+    solver_params: dict[str, Any] | None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Split params into make/apply dictionaries using make__/apply__ prefixes."""
+    make_params: dict[str, Any] = {}
+    apply_params: dict[str, Any] = {}
+    if not solver_params:
+        return make_params, apply_params
+    for key, value in solver_params.items():
+        if key.startswith("apply__"):
+            apply_params[key.removeprefix("apply__")] = value
+        elif key.startswith("make__"):
+            make_params[key.removeprefix("make__")] = value
+        else:
+            make_params[key] = value
+    return make_params, apply_params
+
+
 def _compute_and_apply_worker(
     idx: int,
     solver_module: str,
@@ -452,6 +470,7 @@ def _compute_and_apply_worker(
     pos: np.ndarray,
     require_data: bool,
     noise_cov: mne.Covariance | None = None,
+    solver_params: dict[str, Any] | None = None,
 ) -> tuple[int, dict]:
     """Worker for computing fresh inverse operator per sample.
 
@@ -462,6 +481,7 @@ def _compute_and_apply_worker(
     mod = importlib.import_module(solver_module)
     solver_cls = getattr(mod, solver_class)
     solver = solver_cls()
+    make_params, apply_params = _split_solver_params(solver_params)
 
     evoked = mne.EvokedArray(x_sample, info, tmin=0.0, verbose=0)
     _make_inverse_operator_with_covariance(
@@ -471,8 +491,9 @@ def _compute_and_apply_worker(
         evoked=evoked,
         alpha="auto",
         noise_cov=noise_cov,
+        make_kwargs=make_params,
     )
-    stc = solver.apply_inverse_operator(evoked)
+    stc = solver.apply_inverse_operator(evoked, **apply_params)
     y_pred = stc.data
     metrics = evaluate_all(y_sample, y_pred, adjacency, adjacency, pos, pos)
     return idx, metrics
@@ -510,13 +531,17 @@ def _make_inverse_operator_with_covariance(
     evoked: mne.Evoked | None,
     alpha: str | float,
     noise_cov: mne.Covariance | None,
+    make_kwargs: dict[str, Any] | None = None,
 ) -> None:
     """Compute an inverse operator using an MNE covariance object."""
+    kwargs = dict(make_kwargs or {})
     if require_data:
         assert evoked is not None
-        solver.make_inverse_operator(forward, evoked, alpha=alpha, noise_cov=noise_cov)
+        solver.make_inverse_operator(
+            forward, evoked, alpha=alpha, noise_cov=noise_cov, **kwargs
+        )
     else:
-        solver.make_inverse_operator(forward, alpha=alpha, noise_cov=noise_cov)
+        solver.make_inverse_operator(forward, alpha=alpha, noise_cov=noise_cov, **kwargs)
 
 
 class SampleMetrics(BaseModel):
@@ -622,6 +647,9 @@ class BenchmarkRunner:
                     logger.info("  Solver: %s", solver_name)
                     solver_cls = get_solver_class(solver_name)
                     solver = solver_cls()
+                    make_params, apply_params = _split_solver_params(
+                        self.solver_params.get(solver_name, {})
+                    )
 
                     # Best-effort determinism for fair comparisons when a seed is provided.
                     if self.random_seed is not None:
@@ -648,7 +676,7 @@ class BenchmarkRunner:
                             int(train_sim_config.batch_size),
                             solver_name,
                         )
-                        params = dict(self.solver_params.get(solver_name, {}))
+                        params = dict(make_params)
                         alpha = params.pop("alpha", "auto")
                         solver.make_inverse_operator(
                             self.forward, train_sim_config, alpha=alpha, **params
@@ -663,7 +691,7 @@ class BenchmarkRunner:
                             evoked = mne.EvokedArray(
                                 x_batch[i], self.info, tmin=0.0, verbose=0
                             )
-                            stc = solver.apply_inverse_operator(evoked)
+                            stc = solver.apply_inverse_operator(evoked, **apply_params)
                             y_pred = stc.data
                             metrics = evaluate_all(
                                 y_batch[i], y_pred, adjacency, adjacency, pos, pos
@@ -685,6 +713,7 @@ class BenchmarkRunner:
                             evoked=evoked,
                             alpha="auto",
                             noise_cov=noise_cov,
+                            make_kwargs=make_params,
                         )
 
                         # Some solvers do not expose inverse operators, or may leave the
@@ -698,7 +727,9 @@ class BenchmarkRunner:
                                 evoked = mne.EvokedArray(
                                     x_batch[i], self.info, tmin=0.0, verbose=0
                                 )
-                                stc = solver.apply_inverse_operator(evoked)
+                                stc = solver.apply_inverse_operator(
+                                    evoked, **apply_params
+                                )
                                 y_pred = stc.data
                                 metrics = evaluate_all(
                                     y_batch[i], y_pred, adjacency, adjacency, pos, pos
@@ -765,6 +796,7 @@ class BenchmarkRunner:
                             ds_name,
                             solver_name,
                             noise_cov,
+                            self.solver_params.get(solver_name, {}),
                         )
 
                     result = self._aggregate(solver_name, ds_name, sample_metrics)
@@ -855,6 +887,7 @@ class BenchmarkRunner:
         ds_name: str,
         solver_name: str,
         noise_cov: mne.Covariance | None = None,
+        solver_params: dict[str, Any] | None = None,
     ) -> list[SampleMetrics]:
         """Parallelize full computation (require_recompute=True)."""
         if self.n_jobs == 1:
@@ -877,6 +910,7 @@ class BenchmarkRunner:
                     pos,
                     require_data,
                     noise_cov,
+                    solver_params,
                 )
                 sample_metrics.append(self._metrics_from_dict(metrics))
             return sample_metrics
@@ -897,6 +931,7 @@ class BenchmarkRunner:
                     pos,
                     require_data,
                     noise_cov,
+                    solver_params,
                 ): i
                 for i in range(self.n_samples)
             }
