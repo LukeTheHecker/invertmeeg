@@ -65,7 +65,10 @@ class SolverSelfRegularizedELORETA(BaseSolver):
         self.local_weight = (
             local_weight  # Weight for combining global and local selection
         )
-        return super().__init__(**kwargs)
+        super().__init__(**kwargs)
+        # eLORETA-family methods can require substantially stronger regularization
+        # under low SNR than BaseSolver's default grid covers.
+        self.r_values = np.logspace(-10, 4, int(max(self.n_reg_params, 1)))
 
     def make_inverse_operator(
         self,
@@ -100,11 +103,18 @@ class SolverSelfRegularizedELORETA(BaseSolver):
         self.stop_crit = stop_crit
         self.max_iter = max_iter
 
+        # Leadfield lives in whitened/projected sensor space after
+        # prepare_whitened_forward(). Inverse operators must map raw->source,
+        # so we post-multiply by the sensor transform.
         leadfield = self.leadfield
+        sensor_transform = self._sensor_transform
         n_chans = leadfield.shape[0]
 
         # Some pre-calculations
         I = np.identity(n_chans)
+
+        # Keep alpha scaling consistent with the transformed leadfield.
+        self.get_alphas(reference=leadfield @ leadfield.T)
 
         # No regularization leads to weird results with eLORETA
         if 0 in self.alphas and len(self.alphas) > 1:
@@ -132,7 +142,7 @@ class SolverSelfRegularizedELORETA(BaseSolver):
                 inner_term
             )
 
-            inverse_operators.append(inverse_operator)
+            inverse_operators.append(inverse_operator @ sensor_transform)
 
         self.inverse_operators = [
             InverseOperator(inverse_operator, self.name)
@@ -240,7 +250,6 @@ class SolverSelfRegularizedELORETA(BaseSolver):
 
         data = self.unpack_data_obj(mne_obj)
         self.validate_operator_data_compatibility(data)
-        data = self._sensor_transform @ data
 
         # Apply regularization method to get initial source estimate
         if self.use_last_alpha and self.last_reg_idx is not None:
@@ -342,7 +351,9 @@ class SolverSelfRegularizedELORETA(BaseSolver):
         ) @ pinv(inner_term)
 
         # Apply refined inverse operator to data
-        source_mat_candidates = inverse_operator_refined @ data
+        source_mat_candidates = (
+            inverse_operator_refined @ self._sensor_transform
+        ) @ data
 
         # Create full source matrix with zeros for non-selected sources
         n_sources = self.leadfield.shape[1]
