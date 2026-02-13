@@ -49,6 +49,9 @@ class SolverSMAP(BaseSolver):
         self.rank_tol = float(rank_tol)
         self.eps = float(eps)
         super().__init__(**kwargs)
+        # The BaseSolver default r-grid tops out at 1e1, which is often too
+        # narrow for SMAP's scaled Laplacian penalty. Widen the auto grid.
+        self.r_values = np.logspace(-10, 4, int(max(self.n_reg_params, 1)))
 
     def make_inverse_operator(
         self,

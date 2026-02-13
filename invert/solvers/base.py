@@ -432,21 +432,25 @@ class BaseSolver:
     def log_regularisation_edge_choice(self, *, optimum_idx: int, method: str) -> None:
         """Warn when alpha selection falls on the boundary of the search grid."""
         n_alphas = len(getattr(self, "alphas", []) or [])
-        if n_alphas <= 1:
+        inverse_ops = getattr(self, "inverse_operators", None)
+        n_tested = len(inverse_ops) if inverse_ops else n_alphas
+
+        # Only meaningful if the solver evaluated more than one candidate.
+        if n_tested <= 1:
             return
-        if optimum_idx not in (0, n_alphas - 1):
+        if optimum_idx not in (0, n_tested - 1):
             return
 
         edge = "lowest" if optimum_idx == 0 else "highest"
-        alpha = self.alphas[optimum_idx]
+        alpha = float(self.alphas[optimum_idx]) if optimum_idx < n_alphas else np.nan
         logger.warning(
             "%s selected the %s regularization parameter in the search range "
             "(idx=%d of %d, alpha=%.6e). Consider widening or shifting `r_values`.",
             method,
             edge,
             optimum_idx,
-            n_alphas - 1,
-            float(alpha),
+            n_tested - 1,
+            alpha,
         )
 
     def align_channel_sets(
@@ -1234,20 +1238,30 @@ class BaseSolver:
             inverse_operator.apply(M) for inverse_operator in self.inverse_operators
         ]
 
-        l2_norms = [np.linalg.norm(source_mat) for source_mat in source_mats]
+        l2_norms = np.asarray([np.linalg.norm(source_mat) for source_mat in source_mats])
 
         M_eff = _st @ M if _st is not None else M
-        residual_norms = [
-            np.linalg.norm(L_resid @ source_mat - M_eff) for source_mat in source_mats
-        ]
+        residual_norms = np.asarray(
+            [np.linalg.norm(L_resid @ source_mat - M_eff) for source_mat in source_mats]
+        )
 
-        optimum_idx = self.find_corner(l2_norms, residual_norms)
+        # L-curve corner finding is conventionally done in log-log space:
+        # x-axis: residual norm ||Gx - M||, y-axis: solution norm ||x||.
+        optimum_idx = self.find_corner(residual_norms, l2_norms)
 
         source_mat = source_mats[optimum_idx]
         if plot:
             plt.figure()
-            plt.plot(residual_norms, l2_norms, "ok")
-            plt.plot(residual_norms[optimum_idx], l2_norms[optimum_idx], "r*")
+            plt.loglog(residual_norms, l2_norms, "ok-")
+            plt.loglog(
+                residual_norms[optimum_idx],
+                l2_norms[optimum_idx],
+                "r*",
+                markersize=10,
+            )
+            plt.xlabel(r"Residual norm $\|Gx - M\|_2$")
+            plt.ylabel(r"Solution norm $\|x\|_2$")
+            plt.grid(True, which="both")
             alpha = self.alphas[optimum_idx]
             plt.title(f"L-Curve: {alpha}")
 
@@ -1519,16 +1533,22 @@ class BaseSolver:
             a.pop(idx)
         return a
 
-    def find_corner(self, r_vals, l2_norms):
-        """Find the corner of the l-curve given by plotting regularization
-        levels (r_vals) against norms of the inverse solutions (l2_norms).
+    def find_corner(self, residual_norms, solution_norms, eps: float = 1e-30):
+        """Find the corner of an L-curve in a numerically stable way.
+
+        Uses the maximum-area triangle heuristic on the *log-log* curve of
+        residual norm vs solution norm. Working in log space makes the method
+        invariant to global scaling and matches the conventional L-curve
+        definition used for Tikhonov-style regularization.
 
         Parameters
         ----------
-        r_vals : list
-            Levels of regularization
-        l2_norms : list
-            L2 norms of the inverse solutions per level of regularization.
+        residual_norms : array-like
+            Residual norms (e.g. ``||Gx - M||``) across the regularization grid.
+        solution_norms : array-like
+            Solution norms (e.g. ``||x||``) across the regularization grid.
+        eps : float
+            Floor applied before taking logs.
 
         Return
         ------
@@ -1536,21 +1556,40 @@ class BaseSolver:
             Index at which the L-Curve has its corner.
         """
 
-        # Normalize l2 norms
-        l2_norms /= np.max(l2_norms)
+        x = np.asarray(residual_norms, dtype=float)
+        y = np.asarray(solution_norms, dtype=float)
 
-        A = np.array([r_vals[0], l2_norms[0]])
-        C = np.array([r_vals[-1], l2_norms[-1]])
+        if x.size < 3:
+            return int(max(0, x.size - 1))
+
+        # Log-log coordinates (L-curve convention).
+        x = np.log10(np.maximum(x, eps))
+        y = np.log10(np.maximum(y, eps))
+
+        # Normalize both axes to keep the triangle metric well-scaled.
+        x_span = float(np.max(x) - np.min(x))
+        y_span = float(np.max(y) - np.min(y))
+        if x_span > 0:
+            x = (x - np.min(x)) / x_span
+        else:
+            x = x * 0.0
+        if y_span > 0:
+            y = (y - np.min(y)) / y_span
+        else:
+            y = y * 0.0
+
+        A = np.array([x[0], y[0]])
+        C = np.array([x[-1], y[-1]])
         areas = []
-        for j in range(1, len(l2_norms) - 1):
-            B = np.array([r_vals[j], l2_norms[j]])
+        for j in range(1, len(y) - 1):
+            B = np.array([x[j], y[j]])
             AB = self.euclidean_distance(A, B)
             AC = self.euclidean_distance(A, C)
             CB = self.euclidean_distance(C, B)
             area = abs(self.calc_area_tri(AB, AC, CB))
             areas.append(area)
         if len(areas) > 0:
-            idx = np.argmax(areas) + 1
+            idx = int(np.argmax(areas) + 1)
         else:
             idx = 0
 

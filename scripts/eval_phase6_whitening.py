@@ -8,7 +8,7 @@ Evaluates every fast solver on the *noisy* dataset (SNR -5..0 dB) under:
 All three conditions use the exact same simulated data (fixed seed) so
 differences are purely due to the covariance passed to each solver.
 
-Configuration:  biosemi32 / ico2 / 2 samples / seed 42
+Configuration:  biosemi32 / ico2 / 50 samples / seed 42
 Excludes:       ReciPSIICOS variants, neural networks, SESAME
 
 Usage:
@@ -56,7 +56,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-N_SAMPLES = 2
+N_SAMPLES = 50
 RANDOM_SEED = 42
 SAMPLING = "ico2"
 SENSOR_KIND = "biosemi32"
@@ -73,7 +73,7 @@ NOISY_DATASET: _NoisyDatasetConfig = {
     "n_sources": (1, 3),
     "n_orders": (0, 2),
     "snr_range": (-5.0, 0.0),
-    "n_timepoints": 2,
+    "n_timepoints": 200,
 }
 
 EXCLUDE_SOLVERS = [
@@ -160,7 +160,7 @@ def aggregate(per_sample: list[dict[str, float]]) -> dict[str, dict[str, float]]
 
 def main() -> None:
     print("=" * 72)
-    print("Phase 6: Whitening validation  (noisy dataset, ico2, 2 samples)")
+    print("Phase 6: Whitening validation  (noisy dataset, ico2, 50 samples)")
     print("=" * 72)
 
     # Forward model

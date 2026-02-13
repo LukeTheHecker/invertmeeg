@@ -107,6 +107,10 @@ class SolverSSLOFO(BaseSolver):
         self.time_window = time_window
         self.sloreta_alpha = sloreta_alpha
         super().__init__(**kwargs)
+        # The default BaseSolver r-grid (up to 1e1) can be too narrow once SSP
+        # projection/whitening changes the effective scaling. Widen it so GCV
+        # doesn't systematically saturate at the upper edge.
+        self.r_values = np.logspace(-10, 4, int(max(self.n_reg_params, 1)))
 
     def make_inverse_operator(
         self,
@@ -139,6 +143,11 @@ class SolverSSLOFO(BaseSolver):
 
         # Store original leadfield
         self.leadfield_full = deepcopy(self.leadfield)
+
+        # Regularization candidates must be scaled to the *effective* leadfield
+        # used for selection (whitened/projected space). BaseSolver computed
+        # alphas before whitening, so recompute here.
+        self.get_alphas(reference=self.leadfield_full @ self.leadfield_full.T)
 
         # Build MNE kernels for regularization selection. We intentionally run
         # selection on the unstandardized MNE operators and only use the chosen

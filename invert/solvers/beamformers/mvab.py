@@ -34,6 +34,7 @@ class SolverMVAB(BaseSolver):
         rank="auto",
         **kwargs,
     ):
+        kwargs.setdefault("regularisation_method", "L")
         self.name = name
         return super().__init__(reduce_rank=reduce_rank, rank=rank, **kwargs)
 

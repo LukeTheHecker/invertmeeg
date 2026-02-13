@@ -47,48 +47,27 @@ class SolverDSPM(BaseSolver):
         self,
         name="Dynamic Statistical Parametric Mapping",
         *,
-        lambda2_min: float = 1e-10,
-        lambda2_max: float = 1e2,
         depth: float = 0.8,
         depth_limit: float = 10.0,
+        use_noise_whitener: bool = True,
+        use_trace_normalization: bool = False,
         rank_tol: float = 1e-12,
         eps: float = 1e-15,
         **kwargs,
     ):
         self.name = name
-        self.lambda2_min = float(lambda2_min)
-        self.lambda2_max = float(lambda2_max)
         self.depth = float(depth)
         self.depth_limit = float(depth_limit)
+        self.use_noise_whitener = bool(use_noise_whitener)
+        self.use_trace_normalization = bool(use_trace_normalization)
         self.rank_tol = float(rank_tol)
         self.eps = float(eps)
 
         kwargs.setdefault("use_depth_weighting", False)
         super().__init__(**kwargs)
 
-        # dSPM now uses an MNE-style, trace-normalized formulation where the
-        # regularization parameter is dimensionless ``lambda2 = 1 / snr**2``.
-        # The BaseSolver default grid (spanning ~1e-10..1e15) is tuned for
-        # eigenvalue-scaled α and is far too coarse for lambda2 selection.
-        n_reg = int(max(getattr(self, "n_reg_params", 10), 1))
-        if self.lambda2_min <= 0:
-            raise ValueError(f"lambda2_min must be > 0, got {self.lambda2_min}")
-        if self.lambda2_max <= 0:
-            raise ValueError(f"lambda2_max must be > 0, got {self.lambda2_max}")
-        if self.lambda2_max < self.lambda2_min:
-            raise ValueError(
-                "lambda2_max must be >= lambda2_min, got "
-                f"{self.lambda2_max} < {self.lambda2_min}"
-            )
-
-        self.r_values = np.logspace(
-            np.log10(self.lambda2_min), np.log10(self.lambda2_max), n_reg
-        )
-        target = 1.0 / 9.0  # MNE default: snr=3 -> lambda2=1/9
-        idx = int(np.argmin(np.abs(self.r_values - target)))
-        self.r_values[idx] = target
-        # dSPM depends only on the forward model (and optional covariances).
-        # Marking this allows BenchmarkRunner to compute once per dataset.
+        # dSPM depends only on the forward model (and optional covariances),
+        # so it can be computed once per dataset.
         self.require_recompute = False
         self.require_data = False
         return None
@@ -104,20 +83,6 @@ class SolverDSPM(BaseSolver):
             super().prepare_forward()
         finally:
             self.use_depth_weighting = orig
-
-    def get_alphas(self, reference=None):  # noqa: ARG002
-        """Return lambda2 grid without eigenvalue scaling.
-
-        With whitening + trace normalization, ``lambda2`` is interpretable as
-        ``1 / snr**2`` (MNE-style). Scaling by leadfield/noise eigenvalues would
-        destroy this interpretability.
-        """
-        if self.alpha == "auto":
-            alphas = list(np.asarray(self.r_values, dtype=float))
-        else:
-            alphas = [float(self.alpha)]
-        self.alphas = alphas
-        return alphas
 
     def make_inverse_operator(
         self,
@@ -154,17 +119,43 @@ class SolverDSPM(BaseSolver):
 
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
 
-        wf = self.prepare_whitened_forward(
-            noise_cov,
-            apply_projector_when_no_cov=False,
-            source_cov=source_cov,
-            depth=self.depth if self.use_depth_weighting else None,
-            depth_limit=self.depth_limit,
-            trace_normalize=False,
-            precompute_svd=True,
-            rank_tol=self.rank_tol,
-            eps=self.eps,
-        )
+        if self.use_noise_whitener:
+            # If no covariance is provided, do not silently project; behave like
+            # MNE/wMNE and use an identity transform in that case.
+            if noise_cov is None:
+                wf = self.prepare_whitened_forward(
+                    None,
+                    apply_projector_when_no_cov=False,
+                    source_cov=source_cov,
+                    depth=self.depth if self.use_depth_weighting else None,
+                    depth_limit=self.depth_limit,
+                    trace_normalize=self.use_trace_normalization,
+                    precompute_svd=True,
+                    rank_tol=self.rank_tol,
+                    eps=self.eps,
+                )
+            else:
+                wf = self.prepare_whitened_forward(
+                    noise_cov,
+                    source_cov=source_cov,
+                    depth=self.depth if self.use_depth_weighting else None,
+                    depth_limit=self.depth_limit,
+                    trace_normalize=self.use_trace_normalization,
+                    precompute_svd=True,
+                    rank_tol=self.rank_tol,
+                    eps=self.eps,
+                )
+        else:
+            wf = self.prepare_whitened_forward(
+                None,
+                source_cov=source_cov,
+                depth=self.depth if self.use_depth_weighting else None,
+                depth_limit=self.depth_limit,
+                trace_normalize=self.use_trace_normalization,
+                precompute_svd=True,
+                rank_tol=self.rank_tol,
+                eps=self.eps,
+            )
         if wf.whitener_mode != "projected" and wf.whitener_mode != "none":
             logger.warning("dSPM whitener fallback used: %s", wf.whitener_mode)
 
@@ -182,13 +173,17 @@ class SolverDSPM(BaseSolver):
             left_scale = None
             svd = wf.svd
 
+        # Scale regularization candidates to match the effective matrix used for
+        # the Tikhonov solve (whitened/projected and optionally prior-weighted).
+        self.get_alphas(reference=tikhonov_matrix @ tikhonov_matrix.T)
+
         inverse_operators = []
         mne_operators = []
-        for lambda2 in self.alphas:
-            lambda2 = float(lambda2)
+        for alpha_eff in self.alphas:
+            alpha_eff = float(alpha_eff)
             K_white = self.solve_tikhonov_svd(
                 tikhonov_matrix,
-                lambda2,
+                alpha_eff,
                 left_scale=left_scale,
                 svd=svd,
                 eps=self.eps,

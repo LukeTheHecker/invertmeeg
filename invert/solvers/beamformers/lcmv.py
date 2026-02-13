@@ -45,6 +45,7 @@ class SolverLCMV(BaseSolver):
         eps: float = 1e-15,
         **kwargs,
     ):
+        kwargs.setdefault("regularisation_method", "L")
         self.name = name
         self.use_robust_covariance = bool(use_robust_covariance)
         self.rank_tol = float(rank_tol)

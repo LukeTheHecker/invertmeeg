@@ -320,3 +320,16 @@ def test_regularise_product_warns_when_alpha_choice_is_on_edge(
     assert optimum_idx == expected_idx
     assert "Product selected the" in caplog.text
     assert f"{edge_label} regularization parameter" in caplog.text
+
+
+def test_regularise_gcv_does_not_warn_when_only_one_operator_is_tested(caplog):
+    solver = BaseSolver(n_reg_params=4)
+    solver.leadfield = np.eye(2)
+    solver.alphas = [1e-9, 1e-6, 1e-3, 1e0]
+    solver.inverse_operators = [InverseOperator(np.eye(2), "test_single")]
+
+    caplog.set_level("WARNING")
+    _, optimum_idx = solver.regularise_gcv(np.eye(2), gamma=1.0, method="gcv")
+
+    assert optimum_idx == 0
+    assert "selected the" not in caplog.text
