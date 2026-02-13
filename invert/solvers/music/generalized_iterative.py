@@ -1,5 +1,6 @@
 import logging
 from copy import deepcopy
+from typing import Any
 
 import mne
 import numpy as np
@@ -52,7 +53,7 @@ class SolverGeneralizedIterative(BaseSolver):
     def make_inverse_operator(
         self,
         forward,
-        mne_obj,
+        mne_obj=None,
         *args,
         inverse_type="SSM",
         n_orders=3,
@@ -131,6 +132,8 @@ class SolverGeneralizedIterative(BaseSolver):
         if not self.is_prepared:
             self.prepare_flex()
 
+        self.get_source: Any
+        self.get_covariance: Any
         if inverse_type == "SSM":
             self.get_source = self.get_source_ssm
             self.get_covariance = self.get_covariance_ssm

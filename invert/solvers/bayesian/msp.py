@@ -98,7 +98,7 @@ class SolverMSP(BaseSolver):
     def make_inverse_operator(
         self,
         forward,
-        mne_obj,
+        mne_obj=None,
         *args,
         alpha="auto",
         noise_cov: mne.Covariance | None = None,
@@ -326,9 +326,9 @@ class SolverMSP(BaseSolver):
             grad_norm = np.linalg.norm(grad)
 
             if initial_grad_norm is None:
-                initial_grad_norm = max(grad_norm, 1e-10)
+                initial_grad_norm = float(max(float(grad_norm), 1e-10))
 
-            grad_rel = grad_norm / initial_grad_norm
+            grad_rel = float(grad_norm) / float(initial_grad_norm)
 
             lambdas = lambdas_new
 

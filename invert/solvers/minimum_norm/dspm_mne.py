@@ -133,10 +133,11 @@ class SolverDSPMMNE(BaseSolver):
             logger.warning("dSPM-MNE whitener fallback used: %s", wf.whitener_mode)
 
         inverse_operators = []
+        tikhonov_matrix = wf.A if wf.A is not None else wf.G_white
         for lambda2 in self.alphas:
             lambda2 = float(lambda2)
             K_white = self.solve_tikhonov_svd(
-                wf.A,
+                tikhonov_matrix,
                 lambda2,
                 left_scale=wf.R_sqrt,
                 svd=wf.svd,

@@ -70,7 +70,7 @@ def generate_data(forward, ds_config, noise_mode, n_samples=N_SAMPLES, seed=SEED
     if noise_mode == "structured":
         chunk_sizes = _split_evenly(n_samples, len(STRUCTURED_MODES))
         x_all, y_all, covs = [], [], []
-        for mode, size in zip(STRUCTURED_MODES, chunk_sizes):
+        for mode, size in zip(STRUCTURED_MODES, chunk_sizes, strict=True):
             cfg = SimulationConfig(
                 batch_size=size,
                 n_sources=ds_config.n_sources,

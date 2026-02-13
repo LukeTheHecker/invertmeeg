@@ -50,7 +50,7 @@ class SolverAlternatingProjections(BaseSolver):
     def make_inverse_operator(
         self,
         forward,
-        mne_obj,
+        mne_obj=None,
         *args,
         n_orders=3,
         alpha="auto",

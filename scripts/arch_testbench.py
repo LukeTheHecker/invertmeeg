@@ -41,10 +41,10 @@ _eval_mod = _ilu.module_from_spec(_spec)
 _spec.loader.exec_module(_eval_mod)
 evaluate_all = _eval_mod.evaluate_all
 
-from invert.forward import create_forward_model, get_info
-from invert.simulate import SimulationConfig, SimulationGenerator
-from invert.simulate.spatial import build_adjacency
-from invert.util.util import pos_from_forward
+from invert.forward import create_forward_model, get_info  # noqa: E402
+from invert.simulate import SimulationConfig, SimulationGenerator  # noqa: E402
+from invert.simulate.spatial import build_adjacency  # noqa: E402
+from invert.util.util import pos_from_forward  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,

@@ -37,7 +37,7 @@ class SolverGammaMAP(BaseSolver):
     def make_inverse_operator(
         self,
         forward,
-        mne_obj,
+        mne_obj=None,
         *args,
         alpha="auto",
         noise_cov: mne.Covariance | None = None,

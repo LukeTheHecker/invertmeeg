@@ -116,7 +116,7 @@ class SolverCovCNN(BaseSolver):
     def make_inverse_operator(
         self,
         forward,
-        simulation_config,
+        simulation_config=None,
         *args,
         parcellator=None,
         n_filters="auto",
@@ -504,7 +504,7 @@ class SolverCovCNN(BaseSolver):
             r_grid = np.asarray([float(self.alpha)], dtype=float)
         self.alphas = list(r_grid)
 
-        inverse_operators = []
+        inverse_operators: list[np.ndarray] = []
         for r in r_grid:
             reg_term = float(r) * np.trace(Sigma_y) / n_channels
             inverse_operator = (

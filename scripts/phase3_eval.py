@@ -117,7 +117,7 @@ def print_comparison(before_path: Path, after_path: Path) -> None:
     ]:
         print(f"\n--- {label} ---")
         print(f"  {'Solver':<22} {'Before':>10} {'After':>10} {'Delta':>10} {'%':>8}")
-        print(f"  {'-'*62}")
+        print(f"  {'-' * 62}")
         for solver in TARGET_SOLVERS:
             b = _avg_metric(b_summary, solver, metric)
             a = _avg_metric(a_summary, solver, metric)
@@ -144,7 +144,7 @@ def print_comparison(before_path: Path, after_path: Path) -> None:
             continue
         print(f"\n--- Ranks: {dataset} ---")
         print(f"  {'Solver':<22} {'Before':>8} {'After':>8} {'Delta':>8}")
-        print(f"  {'-'*54}")
+        print(f"  {'-' * 54}")
         for solver in TARGET_SOLVERS:
             b = b_ds.get(solver, float("nan"))
             a = a_ds.get(solver, float("nan"))

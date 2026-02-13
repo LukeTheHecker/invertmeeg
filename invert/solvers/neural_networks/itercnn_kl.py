@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from copy import deepcopy
-from typing import Any
+from typing import Any, cast
 
 import mne
 import numpy as np
@@ -134,12 +134,13 @@ class _IterCNNNet(nn.Module):
         # gamma: (batch, n_outputs) — raw logits, apply softmax for probabilities
         probs = torch.softmax(gamma, dim=-1)  # (batch, n_dipoles)
         # L @ diag(probs) @ L.T — batched
-        L = self.leadfield_t  # (n_channels, n_dipoles)
+        L = cast(torch.Tensor, self.leadfield_t)  # (n_channels, n_dipoles)
         # Scale leadfield columns by sqrt(probs) for efficient outer product
         # L_scaled: (batch, n_channels, n_dipoles)
-        L_scaled = L.unsqueeze(0) * probs.unsqueeze(1)  # broadcast
+        L_scaled = torch.unsqueeze(L, 0) * torch.unsqueeze(probs, 1)  # broadcast
         predicted_cov = torch.bmm(
-            L_scaled, L.T.unsqueeze(0).expand(gamma.shape[0], -1, -1)
+            L_scaled,
+            torch.unsqueeze(torch.transpose(L, 0, 1), 0).expand(gamma.shape[0], -1, -1),
         )
         # predicted_cov: (batch, n_channels, n_channels)
 
@@ -223,7 +224,7 @@ class SolverIterCNNKL(BaseSolver):
     def make_inverse_operator(
         self,
         forward,
-        simulation_config,
+        simulation_config=None,
         *args,
         n_dense_units: int = 300,
         n_dense_layers: int = 2,

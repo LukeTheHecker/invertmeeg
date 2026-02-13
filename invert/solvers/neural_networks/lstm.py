@@ -94,7 +94,7 @@ class SolverLSTM(BaseSolver):
     def make_inverse_operator(
         self,
         forward,
-        simulation_config,
+        simulation_config=None,
         *args,
         n_dense_units=300,
         n_lstm_units=75,

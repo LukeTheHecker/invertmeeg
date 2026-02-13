@@ -16,6 +16,7 @@ import json
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
+from typing import Literal, TypedDict
 
 import mne
 import numpy as np
@@ -38,6 +39,19 @@ METRIC_DIRECTIONS = {
     "average_precision": "max",
     "correlation": "max",
 }
+
+
+class _RealisticNoiseConfig(TypedDict):
+    correlation_mode: Literal["low_rank"]
+    noise_color_coeff: tuple[float, float]
+    noise_temporal_beta: tuple[float, float]
+    noise_rank_deficiency: tuple[int, int]
+    noise_low_rank_dim: tuple[int, int]
+    apply_sensor_projector: bool
+    return_noise_cov: bool
+    estimate_noise_cov: bool
+    noise_cov_n_baseline: int
+    noise_cov_shrinkage: float
 
 
 def _load_evaluate_all():
@@ -120,7 +134,7 @@ def main() -> Path:
     adjacency = mne.spatial_src_adjacency(forward["src"], verbose=0)
     pos = pos_from_forward(forward)
 
-    realistic_noise_cfg = {
+    realistic_noise_cfg: _RealisticNoiseConfig = {
         "correlation_mode": "low_rank",
         "noise_color_coeff": (0.4, 0.9),
         "noise_temporal_beta": (0.5, 1.5),

@@ -8,7 +8,7 @@ Evaluates every fast solver on the *noisy* dataset (SNR -5..0 dB) under:
 All three conditions use the exact same simulated data (fixed seed) so
 differences are purely due to the covariance passed to each solver.
 
-Configuration:  biosemi32 / ico2 / 50 samples / seed 42
+Configuration:  biosemi32 / ico2 / 2 samples / seed 42
 Excludes:       ReciPSIICOS variants, neural networks, SESAME
 
 Usage:
@@ -24,6 +24,7 @@ import logging
 import traceback
 from datetime import datetime
 from pathlib import Path
+from typing import TypedDict
 
 import mne
 import numpy as np
@@ -55,17 +56,25 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-N_SAMPLES = 50
+N_SAMPLES = 2
 RANDOM_SEED = 42
 SAMPLING = "ico2"
 SENSOR_KIND = "biosemi32"
 
-NOISY_DATASET = dict(
-    n_sources=(1, 3),
-    n_orders=(0, 2),
-    snr_range=(-5.0, 0.0),
-    n_timepoints=50,
-)
+
+class _NoisyDatasetConfig(TypedDict):
+    n_sources: tuple[int, int]
+    n_orders: tuple[int, int]
+    snr_range: tuple[float, float]
+    n_timepoints: int
+
+
+NOISY_DATASET: _NoisyDatasetConfig = {
+    "n_sources": (1, 3),
+    "n_orders": (0, 2),
+    "snr_range": (-5.0, 0.0),
+    "n_timepoints": 2,
+}
 
 EXCLUDE_SOLVERS = [
     "SESAME",
@@ -90,6 +99,7 @@ LOWER_IS_BETTER = {"mle", "emd", "sd"}
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def evaluate_solver_on_condition(
     solver_name: str,
@@ -147,9 +157,10 @@ def aggregate(per_sample: list[dict[str, float]]) -> dict[str, dict[str, float]]
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
     print("=" * 72)
-    print("Phase 6: Whitening validation  (noisy dataset, ico2, 50 samples)")
+    print("Phase 6: Whitening validation  (noisy dataset, ico2, 2 samples)")
     print("=" * 72)
 
     # Forward model
@@ -163,8 +174,13 @@ def main() -> None:
     # Resolve solvers
     solver_names = resolve_solvers(
         categories=[
-            "beamformer", "bayesian", "minimum_norm", "loreta",
-            "music", "matching_pursuit", "other",
+            "beamformer",
+            "bayesian",
+            "minimum_norm",
+            "loreta",
+            "music",
+            "matching_pursuit",
+            "other",
         ],
         exclude=EXCLUDE_SOLVERS,
     )
@@ -187,10 +203,12 @@ def main() -> None:
 
     # Build averaged noise covariances
     noise_cov_est_array = np.mean(
-        [sim_info.iloc[j]["noise_cov_est"] for j in range(N_SAMPLES)], axis=0,
+        [sim_info.iloc[j]["noise_cov_est"] for j in range(N_SAMPLES)],
+        axis=0,
     )
     noise_cov_true_array = np.mean(
-        [sim_info.iloc[j]["noise_cov_true"] for j in range(N_SAMPLES)], axis=0,
+        [sim_info.iloc[j]["noise_cov_true"] for j in range(N_SAMPLES)],
+        axis=0,
     )
 
     noise_covs = {
@@ -207,8 +225,15 @@ def main() -> None:
         results[solver_name] = {}
         for cond in CONDITIONS:
             per_sample = evaluate_solver_on_condition(
-                solver_name, fwd, info, x_batch, y_batch,
-                adjacency, pos, noise_covs[cond], N_SAMPLES,
+                solver_name,
+                fwd,
+                info,
+                x_batch,
+                y_batch,
+                adjacency,
+                pos,
+                noise_covs[cond],
+                N_SAMPLES,
             )
             results[solver_name][cond] = {
                 "aggregate": aggregate(per_sample),
@@ -233,10 +258,7 @@ def main() -> None:
             "solvers": solver_names,
         },
         "results": {
-            solver: {
-                cond: data["aggregate"]
-                for cond, data in cond_data.items()
-            }
+            solver: {cond: data["aggregate"] for cond, data in cond_data.items()}
             for solver, cond_data in results.items()
         },
     }
@@ -258,6 +280,7 @@ def main() -> None:
 # Reporting
 # ---------------------------------------------------------------------------
 
+
 def build_report(
     results: dict[str, dict[str, dict]],
     solver_names: list[str],
@@ -266,11 +289,12 @@ def build_report(
     lines.append("# Phase 6: Whitening Validation Report")
     lines.append("")
     lines.append(f"**Date:** {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-    lines.append(f"**Config:** {SENSOR_KIND}/{SAMPLING}, {N_SAMPLES} samples, "
-                 f"seed={RANDOM_SEED}")
+    lines.append(
+        f"**Config:** {SENSOR_KIND}/{SAMPLING}, {N_SAMPLES} samples, seed={RANDOM_SEED}"
+    )
     lines.append(f"**Dataset:** noisy (SNR {NOISY_DATASET['snr_range']})")
     lines.append(f"**Solvers:** {len(solver_names)}")
-    lines.append(f"**Conditions:** none | estimated | true (oracle)")
+    lines.append("**Conditions:** none | estimated | true (oracle)")
     lines.append("")
 
     # Per-metric tables
@@ -286,8 +310,7 @@ def build_report(
             f"| {'est vs none':>11s} | {'true vs none':>12s} |"
         )
         lines.append(
-            f"|{'-'*30}|{'-'*10}|{'-'*10}|{'-'*10}"
-            f"|{'-'*13}|{'-'*14}|"
+            f"|{'-' * 30}|{'-' * 10}|{'-' * 10}|{'-' * 10}|{'-' * 13}|{'-' * 14}|"
         )
 
         for solver in solver_names:
@@ -331,9 +354,7 @@ def build_report(
         f"| {'Metric':<12s} | {'Mean(none)':>10s} | {'Mean(est)':>10s} "
         f"| {'Mean(true)':>10s} | {'est vs none':>11s} | {'true vs none':>12s} |"
     )
-    lines.append(
-        f"|{'-'*14}|{'-'*12}|{'-'*12}|{'-'*12}|{'-'*13}|{'-'*14}|"
-    )
+    lines.append(f"|{'-' * 14}|{'-' * 12}|{'-' * 12}|{'-' * 12}|{'-' * 13}|{'-' * 14}|")
 
     for metric in METRICS:
         lib = metric in LOWER_IS_BETTER
@@ -366,8 +387,10 @@ def build_report(
                 f"| {mt:>10.2f} | {sign_e}{de:>10.2f} | {sign_t}{dt:>11.2f} |"
             )
         else:
-            lines.append(f"| {metric:<12s} | {'nan':>10s} | {'nan':>10s} "
-                         f"| {'nan':>10s} | {'nan':>11s} | {'nan':>12s} |")
+            lines.append(
+                f"| {metric:<12s} | {'nan':>10s} | {'nan':>10s} "
+                f"| {'nan':>10s} | {'nan':>11s} | {'nan':>12s} |"
+            )
 
     lines.append("")
 

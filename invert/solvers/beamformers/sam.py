@@ -36,7 +36,7 @@ class SolverSAM(BaseSolver):
     def make_inverse_operator(
         self,
         forward,
-        mne_obj,
+        mne_obj=None,
         *args,
         weight_norm=True,
         alpha="auto",
@@ -77,12 +77,12 @@ class SolverSAM(BaseSolver):
         inverse_operators = []
         for alpha in self.alphas:
             C_inv = self.robust_inverse(C + alpha * I)
-            W = []
+            weights: list[np.ndarray] = []
             for i in range(n_dipoles):
                 l = leadfield[:, i][:, np.newaxis]
                 w = (C_inv @ l) / (l.T @ C_inv @ l)
-                W.append(w)
-            W = np.stack(W, axis=1)[:, :, 0]
+                weights.append(w)
+            W = np.stack(weights, axis=1)[:, :, 0]
             if self.weight_norm:
                 W = W / np.linalg.norm(W, axis=0)
             inverse_operator = W.T @ wf.sensor_transform

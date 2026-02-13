@@ -205,7 +205,7 @@ class BaseSolver:
         self.prep_leadfield = prep_leadfield
         self.use_depth_weighting = use_depth_weighting
         self.use_last_alpha = use_last_alpha
-        self.last_reg_idx = None
+        self.last_reg_idx: int | None = None
         self.rank = rank
         self.depth_weighting = depth_weighting
         self.depth_weights = None
@@ -219,6 +219,15 @@ class BaseSolver:
         self.r1gcv_gamma = r1gcv_gamma
         self.require_recompute = True
         self.require_data = True
+        # Attributes populated during operator construction.
+        self.forward: Any = None
+        self.leadfield: np.ndarray = np.empty((0, 0), dtype=float)
+        self.inverse_operators: list[InverseOperator] = []
+        self._leadfield_orig: np.ndarray | None = None
+        self._sensor_transform: np.ndarray | None = None
+        self._operator_ch_names: tuple[str, ...] = tuple()
+        self._last_data_ch_names: tuple[str, ...] | None = None
+        self._last_input_data_ch_names: tuple[str, ...] | None = None
 
     def make_inverse_operator(
         self,
@@ -755,7 +764,7 @@ class BaseSolver:
             forward_or_info = getattr(self, "forward", None)
 
         if n_chans is None:
-            if hasattr(self, "leadfield"):
+            if self.leadfield.size:
                 n_chans = int(self.leadfield.shape[0])
             elif forward_or_info is not None:
                 try:
@@ -1420,9 +1429,6 @@ class BaseSolver:
             optimum_idx = valid_idx_positions[min_pos]
 
         if plot and len(self.alphas) == len(gcv_values):
-            print(f"Alphas and {method.upper()} values:")
-            print(self.alphas)
-            print(gcv_values)
             plt.figure()
             plt.semilogx(
                 self.alphas, gcv_values, "o-", label=f"{method.upper()} values"

@@ -217,7 +217,7 @@ for i, metric in enumerate(metrics_to_plot):
 
     # Handle NaN values for plotting
     plot_values = [0 if np.isnan(v) else v for v in values]
-    plot_errors = [0 if np.isnan(v) else e for v, e in zip(values, errors)]
+    plot_errors = [0 if np.isnan(v) else e for v, e in zip(values, errors, strict=True)]
     colors = ["red" if np.isnan(v) else "steelblue" for v in values]
 
     # Create bar plot with error bars
@@ -231,7 +231,7 @@ for i, metric in enumerate(metrics_to_plot):
     ax.tick_params(axis="x", rotation=45)
 
     # Add value labels on bars
-    for bar, value, error in zip(bars, values, errors):
+    for bar, value, error in zip(bars, values, errors, strict=True):
         height = bar.get_height()
         if np.isnan(value):
             label = "NaN"

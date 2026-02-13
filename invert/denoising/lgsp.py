@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, TypeAlias
 
 import mne
 import numpy as np
@@ -7,7 +7,7 @@ from scipy.linalg import eigh
 from sklearn.covariance import OAS
 
 ArrayLike = np.ndarray
-MNEObj = mne.io.BaseRaw | mne.Epochs | mne.Evoked | mne.EvokedArray
+MNEObj: TypeAlias = mne.io.BaseRaw | mne.Epochs | mne.Evoked | mne.EvokedArray
 
 
 # ============================

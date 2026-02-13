@@ -86,7 +86,7 @@ class SolverFC(BaseSolver):
     def make_inverse_operator(
         self,
         forward,
-        simulation_config,
+        simulation_config=None,
         *args,
         n_dense_units=300,
         activation_function="tanh",

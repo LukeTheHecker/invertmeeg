@@ -192,7 +192,7 @@ class SolverRawCNNKLLCMV(BaseSolver):
     def make_inverse_operator(
         self,
         forward,
-        simulation_config,
+        simulation_config=None,
         *args,
         n_dense_units: int = 300,
         n_dense_layers: int = 2,

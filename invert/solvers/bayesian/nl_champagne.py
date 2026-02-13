@@ -40,7 +40,7 @@ class SolverNLChampagne(BaseSolver):
     def make_inverse_operator(
         self,
         forward,
-        mne_obj,
+        mne_obj=None,
         *args,
         alpha="auto",
         max_iter=1000,
