@@ -74,9 +74,6 @@ class SolverGammaMAP(BaseSolver):
         n_chans, n_dipoles = leadfield.shape
         data = self.unpack_data_obj(mne_obj)
         data = wf.sensor_transform @ data
-        data_cov = self.data_covariance(data, center=True, ddof=1)
-        self.get_alphas(reference=data_cov)
-
         if smoothness_prior:
             adjacency = mne.spatial_src_adjacency(self.forward["src"], verbose=0)
             self.gradient = laplacian(adjacency).toarray().astype(np.float32)
@@ -84,6 +81,15 @@ class SolverGammaMAP(BaseSolver):
         else:
             self.gradient = None
             self.sigma_s = np.identity(n_dipoles)
+
+        # Scale regularization against the actual sensor-space model term
+        # that alpha regularizes: Sigma_b = alpha*I + L*Sigma_s*L^T.
+        reg_reference = leadfield @ self.sigma_s @ leadfield.T
+        reg_reference = 0.5 * (reg_reference + reg_reference.T)
+        data_cov = self.data_covariance(data, center=True, ddof=1)
+        if not np.all(np.isfinite(reg_reference)) or np.linalg.norm(reg_reference) == 0:
+            reg_reference = data_cov
+        self.get_alphas(reference=reg_reference)
 
         inverse_operators = []
         for alpha in self.alphas:
@@ -126,27 +132,36 @@ class SolverGammaMAP(BaseSolver):
         L -= L.mean(axis=0)
 
         # Data Covariance Matrix
-        gammas = np.ones(ds)
-        sigma_e = alpha * np.identity(db)
-
-        sigma_b = sigma_e + L @ self.sigma_s @ L.T
-        sigma_b_inv = np.linalg.inv(sigma_b)
+        gammas = np.ones(ds, dtype=float)
+        sigma_e = float(alpha) * np.identity(db)
 
         for _k in range(max_iter):
-            old_gammas = deepcopy(gammas)
+            old_gammas = gammas.copy()
+
+            # Update the effective sensor covariance given current gammas.
+            sigma_s_hat = np.diag(gammas) @ self.sigma_s
+            sigma_b = sigma_e + L @ sigma_s_hat @ L.T
+            sigma_b = 0.5 * (sigma_b + sigma_b.T)
+            sigma_b_inv = np.linalg.inv(sigma_b)
 
             # according to equation (30)
             term_1 = (gammas / np.sqrt(n)) * np.sqrt(
                 np.sum((L.T @ sigma_b_inv @ B) ** 2, axis=1)
             )
-            term_2 = 1 / np.sqrt(np.diagonal(L.T @ sigma_b_inv @ L))
+            denom = np.diagonal(L.T @ sigma_b_inv @ L)
+            denom = np.maximum(denom, 1e-15)
+            term_2 = 1 / np.sqrt(denom)
 
             gammas = term_1 * term_2
-            if np.linalg.norm(gammas) == 0:
+            if not np.all(np.isfinite(gammas)) or np.linalg.norm(gammas) == 0:
                 gammas = old_gammas
                 break
 
-        gammas_final = gammas / gammas.max()
+        gamma_max = float(np.max(gammas))
+        if not np.isfinite(gamma_max) or gamma_max <= 0:
+            gammas_final = np.ones_like(gammas)
+        else:
+            gammas_final = gammas / gamma_max
         sigma_s_hat = (
             np.diag(gammas_final) @ self.sigma_s
         )  #  np.array([gammas_final[i] * C[i] for i in range(ds)])

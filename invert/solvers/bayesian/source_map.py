@@ -72,9 +72,6 @@ class SolverSourceMAP(BaseSolver):
         data = wf.sensor_transform @ data
         leadfield = self.leadfield
         n_chans, n_dipoles = leadfield.shape
-        data_cov = self.data_covariance(data, center=True, ddof=1)
-        self.get_alphas(reference=data_cov)
-
         if smoothness_prior:
             adjacency = mne.spatial_src_adjacency(self.forward["src"], verbose=0)
             self.gradient = laplacian(adjacency).toarray().astype(np.float32)
@@ -82,6 +79,15 @@ class SolverSourceMAP(BaseSolver):
         else:
             self.gradient = None
             self.sigma_s = np.identity(n_dipoles)
+
+        # Scale regularization against the actual sensor-space model term
+        # that alpha regularizes: Sigma_b = alpha*I + L*Sigma_s*L^T.
+        reg_reference = leadfield @ self.sigma_s @ leadfield.T
+        reg_reference = 0.5 * (reg_reference + reg_reference.T)
+        data_cov = self.data_covariance(data, center=True, ddof=1)
+        if not np.all(np.isfinite(reg_reference)) or np.linalg.norm(reg_reference) == 0:
+            reg_reference = data_cov
+        self.get_alphas(reference=reg_reference)
 
         inverse_operators = []
         for alpha in self.alphas:
@@ -126,33 +132,43 @@ class SolverSourceMAP(BaseSolver):
         # Ensure Common average reference
         B -= B.mean(axis=0)
         L -= L.mean(axis=0)
-        L /= np.linalg.norm(L, axis=0)
 
         # Data Covariance Matrix
         # Cb = B @ B.T
-        gammas = np.ones(ds)
-        sigma_e = alpha * np.identity(db)
-
-        sigma_b = sigma_e + L @ self.sigma_s @ L.T
-        sigma_b_inv = np.linalg.inv(sigma_b)
+        gammas = np.ones(ds, dtype=float)
+        sigma_e = float(alpha) * np.identity(db)
+        exponent = float((2.0 - p) / 2.0)
+        exponent = float(np.clip(exponent, 1e-6, 2.0))
 
         for _k in range(max_iter):
             # print(k)
-            old_gammas = deepcopy(gammas)
+            old_gammas = gammas.copy()
 
-            gammas = (
-                (1 / n)
-                * np.sqrt(
-                    np.sum((np.diag(gammas) @ L.T @ sigma_b_inv @ B) ** 2, axis=1)
-                )
-            ) ** ((2 - p) / 2)
+            # Update the effective sensor covariance given current gammas.
+            sigma_s_hat = np.diag(gammas) @ self.sigma_s
+            sigma_b = sigma_e + L @ sigma_s_hat @ L.T
+            sigma_b = 0.5 * (sigma_b + sigma_b.T)
+            sigma_b_inv = np.linalg.inv(sigma_b)
 
-            if np.linalg.norm(gammas) == 0:
+            # Source-MAP update: Gamma-MAP-style relevance term with p-controlled sparsity.
+            term_1 = (gammas / np.sqrt(n)) * np.sqrt(
+                np.sum((L.T @ sigma_b_inv @ B) ** 2, axis=1)
+            )
+            denom = np.diagonal(L.T @ sigma_b_inv @ L)
+            denom = np.maximum(denom, 1e-15)
+            term_2 = 1.0 / np.sqrt(denom)
+            gammas = np.maximum(term_1 * term_2, 1e-15) ** exponent
+
+            if not np.all(np.isfinite(gammas)) or np.linalg.norm(gammas) == 0:
                 gammas = old_gammas
                 break
             # gammas /= np.linalg.norm(gammas)
 
-        gammas_final = gammas / gammas.max()
+        gamma_max = float(np.max(gammas))
+        if not np.isfinite(gamma_max) or gamma_max <= 0:
+            gammas_final = np.ones_like(gammas)
+        else:
+            gammas_final = gammas / gamma_max
         sigma_s_hat = (
             np.diag(gammas_final) @ self.sigma_s
         )  #  np.array([gammas_final[i] * C[i] for i in range(ds)])
