@@ -175,6 +175,9 @@ class BaseSolver:
     """
 
     meta: SolverMeta | None = None
+    # Default regularization grid exponents for r_values = logspace(min_exp, max_exp, n_reg_params).
+    # Solver subclasses can override this to widen/shift the search grid without affecting others.
+    R_VALUE_EXPONENTS: tuple[float, float] = (-10.0, 1.0)
 
     def __init__(
         self,
@@ -197,7 +200,8 @@ class BaseSolver:
     ) -> None:
         self.verbose = verbose
 
-        self.r_values = np.logspace(-10, 1, n_reg_params)
+        min_exp, max_exp = getattr(self, "R_VALUE_EXPONENTS", (-10.0, 1.0))
+        self.r_values = np.logspace(float(min_exp), float(max_exp), n_reg_params)
         # self.r_values = np.logspace(7, 9, n_reg_params)
 
         self.n_reg_params = n_reg_params
@@ -444,9 +448,10 @@ class BaseSolver:
         edge = "lowest" if optimum_idx == 0 else "highest"
         alpha = float(self.alphas[optimum_idx]) if optimum_idx < n_alphas else np.nan
         logger.warning(
-            "%s selected the %s regularization parameter in the search range "
+            "%s selected the %s regularization parameter for %s in the search range "
             "(idx=%d of %d, alpha=%.6e). Consider widening or shifting `r_values`.",
             method,
+            self.name,
             edge,
             optimum_idx,
             n_tested - 1,
@@ -1231,6 +1236,14 @@ class BaseSolver:
 
         """
 
+        if not self.inverse_operators:
+            msg = (
+                "No inverse operators available for regularisation. "
+                "Call make_inverse_operator() and ensure it populates "
+                "self.inverse_operators before apply_inverse_operator()."
+            )
+            raise ValueError(msg)
+
         L_resid = self.leadfield  # G_white if whitened, else original
         _st = getattr(self, "_sensor_transform", None)
 
@@ -1351,6 +1364,14 @@ class BaseSolver:
             parameter for correlated data; Comparing parameter choice methods
             for regularization of ill-posed problems.
         """
+        if not self.inverse_operators:
+            msg = (
+                "No inverse operators available for regularisation. "
+                "Call make_inverse_operator() and ensure it populates "
+                "self.inverse_operators before apply_inverse_operator()."
+            )
+            raise ValueError(msg)
+
         method = method.lower()
         # Trace: use ORIGINAL leadfield (correct by cyclic property of trace)
         _lo = getattr(self, "_leadfield_orig", None)
@@ -1492,6 +1513,14 @@ class BaseSolver:
         rehabilitation, 5(1), 1-33.
 
         """
+
+        if not self.inverse_operators:
+            msg = (
+                "No inverse operators available for regularisation. "
+                "Call make_inverse_operator() and ensure it populates "
+                "self.inverse_operators before apply_inverse_operator()."
+            )
+            raise ValueError(msg)
 
         L_resid = self.leadfield  # G_white if whitened, else original
         _st = getattr(self, "_sensor_transform", None)
