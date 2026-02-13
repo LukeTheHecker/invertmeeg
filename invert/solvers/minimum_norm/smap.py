@@ -104,8 +104,9 @@ class SolverSMAP(BaseSolver):
         LTL = leadfield.T @ leadfield
 
         adjacency = mne.spatial_src_adjacency(self.forward["src"], verbose=0)
-        gradient = laplacian(adjacency)
-        GTG = (gradient.T @ gradient).toarray()
+        # First-order Laplacian smoothness: x^T L x (graph Laplacian), rather
+        # than squaring the Laplacian as in LORETA-style penalties.
+        GTG = laplacian(adjacency).astype(float).toarray()
 
         if alpha == "auto":
             r_grid = np.asarray(self.r_values, dtype=float)

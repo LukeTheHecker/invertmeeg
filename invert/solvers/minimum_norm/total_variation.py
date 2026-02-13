@@ -35,11 +35,57 @@ class SolverTotalVariation(BaseSolver):
         ],
     )
 
-    def __init__(self, name: str = "Total Variation", **kwargs: Any) -> None:
+    def __init__(
+        self,
+        name: str = "Total Variation",
+        default_tv_weight: float = 0.01,
+        default_ridge: float | None = None,
+        default_n_irls: int = 8,
+        default_eps: float = 1e-3,
+        default_cg_tol: float = 1e-4,
+        default_cg_max_iter: int = 200,
+        auto_scale_hyperparams: bool = True,
+        **kwargs: Any,
+    ) -> None:
         self.name = name
         self._edges_i: np.ndarray | None = None
         self._edges_j: np.ndarray | None = None
+        self.default_tv_weight = float(default_tv_weight)
+        self.default_ridge = (
+            None if default_ridge is None else max(float(default_ridge), 1e-15)
+        )
+        self.default_n_irls = int(default_n_irls)
+        self.default_eps = float(default_eps)
+        self.default_cg_tol = float(default_cg_tol)
+        self.default_cg_max_iter = int(default_cg_max_iter)
+        self.auto_scale_hyperparams = bool(auto_scale_hyperparams)
         super().__init__(**kwargs)
+
+    @staticmethod
+    def _auto_scaled_hyperparams(
+        L: np.ndarray,
+        edges_i: np.ndarray,
+        edges_j: np.ndarray,
+        *,
+        tv_weight: float,
+        ridge: float | None,
+    ) -> tuple[float, float]:
+        """Map dimensionless TV/ridge knobs onto the current whitened operator scale."""
+        LTL_diag = np.sum(L * L, axis=0)
+        data_scale = max(float(np.median(LTL_diag)), 1e-12)
+
+        degree = np.bincount(
+            np.concatenate([edges_i, edges_j]), minlength=L.shape[1]
+        ).astype(float)
+        lap_scale = max(float(np.median(degree)), 1.0)
+
+        lam = max(float(tv_weight), 0.0) * (data_scale / lap_scale)
+        if ridge is None:
+            # A small data-scale ridge stabilizes CG while preserving TV structure.
+            ridge_eff = 0.01 * data_scale
+        else:
+            ridge_eff = max(float(ridge), 1e-15)
+        return lam, ridge_eff
 
     def make_inverse_operator(
         self,
@@ -63,12 +109,13 @@ class SolverTotalVariation(BaseSolver):
     def apply_inverse_operator(
         self,
         mne_obj,
-        tv_weight: float = 0.1,
-        n_irls: int = 8,
-        eps: float = 1e-3,
+        tv_weight: float | None = None,
+        n_irls: int | None = None,
+        eps: float | None = None,
         ridge: float | None = None,
-        cg_tol: float = 1e-4,
-        cg_max_iter: int = 200,
+        cg_tol: float | None = None,
+        cg_max_iter: int | None = None,
+        auto_scale_hyperparams: bool | None = None,
     ):  # type: ignore[override]
         if self._edges_i is None or self._edges_j is None:
             raise RuntimeError(
@@ -82,17 +129,38 @@ class SolverTotalVariation(BaseSolver):
         n_chans, n_sources = L.shape
         n_time = Y.shape[1]
 
+        if tv_weight is None:
+            tv_weight = self.default_tv_weight
+        if n_irls is None:
+            n_irls = self.default_n_irls
+        if eps is None:
+            eps = self.default_eps
+        if cg_tol is None:
+            cg_tol = self.default_cg_tol
+        if cg_max_iter is None:
+            cg_max_iter = self.default_cg_max_iter
         if ridge is None:
-            ridge = (
-                float(self.alphas[0])
-                if hasattr(self, "alphas") and self.alphas
-                else 1e-6
-            )
-        ridge = max(float(ridge), 1e-15)
-        lam = max(float(tv_weight), 0.0)
+            ridge = self.default_ridge
+        if auto_scale_hyperparams is None:
+            auto_scale_hyperparams = self.auto_scale_hyperparams
 
         LLT = L @ L.T
-        K_mne = np.linalg.solve(LLT + ridge * np.eye(n_chans), L).T
+        if auto_scale_hyperparams:
+            lam, ridge_eff = self._auto_scaled_hyperparams(
+                L,
+                self._edges_i,
+                self._edges_j,
+                tv_weight=float(tv_weight),
+                ridge=ridge,
+            )
+        else:
+            lam = max(float(tv_weight), 0.0)
+            if ridge is None:
+                ridge_eff = 1e-6
+            else:
+                ridge_eff = max(float(ridge), 1e-15)
+
+        K_mne = np.linalg.solve(LLT + ridge_eff * np.eye(n_chans), L).T
         X = K_mne @ Y
 
         edges_i = self._edges_i
@@ -116,7 +184,7 @@ class SolverTotalVariation(BaseSolver):
             Lap = build_weighted_laplacian(w)
 
             def matvec(v: np.ndarray, Lap_val: np.ndarray = Lap) -> np.ndarray:
-                return L.T @ (L @ v) + lam * (Lap_val @ v) + ridge * v
+                return L.T @ (L @ v) + lam * (Lap_val @ v) + ridge_eff * v
 
             A = LinearOperator((n_sources, n_sources), matvec=matvec, dtype=np.float64)
 

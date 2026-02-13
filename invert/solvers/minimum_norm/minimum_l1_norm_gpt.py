@@ -156,20 +156,26 @@ class SolverMinimumL1NormGPT(BaseSolver):
             A *= depth_weights
 
         y_scaled = y.copy()
-        # Rereference
-        y_scaled -= y_scaled.mean()
         # Scale to unit norm
         norm_y = np.linalg.norm(y_scaled)
+        if norm_y <= 1e-15:
+            return np.zeros(A.shape[1], dtype=float)
         y_scaled /= norm_y
 
         # Compute step size from Lipschitz constant
         L = np.linalg.norm(A, ord=2) ** 2
+        if not np.isfinite(L) or L <= 1e-15:
+            return np.zeros(A.shape[1], dtype=float)
         lr = 1.0 / L
 
         # Calculate initial guess
         x0 = np.linalg.pinv(A) @ y_scaled
         # Scale to unit norm
-        x0 /= np.linalg.norm(x0)
+        x0_norm = np.linalg.norm(x0)
+        if x0_norm > 1e-15:
+            x0 /= x0_norm
+        else:
+            x0 = np.zeros_like(x0)
 
         x = x0.copy()
 
