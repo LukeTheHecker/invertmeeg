@@ -62,6 +62,11 @@ def _read_json_sanitized(path: Path) -> dict[str, Any]:
     return obj
 
 
+def _has_results_list(data: dict[str, Any]) -> bool:
+    """Check if data has the expected leaderboard format: top-level 'results' as list."""
+    return isinstance(data.get("results"), list)
+
+
 def _list_runs(results_dir: Path) -> list[Path]:
     release_dir = results_dir / "release"
     if release_dir.is_dir():
@@ -70,6 +75,19 @@ def _list_runs(results_dir: Path) -> list[Path]:
             return release_runs
     # Legacy fallback
     return sorted(results_dir.glob("benchmark_results*.json"))
+
+
+def _filter_valid_runs(paths: list[Path]) -> list[Path]:
+    """Keep only paths whose JSON has top-level 'results' as a list."""
+    valid: list[Path] = []
+    for p in paths:
+        try:
+            data = _read_json_sanitized(p)
+            if _has_results_list(data):
+                valid.append(p)
+        except (ValueError, json.JSONDecodeError):
+            pass
+    return valid
 
 
 def _get_default_run_id(paths: list[Path]) -> str | None:
@@ -400,9 +418,11 @@ def main() -> None:
     if not results_dir.exists():
         raise RuntimeError(f"Missing results directory: {results_dir}")
 
-    run_paths = _list_runs(results_dir)
+    run_paths = _filter_valid_runs(_list_runs(results_dir))
     if not run_paths:
-        raise RuntimeError(f"No benchmark results found in {results_dir}")
+        raise RuntimeError(
+            f"No benchmark results with 'results' list found in {results_dir}"
+        )
 
     default_run_id = _get_default_run_id(run_paths)
     manifest: dict[str, Any] = {"default_run": default_run_id, "runs": []}
