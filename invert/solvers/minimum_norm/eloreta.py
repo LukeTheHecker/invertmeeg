@@ -49,6 +49,9 @@ class SolverELORETA(BaseSolver):
         self.rank_tol = float(rank_tol)
         self.eps = float(eps)
         super().__init__(**kwargs)
+        # eLORETA can require strong regularization under low SNR; widen the
+        # default grid so selection does not systematically saturate at the edge.
+        self.r_values = np.logspace(-10, 4, int(max(self.n_reg_params, 1)))
         self.require_recompute = False
         self.require_data = False
 

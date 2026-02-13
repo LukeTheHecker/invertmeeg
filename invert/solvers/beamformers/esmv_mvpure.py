@@ -38,6 +38,7 @@ class SolverESMVMVPURE(BaseSolver):
             "Inverse Problem: An Extension to MNE-Python. arXiv preprint arXiv:2509.14118.",
         ],
     )
+    R_VALUE_EXPONENTS = (-16.0, 1.0)
 
     def __init__(
         self,

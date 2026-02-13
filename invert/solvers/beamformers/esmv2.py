@@ -31,6 +31,7 @@ class SolverESMV2(BaseSolver):
             "Biomedical Signal Processing and Control, 14, 175-188.",
         ],
     )
+    R_VALUE_EXPONENTS = (-16.0, 1.0)
 
     def __init__(
         self, name="ESMV2 Beamformer", reduce_rank=True, rank="auto", **kwargs

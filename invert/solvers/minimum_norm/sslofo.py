@@ -153,6 +153,7 @@ class SolverSSLOFO(BaseSolver):
         # selection on the unstandardized MNE operators and only use the chosen
         # alpha for the SSLOFO iterations (analogous to the sLORETA fix).
         leadfield = self.leadfield_full
+        sensor_transform = self._sensor_transform
         n_chans = leadfield.shape[0]
         LLT = leadfield @ leadfield.T
         I = np.identity(n_chans)
@@ -160,7 +161,11 @@ class SolverSSLOFO(BaseSolver):
         mne_operators = []
         for alpha_eff in self.alphas:
             inner_inv = np.linalg.pinv(LLT + alpha_eff * I)
-            mne_operators.append(leadfield.T @ inner_inv)
+            op_eff = leadfield.T @ inner_inv
+            # Make operators compatible with BaseSolver regularisation selection:
+            # regularise_* expects raw sensor data and uses _sensor_transform for
+            # residuals. Therefore inverse operators must map raw->source.
+            mne_operators.append(op_eff @ sensor_transform)
 
         self.inverse_operators = [
             InverseOperator(op, self.name) for op in mne_operators
@@ -181,19 +186,23 @@ class SolverSSLOFO(BaseSolver):
         stc : mne.SourceEstimate
             The source estimate.
         """
-        data = self.unpack_data_obj(mne_obj)
-        self.validate_operator_data_compatibility(data)
-        data = self._sensor_transform @ data
-        if data.ndim == 1:
-            data = data[:, np.newaxis]
+        data_raw = self.unpack_data_obj(mne_obj)
+        self.validate_operator_data_compatibility(data_raw)
+        if data_raw.ndim == 1:
+            data_raw = data_raw[:, np.newaxis]
 
         if self.use_last_alpha and self.last_reg_idx is not None:
             idx = int(self.last_reg_idx)
         else:
-            idx = self._select_regularization_idx(data)
+            # Select alpha on raw data. BaseSolver regularise_* methods will
+            # apply _sensor_transform internally for residuals.
+            idx = self._select_regularization_idx(data_raw)
             self.last_reg_idx = idx
 
         alpha = self.alphas[int(np.clip(idx, 0, len(self.alphas) - 1))]
+
+        # SSLOFO iterations operate in whitened/projected sensor space.
+        data = self._sensor_transform @ data_raw
 
         if self.spatial_temporal and data.ndim == 2:
             # Use spatio-temporal variant

@@ -50,6 +50,7 @@ class SolverAdaptFlexESMV(BaseSolver):
             "Biomedical Signal Processing and Control, 14, 175-188.",
         ],
     )
+    R_VALUE_EXPONENTS = (-16.0, 1.0)
 
     def __init__(
         self,
@@ -148,6 +149,7 @@ class SolverAdaptFlexESMV(BaseSolver):
 
             n_comp = self.estimate_n_sources(C_reg, method="auto")
             sigma2 = np.mean(eigvals[n_comp:]) if n_comp < n_chans else epsilon
+            sigma2 = float(max(sigma2, 0.0))
 
             # Adaptive exponent from eigenvalue gap
             if n_comp < n_chans:
@@ -156,7 +158,12 @@ class SolverAdaptFlexESMV(BaseSolver):
             else:
                 p = 1.0
 
-            wiener = (eigvals / (eigvals + sigma2 + epsilon)) ** p
+            # Numerical safety: covariance eigvals should be >= 0, but can go slightly
+            # negative due to floating point noise; fractional powers would yield NaNs.
+            eigvals_pos = np.maximum(eigvals, 0.0)
+            base = eigvals_pos / (eigvals_pos + sigma2 + epsilon)
+            base = np.clip(base, 0.0, 1.0)
+            wiener = base**p
             P_adapt = eigvecs @ (np.diag(wiener) @ eigvecs.T)
 
             C_inv = self.robust_inverse(C_reg)

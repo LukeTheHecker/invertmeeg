@@ -47,6 +47,9 @@ class SolverLORETA(BaseSolver):
         self.rank_tol = float(rank_tol)
         self.eps = float(eps)
         super().__init__(**kwargs)
+        # LORETA's smoothness penalty can push the optimal alpha above the
+        # BaseSolver grid under low SNR; widen to avoid edge saturation.
+        self.r_values = np.logspace(-10, 4, int(max(self.n_reg_params, 1)))
 
     def make_inverse_operator(
         self,

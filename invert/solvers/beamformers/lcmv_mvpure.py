@@ -44,6 +44,7 @@ class SolverLCMVMVPURE(BaseSolver):
             "Inverse Problem: An Extension to MNE-Python. arXiv preprint arXiv:2509.14118."
         ],
     )
+    R_VALUE_EXPONENTS = (-10.0, 4.0)
 
     def __init__(
         self,
