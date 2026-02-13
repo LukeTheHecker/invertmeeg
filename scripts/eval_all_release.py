@@ -11,7 +11,7 @@ from invert.forward import create_forward_model, get_info
 
 if __name__ == "__main__":
     info = get_info(kind="biosemi32")
-    fwd = create_forward_model(sampling="ico3", info=info)
+    fwd = create_forward_model(sampling="ico2", info=info)
 
     runner = BenchmarkRunner(
         fwd,
@@ -28,12 +28,22 @@ if __name__ == "__main__":
         ],
         exclude_solvers=[
             "SESAME",
+            "EBB",
+            "RECI"
+            "ReciPSIICOS",
+            "ReciPSIICOS-Whitened",
         ],
         solvers=[
             "CovCNN",
             "CovCNN-KL",
             "CovCNN-KL-FLEXOMP",
         ],
+        solver_params={
+            # Script-level ANN speedup: keep global solver defaults unchanged.
+            "CovCNN": {"epochs": 120, "patience": 40},
+            "CovCNN-KL": {"epochs": 250, "patience": 80},
+            "CovCNN-KL-FLEXOMP": {"epochs": 250, "patience": 80},
+        },
         n_jobs=-1,
     )
     runner.run()

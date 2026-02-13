@@ -687,9 +687,11 @@ class BenchmarkRunner:
                             noise_cov=noise_cov,
                         )
 
-                        # Check if solver has inverse_operators attribute
-                        # Some solvers (e.g., SolverRandomNoise) don't create inverse operators
-                        if not hasattr(solver, "inverse_operators"):
+                        # Some solvers do not expose inverse operators, or may leave the
+                        # list empty for data-dependent paths. In both cases, fall back
+                        # to direct per-sample application.
+                        inverse_ops = getattr(solver, "inverse_operators", None)
+                        if not inverse_ops:
                             # Fall back to direct application for each sample
                             sample_metrics = []
                             for i in range(len(x_batch)):
@@ -704,11 +706,34 @@ class BenchmarkRunner:
                                 sample_metrics.append(self._metrics_from_dict(metrics))
                         else:
                             # Select optimal regularization via L-curve/GCV
-                            if len(solver.inverse_operators) > 1:  # type: ignore[attr-defined]
-                                _, optimal_idx = solver.regularise_gcv(x_batch[0])  # type: ignore[attr-defined]
+                            n_ops = len(inverse_ops)
+                            if n_ops > 1:
+                                try:
+                                    _, optimal_idx = solver.regularise_gcv(x_batch[0])
+                                except Exception as exc:
+                                    logger.warning(
+                                        "Regularisation selection failed for %s on %s; "
+                                        "falling back to first inverse operator (%s).",
+                                        solver_name,
+                                        ds_name,
+                                        exc,
+                                    )
+                                    optimal_idx = 0
                             else:
                                 optimal_idx = 0
-                            inv_op = solver.inverse_operators[optimal_idx]  # type: ignore[attr-defined]
+                            if optimal_idx < 0 or optimal_idx >= n_ops:
+                                clipped_idx = int(np.clip(optimal_idx, 0, n_ops - 1))
+                                logger.warning(
+                                    "Regularisation index %d out of bounds for %s on %s "
+                                    "(n_ops=%d); using idx=%d instead.",
+                                    optimal_idx,
+                                    solver_name,
+                                    ds_name,
+                                    n_ops,
+                                    clipped_idx,
+                                )
+                                optimal_idx = clipped_idx
+                            inv_op = inverse_ops[optimal_idx]
 
                             # Extract the inverse operator matrix (numpy array)
                             inv_op_matrix = inv_op.data[0]
