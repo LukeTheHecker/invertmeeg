@@ -271,7 +271,6 @@ def best_index_residual(residuals, x_hats, plot=False):
         bad_idx = (np.where(np.diff(residuals) > 0)[0] + 1)[0]
     else:
         bad_idx = len(residuals)
-    bad_idx = len(residuals)
 
     iters = iters[:bad_idx]
     x_hats = x_hats[:bad_idx]
