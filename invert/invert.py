@@ -180,12 +180,8 @@ def _build_registry() -> dict[str, Any]:
     # -- Matching Pursuit / Compressive Sensing -----------------------------
     _add("omp", solvers.SolverOMP)
     _add("cosamp", solvers.SolverCOSAMP)
-    _add("somp", solvers.SolverSOMP)
     _add("rembo", solvers.SolverREMBO)
     _add("sp", solvers.SolverSP)
-    _add("ssp", solvers.SolverSSP)
-    _add("smp", solvers.SolverSMP)
-    _add("ssmp", solvers.SolverSSMP)
     _add("subsmp", solvers.SolverSubSMP)
     _add("isubsmp", solvers.SolverISubSMP)
     _add("bcs", solvers.SolverBCS)

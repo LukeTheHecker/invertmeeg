@@ -158,14 +158,9 @@ _SOLVER_REGISTRY: dict[str, tuple[str, str]] = {
     "GenIterative": ("invert.solvers.music", "SolverGeneralizedIterative"),
     # Matching pursuit
     "OMP": ("invert.solvers.matching_pursuit", "SolverOMP"),
-    "SOMP": ("invert.solvers.matching_pursuit", "SolverSOMP"),
     "COSAMP": ("invert.solvers.matching_pursuit", "SolverCOSAMP"),
     "REMBO": ("invert.solvers.matching_pursuit", "SolverREMBO"),
     "SP": ("invert.solvers.matching_pursuit", "SolverSP"),
-    "SSP": ("invert.solvers.matching_pursuit", "SolverSSP"),
-    # Smooth matching pursuit
-    "SMP": ("invert.solvers.matching_pursuit", "SolverSMP"),
-    "SSMP": ("invert.solvers.matching_pursuit", "SolverSSMP"),
     "SubSMP": ("invert.solvers.matching_pursuit", "SolverSubSMP"),
     "ISubSMP": ("invert.solvers.matching_pursuit", "SolverISubSMP"),
     # Other

@@ -503,11 +503,6 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         class_name="SolverCOSAMP",
     ),
     SolverSpec(
-        solver_id="somp",
-        module_path="invert.solvers.matching_pursuit.somp",
-        class_name="SolverSOMP",
-    ),
-    SolverSpec(
         solver_id="rembo",
         module_path="invert.solvers.matching_pursuit.rembo",
         class_name="SolverREMBO",
@@ -516,21 +511,6 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         solver_id="sp",
         module_path="invert.solvers.matching_pursuit.sp",
         class_name="SolverSP",
-    ),
-    SolverSpec(
-        solver_id="ssp",
-        module_path="invert.solvers.matching_pursuit.ssp",
-        class_name="SolverSSP",
-    ),
-    SolverSpec(
-        solver_id="smp",
-        module_path="invert.solvers.matching_pursuit.smp",
-        class_name="SolverSMP",
-    ),
-    SolverSpec(
-        solver_id="ssmp",
-        module_path="invert.solvers.matching_pursuit.ssmp",
-        class_name="SolverSSMP",
     ),
     SolverSpec(
         solver_id="subsmp",

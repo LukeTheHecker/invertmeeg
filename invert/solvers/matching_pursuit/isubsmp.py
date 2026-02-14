@@ -7,6 +7,7 @@ from scipy.sparse.csgraph import laplacian
 
 from ...util import (
     best_index_residual,
+    build_source_adjacency,
     calc_residual_variance,
     thresholding,
 )
@@ -46,6 +47,42 @@ class SolverISubSMP(BaseSolver):
         self.name = name
         return super().__init__(**kwargs)
 
+    @staticmethod
+    def _adjacency_from_discrete_src(src):
+        """Fallback adjacency for discrete source spaces.
+
+        MNE's ``spatial_src_adjacency`` expects ico surfaces when ``dist=None``.
+        The 4D phantom notebook uses a spherical discrete source space, where
+        neighbor information is available in ``neighbor_vert``.
+        """
+        if len(src) != 1 or src[0].get("type") != "discrete":
+            msg = "Fallback adjacency only supports single discrete source spaces."
+            raise RuntimeError(msg)
+
+        space = src[0]
+        vertno = np.asarray(space["vertno"], dtype=int)
+        neighbor_vert = space.get("neighbor_vert")
+        if neighbor_vert is None:
+            msg = "Discrete source space is missing 'neighbor_vert'."
+            raise RuntimeError(msg)
+
+        n_vertices = len(vertno)
+        vertex_to_local = {int(v): idx for idx, v in enumerate(vertno)}
+        adjacency = np.zeros((n_vertices, n_vertices), dtype=float)
+
+        for local_i, vertex in enumerate(vertno):
+            neighbors = neighbor_vert[int(vertex)]
+            if neighbors is None:
+                continue
+            for neighbor in np.asarray(neighbors, dtype=int):
+                local_j = vertex_to_local.get(int(neighbor))
+                if local_j is not None:
+                    adjacency[local_i, local_j] = 1.0
+
+        adjacency = np.maximum(adjacency, adjacency.T)
+        np.fill_diagonal(adjacency, 0.0)
+        return adjacency
+
     def make_inverse_operator(
         self,
         forward,
@@ -72,26 +109,25 @@ class SolverISubSMP(BaseSolver):
         self.prepare_whitened_forward(noise_cov)
         self.inverse_operators = []
 
-        adjacency = mne.spatial_src_adjacency(self.forward["src"], verbose=0).toarray()
+        adjacency = build_source_adjacency(self.forward["src"], verbose=0).toarray()
         self.adjacency = adjacency
         laplace_operator = laplacian(adjacency)
         self.laplace_operator = laplace_operator
 
         patch_operator = adjacency + np.eye(adjacency.shape[0])
-        leadfield_smooth = self.leadfield @ patch_operator
+        self.leadfield_original = self.leadfield.copy()
+        leadfield_smooth = self.leadfield_original @ patch_operator
 
         self.leadfield_smooth = leadfield_smooth
-        norms = np.linalg.norm(self.leadfield_smooth, axis=0)
-        norms[norms == 0] = 1
-        self.leadfield_smooth_normed = self.leadfield_smooth / norms
-        norms = np.linalg.norm(self.leadfield, axis=0)
-        norms[norms == 0] = 1
-        self.leadfield_normed = self.leadfield / norms
+        self.leadfield_smooth_normed = self.robust_normalize_leadfield(
+            self.leadfield_smooth
+        )
+        self.leadfield_normed = self.robust_normalize_leadfield(self.leadfield_original)
 
         return self
 
     def apply_inverse_operator(
-        self, mne_obj, include_singletons=True
+        self, mne_obj, include_singletons=False, include_patches=False,
     ) -> mne.SourceEstimate:
         """Apply the inverse operator.
         Parameters
@@ -149,7 +185,7 @@ class SolverISubSMP(BaseSolver):
         omega = np.array([], dtype=int)
         r = deepcopy(y)
         r_component = np.linalg.svd(r, full_matrices=False)[0][:, 0]
-        y_hat = self.leadfield @ x_hat
+        y_hat = self.leadfield_original @ x_hat
         residuals = np.array(
             [
                 np.linalg.norm(y - y_hat),
@@ -179,10 +215,11 @@ class SolverISubSMP(BaseSolver):
 
             omega = np.unique(np.append(omega, new_patch)).astype(int)
             x_hat = np.zeros((n_dipoles, n_time))
-            x_hat[omega], _, _, _ = np.linalg.lstsq(
-                self.leadfield[:, omega], y, rcond=None
-            )
-            y_hat = self.leadfield @ x_hat
+            if len(omega) > 0:
+                x_hat[omega] = self.robust_inverse_solution(
+                    self.leadfield_original[:, omega], y
+                )
+            y_hat = self.leadfield_original @ x_hat
             r = y - y_hat
             r_component = np.linalg.svd(r, full_matrices=False)[0][:, 0]
 

@@ -90,12 +90,8 @@ __all__ = [
     # Matching Pursuit
     "SolverOMP",
     "SolverCOSAMP",
-    "SolverSOMP",
     "SolverREMBO",
     "SolverSP",
-    "SolverSSP",
-    "SolverSMP",
-    "SolverSSMP",
     "SolverSubSMP",
     "SolverISubSMP",
     "SolverBCS",

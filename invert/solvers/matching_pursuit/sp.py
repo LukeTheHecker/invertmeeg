@@ -4,6 +4,7 @@ import mne
 import numpy as np
 
 from ...util import (
+    build_source_adjacency,
     thresholding,
 )
 from ..base import BaseSolver, SolverMeta
@@ -12,17 +13,21 @@ logger = logging.getLogger(__name__)
 
 
 class SolverSP(BaseSolver):
-    """Class for the Subspace Pursuit (SP) inverse solution [1]. The algorithm
-        as described by [2] was implemented.
+    """Subspace Pursuit (SP) with MMV and patch-dictionary support.
+
+    Greedy sparse recovery that alternates between support expansion and
+    pruning, solving a least-squares fit on the candidate support each
+    iteration.  All time points are used jointly (MMV) and spatial patches
+    can be selected via an adjacency-based smooth dictionary.
 
     References
     ----------
     [1] Dai, W., & Milenkovic, O. (2009). Subspace pursuit for compressive
-    sensing signal reconstruction. IEEE transactions on Information Theory,
+    sensing signal reconstruction. IEEE Transactions on Information Theory,
     55(5), 2230-2249.
 
     [2] Duarte, M. F., & Eldar, Y. C. (2011). Structured compressed sensing:
-    From theory to applications. IEEE Transactions on signal processing, 59(9),
+    From theory to applications. IEEE Transactions on Signal Processing, 59(9),
     4053-4085.
     """
 
@@ -31,7 +36,8 @@ class SolverSP(BaseSolver):
         full_name="Subspace Pursuit",
         category="Matching Pursuit",
         description=(
-            "Greedy sparse recovery that alternates between support expansion and pruning, "
+            "Greedy sparse recovery that alternates between support expansion and "
+            "pruning (singletons or patches) using all time points jointly (MMV), "
             "solving a least-squares fit on the candidate support each iteration."
         ),
         references=[
@@ -50,7 +56,6 @@ class SolverSP(BaseSolver):
         *args,
         alpha="auto",
         noise_cov: mne.Covariance | None = None,
-        verbose=0,
         **kwargs,
     ):
         """Calculate inverse operator.
@@ -68,23 +73,37 @@ class SolverSP(BaseSolver):
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
         self.prepare_whitened_forward(noise_cov)
-        # Store original leadfield for coefficient estimation
+
+        # Adjacency and patch dictionary
+        adjacency = build_source_adjacency(self.forward["src"], verbose=0).toarray()
+        self.adjacency = adjacency
+        patch_operator = adjacency + np.eye(adjacency.shape[0])
+
         self.leadfield_original = self.leadfield.copy()
-        # Use robust normalization from base class for atom selection
-        self.leadfield_normed = self.robust_normalize_leadfield(self.leadfield)
+        leadfield_smooth = self.leadfield_original @ patch_operator
+
+        self.leadfield_smooth_normed = self.robust_normalize_leadfield(leadfield_smooth)
+        self.leadfield_normed = self.robust_normalize_leadfield(self.leadfield_original)
 
         self.inverse_operators = []
         return self
 
-    def apply_inverse_operator(self, mne_obj, K="auto") -> mne.SourceEstimate:  # type: ignore
+    def apply_inverse_operator(
+        self, mne_obj, K="auto",
+        include_singletons=True, include_patches=False,
+    ) -> mne.SourceEstimate:
         """Apply the SP inverse solution.
 
         Parameters
         ----------
         mne_obj : [mne.Evoked, mne.Epochs, mne.io.Raw]
             The MNE data object.
-        K : int
-            The number of atoms to select per iteration.
+        K : int | "auto"
+            The sparsity level (number of atoms to keep after pruning).
+        include_singletons : bool
+            Include individual dipoles as candidate atoms.
+        include_patches : bool
+            Include spatial-patch atoms built from source adjacency.
 
         Return
         ------
@@ -94,28 +113,76 @@ class SolverSP(BaseSolver):
         data = self.unpack_data_obj(mne_obj)
         self.validate_operator_data_compatibility(data)
         data = self._sensor_transform @ data
-        source_mat = np.stack([self.calc_sp_solution(y, K=K) for y in data.T], axis=1)
+        source_mat = self.calc_sp_solution(
+            data, K=K,
+            include_singletons=include_singletons,
+            include_patches=include_patches,
+        )
         stc = self.source_to_object(source_mat)
         return stc
 
-    def calc_sp_solution(self, y, K="auto"):
-        """Calculates the Subspace Pursuit (SP) inverse solution.
+    def _select_atoms(self, R, K, include_singletons, include_patches):
+        """Select K candidate atoms from residual using aggregated correlations."""
+        if include_patches and include_singletons:
+            b_smooth = np.linalg.norm(self.leadfield_smooth_normed.T @ R, axis=1)
+            b_sparse = np.linalg.norm(self.leadfield_normed.T @ R, axis=1)
+            if b_sparse.max() > b_smooth.max():
+                b_thresh = thresholding(b_sparse, K)
+                return np.where(b_thresh != 0)[0]
+            else:
+                b_thresh = thresholding(b_smooth, K)
+                best_idx = np.where(b_thresh != 0)[0]
+                patches = []
+                for idx in best_idx:
+                    patch = np.where(self.adjacency[idx] != 0)[0]
+                    patch = np.append(patch, idx)
+                    patches.append(patch)
+                return np.unique(np.concatenate(patches)) if patches else np.array([], dtype=int)
+        elif include_patches:
+            b_smooth = np.linalg.norm(self.leadfield_smooth_normed.T @ R, axis=1)
+            b_thresh = thresholding(b_smooth, K)
+            best_idx = np.where(b_thresh != 0)[0]
+            patches = []
+            for idx in best_idx:
+                patch = np.where(self.adjacency[idx] != 0)[0]
+                patch = np.append(patch, idx)
+                patches.append(patch)
+            return np.unique(np.concatenate(patches)) if patches else np.array([], dtype=int)
+        else:  # include_singletons only
+            b_sparse = np.linalg.norm(self.leadfield_normed.T @ R, axis=1)
+            b_thresh = thresholding(b_sparse, K)
+            return np.where(b_thresh != 0)[0]
+
+    def calc_sp_solution(self, y, K="auto",
+                         include_singletons=True, include_patches=False):
+        """Calculates the Subspace Pursuit (SP) inverse solution (MMV, patch-aware).
 
         Parameters
         ----------
         y : numpy.ndarray
-            The data matrix (channels,).
-        K : ["auto", int]
-            The number of atoms to select per iteration.
-            If "auto", set to min(8, max(2, n_chans // 10)).
+            The data matrix, shape ``(n_chans,)`` or ``(n_chans, n_time)``.
+        K : int | "auto"
+            Sparsity level.
+        include_singletons : bool
+            Include individual-dipole atoms.
+        include_patches : bool
+            Include spatial-patch atoms.
 
         Return
         ------
         x_hat : numpy.ndarray
-            The inverse solution (dipoles,)
+            The inverse solution.
         """
-        n_chans = len(y)
-        _, n_dipoles = self.leadfield.shape
+        if not include_singletons and not include_patches:
+            raise ValueError("At least one of include_patches/include_singletons must be True")
+
+        squeeze = False
+        if y.ndim == 1:
+            y = y[:, np.newaxis]
+            squeeze = True
+
+        n_chans, n_time = y.shape
+        _, n_dipoles = self.leadfield_original.shape
 
         if K == "auto":
             K = min(8, max(2, n_chans // 10))
@@ -123,53 +190,47 @@ class SolverSP(BaseSolver):
         if K <= 0:
             raise ValueError("K must be positive")
 
-        # Use robust residual from base class
-        def resid(y, phi):
-            return self.robust_residual(y, phi)
+        # Initial atom selection
+        T0 = self._select_atoms(y, K, include_singletons, include_patches)
 
-        # Use normalized leadfield for initial atom selection
-        b = self.leadfield_normed.T @ y
-        T0 = np.where(thresholding(b, K) != 0)[0]
+        # Initial residual
+        if len(T0) > 0:
+            L_T0 = self.leadfield_original[:, T0]
+            x_T0 = self.robust_inverse_solution(L_T0, y)
+            R = y - L_T0 @ x_T0
+        else:
+            R = y.copy()
 
-        # Use original leadfield for residual calculation
-        R = resid(y, self.leadfield_original[:, T0])
-
-        T_list = [
-            T0,
-        ]
-        R_list = [
-            R,
-        ]
+        T_list = [T0]
+        R_list = [R]
 
         for i in range(1, n_chans + 1):
-            # Use normalized leadfield for atom selection
-            b = self.leadfield_normed.T @ R_list[-1]
-
-            new_T = np.where(thresholding(b, K) != 0)[0]
+            # Select K new candidates from residual
+            new_T = self._select_atoms(R_list[-1], K, include_singletons, include_patches)
             T_tilde = np.unique(np.concatenate([T_list[i - 1], new_T]))
 
-            # Use original leadfield for coefficient estimation with numerical stability
+            # Solve on expanded support and prune by coefficient norms
             if len(T_tilde) > 0:
                 L_tilde = self.leadfield_original[:, T_tilde]
-                cond_num = np.linalg.cond(L_tilde)
-                if cond_num > 1e12:
-                    regularization = 1e-12 * np.eye(L_tilde.shape[1])
-                    xp = np.linalg.solve(
-                        L_tilde.T @ L_tilde + regularization, L_tilde.T @ y
-                    )
-                else:
-                    xp = np.linalg.pinv(L_tilde) @ y
-
-                T_l = T_tilde[np.where(thresholding(xp, K) != 0)[0]]
+                xp = self.robust_inverse_solution(L_tilde, y)
+                xp_norm = np.linalg.norm(xp, axis=1)
+                T_l = T_tilde[np.where(thresholding(xp_norm, K) != 0)[0]]
             else:
                 T_l = T_tilde
 
             T_list.append(T_l)
-            R = resid(y, self.leadfield_original[:, T_l])
+
+            # Calculate residual
+            if len(T_l) > 0:
+                L_final = self.leadfield_original[:, T_l]
+                xp_final = self.robust_inverse_solution(L_final, y)
+                R = y - L_final @ xp_final
+            else:
+                R = y.copy()
 
             R_list.append(R)
 
-            # Early stopping with improved criterion
+            # Early stopping
             if len(R_list) > 1 and (
                 np.linalg.norm(R_list[-1]) >= np.linalg.norm(R_list[-2]) or i == n_chans
             ):
@@ -178,8 +239,11 @@ class SolverSP(BaseSolver):
             else:
                 T_l = T_list[-1]
 
-        x_hat = np.zeros(n_dipoles)
+        x_hat = np.zeros((n_dipoles, n_time))
         if len(T_l) > 0:
             L_final = self.leadfield_original[:, T_l]
             x_hat[T_l] = self.robust_inverse_solution(L_final, y)
+
+        if squeeze:
+            x_hat = x_hat[:, 0]
         return x_hat

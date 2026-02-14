@@ -5,6 +5,7 @@ import mne
 import numpy as np
 
 from ...util import (
+    build_source_adjacency,
     thresholding,
 )
 from ..base import BaseSolver, SolverMeta
@@ -13,18 +14,21 @@ logger = logging.getLogger(__name__)
 
 
 class SolverREMBO(BaseSolver):
-    """Class for the Reduce Multi-Measurement-Vector and Boost (ReMBo) inverse
-        solution [1]. The algorithm as describe in [2] was used for the
-        imlpementation.
+    """Reduce Multi-Measurement-Vector and Boost (ReMBo) with patch support.
+
+    Randomly reduces a multi-measurement problem to repeated single-measurement
+    OMP-style recovery (with patch-dictionary awareness), then boosts by
+    re-fitting on the recovered joint support.
 
     References
     ----------
     [1] Mishali, M., & Eldar, Y. C. (2008). Reduce and boost: Recovering
     arbitrary sets of jointly sparse vectors. IEEE Transactions on Signal
     Processing, 56(10), 4692-4702.
-    [2] Duarte, M. F., & Eldar, Y. C. (2011).
-    Structured compressed sensing: From theory to applications. IEEE
-    Transactions on signal processing, 59(9), 4053-4085.
+
+    [2] Duarte, M. F., & Eldar, Y. C. (2011). Structured compressed sensing:
+    From theory to applications. IEEE Transactions on Signal Processing, 59(9),
+    4053-4085.
     """
 
     meta = SolverMeta(
@@ -33,7 +37,8 @@ class SolverREMBO(BaseSolver):
         category="Matching Pursuit",
         description=(
             "Randomly reduces a multi-measurement problem to repeated single-measurement "
-            "OMP-style recovery, then boosts by re-fitting on the recovered joint support."
+            "OMP-style recovery with patch-dictionary awareness, then boosts by re-fitting "
+            "on the recovered joint support."
         ),
         references=[
             "Mishali, M., & Eldar, Y. C. (2008). Reduce and boost: Recovering arbitrary sets of jointly sparse vectors. IEEE Transactions on Signal Processing, 56(10), 4692–4702.",
@@ -51,7 +56,6 @@ class SolverREMBO(BaseSolver):
         *args,
         alpha="auto",
         noise_cov: mne.Covariance | None = None,
-        verbose=0,
         **kwargs,
     ):
         """Calculate inverse operator.
@@ -69,29 +73,41 @@ class SolverREMBO(BaseSolver):
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
         self.prepare_whitened_forward(noise_cov)
+
+        # Adjacency and patch dictionary
+        adjacency = build_source_adjacency(self.forward["src"], verbose=0).toarray()
+        self.adjacency = adjacency
+        patch_operator = adjacency + np.eye(adjacency.shape[0])
+
         self.leadfield_original = self.leadfield.copy()
-        self.leadfield_normed = self.robust_normalize_leadfield(self.leadfield)
+        leadfield_smooth = self.leadfield_original @ patch_operator
+
+        self.leadfield_smooth_normed = self.robust_normalize_leadfield(leadfield_smooth)
+        self.leadfield_normed = self.robust_normalize_leadfield(self.leadfield_original)
 
         self.inverse_operators = []
         return self
 
     def apply_inverse_operator(
-        self, mne_obj, K="auto", max_boost_iter=None, fit_tol="auto"
-    ) -> mne.SourceEstimate:  # type: ignore
+        self, mne_obj, K="auto", max_boost_iter=None, fit_tol="auto",
+        include_singletons=True, include_patches=False,
+    ) -> mne.SourceEstimate:
         """Apply the REMBO inverse solution.
 
         Parameters
         ----------
         mne_obj : [mne.Evoked, mne.Epochs, mne.io.Raw]
             The MNE data object.
-        K : ["auto", int]
+        K : int | "auto"
             Maximum support size (sparsity budget) for the SMV solve.
-            If "auto", uses a small adaptive budget based on channel count.
-        max_boost_iter : [None, int]
-            Maximum number of boost iterations. If None, defaults to 50.
-        fit_tol : ["auto", float]
-            Relative SMV fit tolerance used by the boosting acceptance check.
-            If "auto", defaults to 1e-3.
+        max_boost_iter : int | None
+            Maximum number of boost iterations.
+        fit_tol : float | "auto"
+            Relative SMV fit tolerance for boost acceptance.
+        include_singletons : bool
+            Include individual dipoles as candidate atoms.
+        include_patches : bool
+            Include spatial-patch atoms built from source adjacency.
 
         Return
         ------
@@ -102,38 +118,42 @@ class SolverREMBO(BaseSolver):
         self.validate_operator_data_compatibility(data)
         data = self._sensor_transform @ data
         source_mat = self.calc_rembo_solution(
-            data, K=K, max_boost_iter=max_boost_iter, fit_tol=fit_tol
+            data, K=K, max_boost_iter=max_boost_iter, fit_tol=fit_tol,
+            include_singletons=include_singletons,
+            include_patches=include_patches,
         )
         stc = self.source_to_object(source_mat)
         return stc
 
-    def calc_rembo_solution(self, y, K="auto", max_boost_iter=None, fit_tol="auto"):
-        """Calculate the REMBO inverse solution based on the measurement vector
-            y.
+    def calc_rembo_solution(self, y, K="auto", max_boost_iter=None, fit_tol="auto",
+                            include_singletons=True, include_patches=False):
+        """Calculate the REMBO inverse solution.
 
         Parameters
         ----------
         y : numpy.ndarray
-            The EEG matrix (channels, time)
-        K : ["auto", int]
-            Maximum support size (sparsity budget) for the SMV step.
-            If "auto", set to min(8, max(2, n_chans // 10)).
-        max_boost_iter : [None, int]
-            Maximum number of random MMV->SMV reductions to try.
-            If None, defaults to 50.
-        fit_tol : ["auto", float]
-            Relative SMV fit tolerance. Candidate supports satisfy
-            ||y_vec - L x_hat||_2 / ||y_vec||_2 <= fit_tol.
-            If "auto", defaults to 1e-3.
+            The EEG matrix (channels, time).
+        K : int | "auto"
+            Maximum support size for the SMV step.
+        max_boost_iter : int | None
+            Maximum number of random MMV->SMV reductions.
+        fit_tol : float | "auto"
+            Relative SMV fit tolerance.
+        include_singletons : bool
+            Include individual-dipole atoms.
+        include_patches : bool
+            Include spatial-patch atoms.
 
         Return
         ------
         x_hat : numpy.ndarray
-            The source matrix (dipoles, time)
+            The source matrix (dipoles, time).
         """
+        if not include_singletons and not include_patches:
+            raise ValueError("At least one of include_patches/include_singletons must be True")
+
         n_chans, n_time = y.shape
         if K == "auto":
-            # Adaptive default: avoid single-source bias while keeping sparsity tight.
             K = min(8, max(2, n_chans // 10))
         K = int(K)
         if K <= 0:
@@ -151,23 +171,25 @@ class SolverREMBO(BaseSolver):
         if fit_tol < 0:
             raise ValueError("fit_tol must be non-negative")
 
-        n_dipoles = self.leadfield.shape[1]
+        n_dipoles = self.leadfield_original.shape[1]
         y_norm_eps = 1e-15
         best_support = np.array([], dtype=int)
         best_rel_resid = np.inf
 
         for _ in range(max_boost_iter):
-            # Random merge vector from an absolutely continuous distribution.
-            # Use NumPy's global RNG so benchmark seeds control reproducibility.
             a = np.random.standard_normal(n_time)
             y_vec = y @ a
-            x_vec = self.calc_omp_solution(y_vec, K=K)
+            x_vec = self.calc_omp_solution(
+                y_vec, K=K,
+                include_singletons=include_singletons,
+                include_patches=include_patches,
+            )
             S_hat = np.where(x_vec != 0)[0].astype(int)
 
             if len(S_hat) == 0 or len(S_hat) > K:
                 continue
 
-            rel_resid = np.linalg.norm(y_vec - self.leadfield @ x_vec) / max(
+            rel_resid = np.linalg.norm(y_vec - self.leadfield_original @ x_vec) / max(
                 np.linalg.norm(y_vec), y_norm_eps
             )
             if rel_resid < best_rel_resid:
@@ -181,29 +203,33 @@ class SolverREMBO(BaseSolver):
         if len(best_support) == 0:
             return x_hat
 
-        As_pinv = np.linalg.pinv(self.leadfield[:, best_support])
+        As_pinv = np.linalg.pinv(self.leadfield_original[:, best_support])
         x_hat[best_support, :] = As_pinv @ y
 
         return x_hat
 
-    def calc_omp_solution(self, y, K="auto"):
-        """Calculates the Orthogonal Matching Pursuit (OMP) inverse solution.
-        (Used by REMBO algorithm)
+    def calc_omp_solution(self, y, K="auto",
+                          include_singletons=True, include_patches=False):
+        """Inner OMP for a single-measurement vector (used by ReMBo).
 
         Parameters
         ----------
         y : numpy.ndarray
-            The data matrix (channels,).
-        K : ["auto", int]
+            The data vector (channels,).
+        K : int | "auto"
             Maximum number of nonzero atoms.
+        include_singletons : bool
+            Include individual-dipole atoms.
+        include_patches : bool
+            Include spatial-patch atoms.
 
         Return
         ------
         x_hat : numpy.ndarray
-            The inverse solution (dipoles,)
+            The inverse solution (dipoles,).
         """
         n_chans = len(y)
-        _, n_dipoles = self.leadfield.shape
+        _, n_dipoles = self.leadfield_original.shape
 
         if K == "auto":
             K = 1
@@ -214,22 +240,47 @@ class SolverREMBO(BaseSolver):
         x_hat = np.zeros(n_dipoles)
         x_hats = [deepcopy(x_hat)]
 
-        omega = np.array([])
-        r = deepcopy(y)
+        omega = np.array([], dtype=int)
+        r = y.copy()
         residuals = np.array([np.linalg.norm(r)])
 
         max_iter = min(n_chans, K)
         for _ in range(max_iter):
-            # Use normalized atoms for selection to avoid superficial/high-norm bias.
-            b = self.leadfield_normed.T @ r
-            b_thresh = thresholding(b, 1)
-            new_atoms = np.where(b_thresh != 0)[0]
-            omega = np.append(omega, new_atoms)
-            omega = np.unique(omega.astype(int))
+            if include_patches and include_singletons:
+                b_smooth = np.abs(self.leadfield_smooth_normed.T @ r)
+                b_sparse = np.abs(self.leadfield_normed.T @ r)
+                if b_sparse.max() > b_smooth.max():
+                    b_thresh = thresholding(b_sparse, 1)
+                    new_atoms = np.where(b_thresh != 0)[0]
+                else:
+                    b_thresh = thresholding(b_smooth, 1)
+                    best_idx = np.where(b_thresh != 0)[0]
+                    new_atoms = []
+                    for idx in best_idx:
+                        patch = np.where(self.adjacency[idx] != 0)[0]
+                        patch = np.append(patch, idx)
+                        new_atoms.append(patch)
+                    new_atoms = np.unique(np.concatenate(new_atoms)) if new_atoms else np.array([], dtype=int)
+            elif include_patches:
+                b_smooth = np.abs(self.leadfield_smooth_normed.T @ r)
+                b_thresh = thresholding(b_smooth, 1)
+                best_idx = np.where(b_thresh != 0)[0]
+                new_atoms = []
+                for idx in best_idx:
+                    patch = np.where(self.adjacency[idx] != 0)[0]
+                    patch = np.append(patch, idx)
+                    new_atoms.append(patch)
+                new_atoms = np.unique(np.concatenate(new_atoms)) if new_atoms else np.array([], dtype=int)
+            else:  # include_singletons only
+                b_sparse = self.leadfield_normed.T @ r
+                b_thresh = thresholding(b_sparse, 1)
+                new_atoms = np.where(b_thresh != 0)[0]
 
-            # Use robust inverse from base class for coefficient estimation
+            omega = np.unique(np.append(omega, new_atoms)).astype(int)
+
             if len(omega) > 0:
                 L_omega = self.leadfield_original[:, omega]
+                x_hat = np.zeros(n_dipoles)
                 x_hat[omega] = self.robust_inverse_solution(L_omega, y)
 
             r = y - self.leadfield_original @ x_hat
@@ -237,7 +288,6 @@ class SolverREMBO(BaseSolver):
             residuals = np.append(residuals, np.linalg.norm(r))
             x_hats.append(deepcopy(x_hat))
 
-            # Early stopping if residual starts increasing
             if len(residuals) > 1 and residuals[-1] > residuals[-2]:
                 break
 
