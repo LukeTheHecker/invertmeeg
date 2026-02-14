@@ -72,7 +72,7 @@ class SolverEBB(BaseSolver):
         sources : array, shape (n_sources, n_times)
             The estimated source time series.
         """
-        super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        super().make_inverse_operator(forward, mne_obj, *args, alpha=alpha, **kwargs)
 
         data = self.unpack_data_obj(mne_obj)
 

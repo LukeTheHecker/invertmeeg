@@ -65,7 +65,7 @@ class SolverSSPIRESMV(BaseSolver):
         noise_cov: mne.Covariance | None = None,
         **kwargs,
     ):
-        super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        super().make_inverse_operator(forward, mne_obj, *args, alpha=alpha, **kwargs)
         self.prepare_whitened_forward(noise_cov)
         self.leadfield_original = self.leadfield.copy()
         self.leadfield_normed = self.robust_normalize_leadfield(self.leadfield)

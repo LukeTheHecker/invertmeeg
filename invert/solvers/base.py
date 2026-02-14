@@ -15,6 +15,11 @@ import numpy.typing as npt
 from mne.io.constants import FIFF
 
 from ..util import find_corner
+from .orientation import (
+    ensure_surface_free_surf_ori,
+    estimate_orientation_pca,
+    reduce_free_to_scalar,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -175,6 +180,8 @@ class BaseSolver:
     """
 
     meta: SolverMeta | None = None
+    # Opt-in: solvers that support true 3-component (vector) source models.
+    SUPPORTS_VECTOR_ORIENTATION: bool = False
     # Default regularization grid exponents for r_values = logspace(min_exp, max_exp, n_reg_params).
     # Solver subclasses can override this to widen/shift the search grid without affecting others.
     R_VALUE_EXPONENTS: tuple[float, float] = (-10.0, 1.0)
@@ -195,6 +202,9 @@ class BaseSolver:
         mgcv_gamma: float = 1.05,
         rgcv_gamma: float = 0.5,
         r1gcv_gamma: float = 0.5,
+        orientation: str = "auto",
+        orientation_pca_reg: float = 0.01,
+        orientation_pca_deterministic_sign: bool = True,
         verbose: int = 0,
         **kwargs: Any,
     ) -> None:
@@ -221,10 +231,25 @@ class BaseSolver:
         self.mgcv_gamma = mgcv_gamma
         self.rgcv_gamma = rgcv_gamma
         self.r1gcv_gamma = r1gcv_gamma
+        orientation = str(orientation).lower()
+        if orientation not in {"auto", "fixed", "pca", "free"}:
+            raise ValueError(
+                "orientation must be one of {'auto','fixed','pca','free'}, "
+                f"got {orientation!r}"
+            )
+        self.orientation = orientation
+        self.orientation_pca_reg = float(orientation_pca_reg)
+        if not np.isfinite(self.orientation_pca_reg) or self.orientation_pca_reg < 0:
+            raise ValueError(
+                f"orientation_pca_reg must be a finite non-negative float, got {orientation_pca_reg!r}"
+            )
+        self.orientation_pca_deterministic_sign = bool(orientation_pca_deterministic_sign)
         self.require_recompute = True
         self.require_data = True
         self._free_orientation = False
         self._n_orient = 1
+        self._orientation_data_obj: Any | None = None
+        self._orientation_q: np.ndarray | None = None
         # Attributes populated during operator construction.
         self.forward: Any = None
         self.leadfield: np.ndarray = np.empty((0, 0), dtype=float)
@@ -266,6 +291,25 @@ class BaseSolver:
         None
 
         """
+        # Optional: store the data object used for orientation estimation (PCA mode).
+        # Many solvers accept an mne_obj in make_inverse_operator(forward, mne_obj, ...);
+        # when provided positionally, it will appear here as args[0].
+        self._orientation_data_obj = None
+        self._orientation_q = None
+        if args:
+            candidate = args[0]
+            if isinstance(
+                candidate,
+                (
+                    mne.Evoked,
+                    mne.EvokedArray,
+                    mne.Epochs,
+                    mne.EpochsArray,
+                    mne.io.BaseRaw,
+                ),
+            ):
+                self._orientation_data_obj = candidate
+
         self.forward = deepcopy(forward)
         self.prepare_forward()
         # Reset whitening state — will be set by prepare_whitened_forward()
@@ -303,43 +347,61 @@ class BaseSolver:
 
         data = self.unpack_data_obj(mne_obj)
         self.validate_operator_data_compatibility(data)
-
-        if self.use_last_alpha and self.last_reg_idx is not None:
-            source_mat = self.inverse_operators[self.last_reg_idx].apply(data)
-
-        else:
-            if self.regularisation_method.lower() == "l":
-                source_mat, idx = self.regularise_lcurve(data, plot=self.plot_reg)
-                self.last_reg_idx = idx
-            elif self.regularisation_method.lower() in {
-                "gcv",
-                "mgcv",
-                "rgcv",
-                "r1gcv",
-                "composite",
-            }:
-                method = self.regularisation_method.lower()
-                if method == "gcv":
-                    gamma = self.gcv_gamma
-                elif method == "mgcv":
-                    gamma = self.mgcv_gamma
-                elif method in {"rgcv", "composite"}:
-                    gamma = self.rgcv_gamma
-                else:  # r1gcv
-                    gamma = self.r1gcv_gamma
-                source_mat, idx = self.regularise_gcv(
-                    data, plot=self.plot_reg, gamma=gamma, method=method
-                )
-                self.last_reg_idx = idx
-            elif self.regularisation_method.lower() == "product":
-                source_mat, idx = self.regularise_product(data, plot=self.plot_reg)
-                self.last_reg_idx = idx
-            else:
-                msg = f"{self.regularisation_method} is no valid regularisation method."
-                raise AttributeError(msg)
-
+        source_mat, _idx = self._compute_source_mat(data)
         stc = self.source_to_object(source_mat)
         return stc
+
+    def _compute_source_mat(
+        self, data: npt.NDArray[np.floating]
+    ) -> tuple[npt.NDArray[np.floating], int]:
+        """Return (source_mat, idx) for the current regularisation selection policy."""
+        if self.use_last_alpha and self.last_reg_idx is not None:
+            idx = int(self.last_reg_idx)
+            return self.inverse_operators[idx].apply(data), idx
+
+        method = self.regularisation_method.lower()
+        if method == "l":
+            source_mat, idx = self.regularise_lcurve(data, plot=self.plot_reg)
+        elif method in {"gcv", "mgcv", "rgcv", "r1gcv", "composite"}:
+            if method == "gcv":
+                gamma = self.gcv_gamma
+            elif method == "mgcv":
+                gamma = self.mgcv_gamma
+            elif method in {"rgcv", "composite"}:
+                gamma = self.rgcv_gamma
+            else:  # r1gcv
+                gamma = self.r1gcv_gamma
+            source_mat, idx = self.regularise_gcv(
+                data, plot=self.plot_reg, gamma=gamma, method=method
+            )
+        elif method == "product":
+            source_mat, idx = self.regularise_product(data, plot=self.plot_reg)
+        else:
+            raise AttributeError(
+                f"{self.regularisation_method} is no valid regularisation method."
+            )
+
+        self.last_reg_idx = int(idx)
+        return source_mat, int(idx)
+
+    def apply_inverse_operator_vector(self, mne_obj):
+        """Apply the inverse operator and return a vector (3-component) STC.
+
+        This is an opt-in API: the default ``apply_inverse_operator`` remains scalar
+        and will collapse free-orientation outputs by vector norm.
+        """
+
+        if not getattr(self, "_free_orientation", False) or int(getattr(self, "_n_orient", 1)) != 3:
+            raise ValueError(
+                "apply_inverse_operator_vector() requires a 3-component source model. "
+                "Build the operator with orientation='free' (vector-capable solvers only), "
+                "or use a volume/discrete free-orientation forward with orientation='auto'."
+            )
+
+        data = self.unpack_data_obj(mne_obj)
+        self.validate_operator_data_compatibility(data)
+        source_mat, _idx = self._compute_source_mat(data)
+        return self.source_to_object_vector(source_mat)
 
     def prep_data(self, mne_obj):
         if (
@@ -449,12 +511,13 @@ class BaseSolver:
 
         edge = "lowest" if optimum_idx == 0 else "highest"
         alpha = float(self.alphas[optimum_idx]) if optimum_idx < n_alphas else np.nan
+        solver_label = getattr(self, "name", self.__class__.__name__)
         logger.warning(
             "%s selected the %s regularization parameter for %s in the search range "
             "(idx=%d of %d, alpha=%.6e). Consider widening or shifting `r_values`.",
             method,
-            self.name,
             edge,
+            solver_label,
             optimum_idx,
             n_tested - 1,
             alpha,
@@ -608,6 +671,7 @@ class BaseSolver:
         )
         self.log_channel_alignment(alignment)
         missing_operator_channels = list(alignment.dropped_from_forward)
+        extra_data_channels = list(alignment.dropped_from_data)
         if (
             getattr(self, "made_inverse_operator", False)
             and getattr(self, "_operator_ch_names", ())
@@ -617,6 +681,18 @@ class BaseSolver:
                 "Data is missing channels required by the inverse operator "
                 f"({len(missing_operator_channels)} missing)"
                 f"{self._format_channel_list(missing_operator_channels, max_items=None)}. "
+                "Recompute the inverse operator on the current data channel set."
+            )
+            raise ValueError(msg)
+        if (
+            getattr(self, "made_inverse_operator", False)
+            and getattr(self, "_operator_ch_names", ())
+            and extra_data_channels
+        ):
+            msg = (
+                "Data channels do not match the inverse operator channel set. "
+                f"Extra in data: {len(extra_data_channels)}"
+                f"{self._format_channel_list(extra_data_channels, max_items=None)}. "
                 "Recompute the inverse operator on the current data channel set."
             )
             raise ValueError(msg)
@@ -1842,29 +1918,103 @@ class BaseSolver:
         Return
         ------
         """
-        # Handle free source orientation.
+        orientation = str(getattr(self, "orientation", "auto")).lower()
+        if orientation not in {"auto", "fixed", "pca", "free"}:
+            raise ValueError(
+                "orientation must be one of {'auto','fixed','pca','free'}, "
+                f"got {orientation!r}"
+            )
+
+        self._orientation_q = None
+        solver_label = getattr(self, "name", self.__class__.__name__)
+
+        src_types = [str(s.get("type", "")) for s in self.forward["src"]]
+        has_volume_like = any(t in ("vol", "discrete") for t in src_types)
+        is_surface = len(src_types) == 2 and all(t == "surf" for t in src_types)
+
+        leadfield: np.ndarray | None = None
+
         if self.forward["source_ori"] == FIFF.FIFFV_MNE_FREE_ORI:
-            src_types = [str(s.get("type", "")) for s in self.forward["src"]]
-            if any(t in ("vol", "discrete") for t in src_types):
-                # Volume/discrete source space: keep free orientation.
-                # The default normals are [0,0,1] which are meaningless
-                # for volume grids — forcing fixed would destroy most
-                # signal.  Instead, keep 3 components per source and
-                # combine via vector norm in source_to_object().
-                self._free_orientation = True
-                self._n_orient = 3
-            else:
-                # Surface source space: convert to fixed (cortical normal).
-                self.forward = mne.convert_forward_solution(
-                    self.forward, force_fixed=True, verbose=0
+            if orientation in {"auto", "fixed"}:
+                if has_volume_like:
+                    if orientation == "fixed":
+                        raise ValueError(
+                            "orientation='fixed' is only supported for surface source spaces. "
+                            "Use orientation='pca' (data-driven) or orientation='auto'."
+                        )
+                    # Volume/discrete source space: keep free orientation.
+                    # Surface-only fixed normals are meaningless for volume grids.
+                    self._free_orientation = True
+                    self._n_orient = 3
+                else:
+                    # Surface source space: convert to fixed (cortical normal).
+                    self.forward = mne.convert_forward_solution(
+                        self.forward,
+                        surf_ori=True,
+                        force_fixed=True,
+                        use_cps=True,
+                        verbose=0,
+                    )
+                    self._free_orientation = False
+                    self._n_orient = 1
+
+            elif orientation == "pca":
+                if self._orientation_data_obj is None:
+                    raise ValueError(
+                        "orientation='pca' requires passing an MNE data object to "
+                        "make_inverse_operator(forward, mne_obj, ...)."
+                    )
+                logger.info("%s orientation: using PCA reduction (free->scalar).", solver_label)
+                # Extract data using the same preprocessing/picking pipeline.
+                Y = self.unpack_data_obj(self._orientation_data_obj)
+                kept_ch_names = list(getattr(self, "_last_data_ch_names", ()) or [])
+                if kept_ch_names:
+                    # Pick forward channels to match the PCA data channels.
+                    self.forward = self.forward.pick_channels(kept_ch_names, ordered=True)
+
+                G_free = np.asarray(self.forward["sol"]["data"], dtype=float)
+                q = estimate_orientation_pca(
+                    G_free,
+                    Y,
+                    reg=float(self.orientation_pca_reg),
+                    deterministic_sign=bool(self.orientation_pca_deterministic_sign),
                 )
+                self._orientation_q = q
+                leadfield = reduce_free_to_scalar(G_free, q)
                 self._free_orientation = False
                 self._n_orient = 1
+
+            else:  # orientation == "free"
+                supports_vector = bool(getattr(self, "SUPPORTS_VECTOR_ORIENTATION", False))
+                if not supports_vector:
+                    # All beamformers can operate on free-orientation leadfields
+                    # (at minimum by treating the 3 components as grouped columns).
+                    supports_vector = ".beamformers." in str(self.__class__.__module__)
+                if not supports_vector:
+                    solver_label = getattr(self, "name", self.__class__.__name__)
+                    supported = ["auto", "fixed", "pca"]
+                    raise ValueError(
+                        f"{solver_label} does not support orientation='free'. "
+                        f"Supported: {supported}."
+                    )
+                if is_surface:
+                    self.forward = ensure_surface_free_surf_ori(self.forward)
+                self._free_orientation = True
+                self._n_orient = 3
+                logger.info("%s orientation: using true free orientation (3-component).", solver_label)
         else:
+            if orientation == "free":
+                raise ValueError(
+                    "orientation='free' requires a forward model with source_ori=FREE."
+                )
             self._free_orientation = False
             self._n_orient = 1
 
-        self.leadfield = deepcopy(self.forward["sol"]["data"])
+        if leadfield is None:
+            leadfield = np.asarray(self.forward["sol"]["data"], dtype=float)
+
+        # Always copy: several solvers modify leadfield in-place.
+        self.leadfield = np.array(leadfield, dtype=float, copy=True)
 
         if self.common_average_reference:
             n = self.leadfield.shape[0]
@@ -1878,6 +2028,17 @@ class BaseSolver:
             )
         else:
             self.depth_weights = None
+
+        # Final orientation summary at INFO level.
+        eff = "free" if getattr(self, "_free_orientation", False) else "scalar"
+        logger.info(
+            "%s orientation: requested=%s effective=%s n_orient=%d src_types=%s",
+            solver_label,
+            orientation,
+            eff,
+            int(getattr(self, "_n_orient", 1)),
+            src_types,
+        )
 
     @staticmethod
     def depth_weight_fixed(L, degree=0.8, ref="median", eps=1e-12):
@@ -2150,6 +2311,81 @@ class BaseSolver:
                 verbose=self.verbose,
             )
         return stc
+
+    def source_to_object_vector(
+        self, source_mat: npt.NDArray[np.floating]
+    ) -> (
+        "mne.VectorSourceEstimate"
+        | "mne.VolVectorSourceEstimate"
+        | "mne.MixedVectorSourceEstimate"
+    ):
+        """Convert a (3*n_sources, n_times) matrix into a VectorSourceEstimate."""
+
+        # Undo depth weighting only for solvers that explicitly use it.
+        if (
+            self.prep_leadfield
+            and self.use_depth_weighting
+            and hasattr(self, "depth_weights")
+            and self.depth_weights is not None
+        ):
+            source_mat = source_mat / self.depth_weights[:, np.newaxis]
+
+        source_mat = np.asarray(source_mat, dtype=float)
+        if source_mat.ndim == 1:
+            source_mat = source_mat[:, np.newaxis]
+
+        n_orient = int(getattr(self, "_n_orient", 3))
+        if n_orient != 3:
+            raise ValueError(
+                f"source_to_object_vector requires n_orient==3, got {n_orient}"
+            )
+        if source_mat.shape[0] % n_orient != 0:
+            raise ValueError(
+                f"source_mat has {source_mat.shape[0]} rows which is not divisible by n_orient={n_orient}"
+            )
+
+        n_src = int(source_mat.shape[0] // n_orient)
+        vec = source_mat.reshape(n_src, n_orient, -1)
+
+        source_model = self.forward["src"]
+        vertices = [np.asarray(s["vertno"]) for s in source_model]
+        src_types = [str(s.get("type", "")) for s in source_model]
+        tmin = self.tmin
+        sfreq = self.obj_info["sfreq"]
+        tstep = 1 / sfreq
+        subject = self.obj_info["subject_info"]
+
+        if isinstance(subject, dict) and "his_id" in subject:
+            subject = subject["his_id"]
+        else:
+            subject = "fsaverage"
+
+        if len(vertices) == 2 and all(src_type == "surf" for src_type in src_types):
+            return mne.VectorSourceEstimate(
+                vec,
+                vertices,
+                tmin=tmin,
+                tstep=tstep,
+                subject=subject,
+                verbose=self.verbose,
+            )
+        if len(vertices) == 1 and src_types[0] in {"vol", "discrete"}:
+            return mne.VolVectorSourceEstimate(
+                vec,
+                vertices,
+                tmin=tmin,
+                tstep=tstep,
+                subject=subject,
+                verbose=self.verbose,
+            )
+        return mne.MixedVectorSourceEstimate(
+            vec,
+            vertices,
+            tmin=tmin,
+            tstep=tstep,
+            subject=subject,
+            verbose=self.verbose,
+        )
 
     def _fix_class_identity(self):
         """Fix class identity issues that can occur with module reloading (e.g., Jupyter autoreload).

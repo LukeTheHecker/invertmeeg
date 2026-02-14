@@ -92,7 +92,7 @@ class SolverLCMVMVPURE(BaseSolver):
         **kwargs: Any,
     ) -> Any:
         self.weight_norm = bool(weight_norm)
-        super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        super().make_inverse_operator(forward, mne_obj, *args, alpha=alpha, **kwargs)
         data = self.unpack_data_obj(mne_obj)
 
         if noise_cov is None:

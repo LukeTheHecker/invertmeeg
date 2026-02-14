@@ -62,7 +62,7 @@ class SolverVBSBL(BaseSolver):
         convergence_criterion: float = 1e-6,
         **kwargs: Any,
     ):
-        super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        super().make_inverse_operator(forward, mne_obj, *args, alpha=alpha, **kwargs)
 
         Y = self.unpack_data_obj(mne_obj)
         Y = Y - Y.mean(axis=0, keepdims=True)

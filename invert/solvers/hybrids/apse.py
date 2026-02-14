@@ -101,7 +101,7 @@ class SolverAPSE(BaseSolver):
         self : object
             Returns itself for convenience
         """
-        super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        super().make_inverse_operator(forward, mne_obj, *args, alpha=alpha, **kwargs)
         wf = self.prepare_whitened_forward(noise_cov)
 
         # Get data and leadfield

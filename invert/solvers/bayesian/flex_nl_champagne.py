@@ -67,7 +67,7 @@ class SolverFlexNLChampagne(BaseSolver):
         convergence_criterion=1e-8,
         **kwargs,
     ):
-        super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        super().make_inverse_operator(forward, mne_obj, *args, alpha=alpha, **kwargs)
         wf = self.prepare_whitened_forward(noise_cov)
         self.is_prepared = False
         data = self.unpack_data_obj(mne_obj)

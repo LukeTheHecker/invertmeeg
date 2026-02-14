@@ -101,7 +101,7 @@ class SolverReciPSIICOSWhitened(BaseSolver):
         self : object
             Returns itself for convenience
         """
-        super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        super().make_inverse_operator(forward, mne_obj, *args, alpha=alpha, **kwargs)
         data = self.unpack_data_obj(mne_obj)
 
         # 1) Whiten leadfield and data via standard pipeline (SSP + noise whitening)

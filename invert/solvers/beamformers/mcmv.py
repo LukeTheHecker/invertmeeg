@@ -77,7 +77,7 @@ class SolverMCMV(BaseSolver):
         Implements the MCMV formula: w = C_inv @ G @ inv(G.T @ C_inv @ G) @ f
         where G is the constraint matrix (m × k) and f is the constraint vector.
         """
-        super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        super().make_inverse_operator(forward, mne_obj, *args, alpha=alpha, **kwargs)
         data = self.unpack_data_obj(mne_obj)
 
         wf = self.prepare_whitened_forward(noise_cov)

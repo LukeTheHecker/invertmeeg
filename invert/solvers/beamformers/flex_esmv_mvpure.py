@@ -80,7 +80,7 @@ class SolverFlexESMVMVPURE(BaseSolver):
         **kwargs,
     ):
         # Keep forward/info handling consistent and defer heavy work to apply.
-        super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        super().make_inverse_operator(forward, mne_obj, *args, alpha=alpha, **kwargs)
         if noise_cov is not None:
             self.coerce_noise_cov(noise_cov)
         self._noise_cov = noise_cov

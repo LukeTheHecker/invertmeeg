@@ -68,7 +68,7 @@ class SolverSESAME(BaseSolver):
         random_state: int | None = 0,
         **kwargs: Any,
     ):
-        super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        super().make_inverse_operator(forward, mne_obj, *args, alpha=alpha, **kwargs)
         wf = self.prepare_whitened_forward(noise_cov)
 
         data = self.unpack_data_obj(mne_obj)

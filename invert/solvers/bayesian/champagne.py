@@ -145,7 +145,7 @@ class SolverChampagne(BaseSolver):
         self : object returns itself for convenience
 
         """
-        super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        super().make_inverse_operator(forward, mne_obj, *args, alpha=alpha, **kwargs)
 
         n_chans = self.leadfield.shape[0]
         if noise_cov is None:
