@@ -1,7 +1,8 @@
-import mne
 import numpy as np
 from scipy.sparse import csr_matrix, vstack
 from scipy.sparse.csgraph import laplacian
+
+from ..util import build_source_adjacency
 
 
 def build_adjacency(forward, verbose=0):
@@ -19,8 +20,7 @@ def build_adjacency(forward, verbose=0):
     adjacency : csr_matrix
         Sparse adjacency matrix.
     """
-    adjacency = mne.spatial_src_adjacency(forward["src"], verbose=verbose)
-    return csr_matrix(adjacency)
+    return build_source_adjacency(forward["src"], verbose=verbose)
 
 
 def build_spatial_basis(

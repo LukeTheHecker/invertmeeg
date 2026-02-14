@@ -1,6 +1,7 @@
 import mne
 import numpy as np
 from scipy.sparse.csgraph import laplacian
+from invert.util import build_source_adjacency
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
 
@@ -107,7 +108,7 @@ class SolverBasisFunctions(BaseSolver):
         eigenmodes and B are coefficients. MAP inference in basis space yields:
         B_hat = Sigma_b G^T (G Sigma_b G^T + alpha I)^-1 Y, with G = L Phi.
         """
-        adjacency = mne.spatial_src_adjacency(self.forward["src"], verbose=0)
+        adjacency = build_source_adjacency(self.forward["src"], verbose=0)
         graph_laplacian = laplacian(adjacency, normed=False).astype(float).toarray()
 
         eigenvalues, eigenvectors = np.linalg.eigh(graph_laplacian)

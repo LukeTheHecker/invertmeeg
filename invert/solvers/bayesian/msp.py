@@ -1,4 +1,5 @@
 import logging
+from invert.util import build_source_adjacency
 
 import mne
 import numpy as np
@@ -412,7 +413,7 @@ class SolverMSP(BaseSolver):
             List of spatial patterns (numpy arrays).
         """
         # Get source space adjacency
-        adjacency = mne.spatial_src_adjacency(forward["src"], verbose=0)
+        adjacency = build_source_adjacency(forward["src"], verbose=0)
         adjacency = csr_matrix(adjacency)
         n_dipoles = adjacency.shape[0]
 

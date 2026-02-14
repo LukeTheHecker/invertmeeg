@@ -1,4 +1,5 @@
 from copy import deepcopy
+from invert.util import build_source_adjacency
 
 import mne
 import numpy as np
@@ -125,7 +126,7 @@ class Compressor:
         pass
 
     def fit(self, fwd, k=600):
-        A = mne.spatial_src_adjacency(fwd["src"], verbose=0).toarray()
+        A = build_source_adjacency(fwd["src"], verbose=0).toarray()
         L = laplacian(A)
         U, s, V = np.linalg.svd(L)
 

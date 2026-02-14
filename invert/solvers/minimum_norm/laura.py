@@ -4,7 +4,7 @@ import mne
 import numpy as np
 from scipy.spatial.distance import cdist
 
-from ...util import pos_from_forward
+from ...util import build_source_adjacency, pos_from_forward
 from ..base import BaseSolver, InverseOperator, SolverMeta
 
 logger = logging.getLogger(__name__)
@@ -140,9 +140,7 @@ class SolverLAURA(BaseSolver):
         # Determine neighborhood structure
         if self.use_mesh_adjacency:
             # Use mesh connectivity (extension)
-            adjacency = mne.spatial_src_adjacency(
-                forward["src"], verbose=verbose
-            ).toarray()
+            adjacency = build_source_adjacency(forward["src"], verbose=verbose).toarray()
             d_adj = d * adjacency
         else:
             # Pure LAURA: use all sources (full distance matrix, exclude diagonal)

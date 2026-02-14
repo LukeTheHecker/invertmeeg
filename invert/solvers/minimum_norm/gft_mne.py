@@ -1,4 +1,5 @@
 import logging
+from invert.util import build_source_adjacency
 
 import mne
 import numpy as np
@@ -78,7 +79,7 @@ class SolverGFTMNE(BaseSolver):
 
         # Get Adjacency matrix
 
-        adjacency = mne.spatial_src_adjacency(forward["src"], verbose=0)
+        adjacency = build_source_adjacency(forward["src"], verbose=0)
         lap = laplacian(adjacency).astype(float)
 
         num_eigenvalues = lap.shape[0]

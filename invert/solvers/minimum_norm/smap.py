@@ -1,4 +1,5 @@
 import logging
+from invert.util import build_source_adjacency
 
 import mne
 import numpy as np
@@ -103,7 +104,7 @@ class SolverSMAP(BaseSolver):
 
         LTL = leadfield.T @ leadfield
 
-        adjacency = mne.spatial_src_adjacency(self.forward["src"], verbose=0)
+        adjacency = build_source_adjacency(self.forward["src"], verbose=0)
         # First-order Laplacian smoothness: x^T L x (graph Laplacian), rather
         # than squaring the Laplacian as in LORETA-style penalties.
         GTG = laplacian(adjacency).astype(float).toarray()

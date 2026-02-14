@@ -1,4 +1,5 @@
 from copy import deepcopy
+from invert.util import build_source_adjacency
 
 import mne
 import numpy as np
@@ -73,7 +74,7 @@ class SolverSourceMAP(BaseSolver):
         leadfield = self.leadfield
         n_chans, n_dipoles = leadfield.shape
         if smoothness_prior:
-            adjacency = mne.spatial_src_adjacency(self.forward["src"], verbose=0)
+            adjacency = build_source_adjacency(self.forward["src"], verbose=0)
             self.gradient = laplacian(adjacency).toarray().astype(np.float32)
             self.sigma_s = np.identity(n_dipoles) @ abs(self.gradient)
         else:

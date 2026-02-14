@@ -7,6 +7,7 @@ from .util import (
     read_solver,
     thresholding,
 )
+from .source_adjacency import build_source_adjacency
 
 __all__ = [
     "read_solver",
@@ -16,4 +17,5 @@ __all__ = [
     "thresholding",
     "best_index_residual",
     "euclidean_distance",
+    "build_source_adjacency",
 ]

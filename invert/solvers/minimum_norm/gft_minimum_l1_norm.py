@@ -1,5 +1,6 @@
 import logging
 from copy import deepcopy
+from invert.util import build_source_adjacency
 
 import mne
 import numpy as np
@@ -71,7 +72,7 @@ class SolverGFTMinimumL1Norm(BaseSolver):
 
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
 
-        adjacency = mne.spatial_src_adjacency(forward["src"], verbose=0)
+        adjacency = build_source_adjacency(forward["src"], verbose=0)
         graph_laplacian = laplacian(adjacency, normed=False).astype(float).toarray()
         eigenvalues, eigenvectors = np.linalg.eigh(graph_laplacian)
 

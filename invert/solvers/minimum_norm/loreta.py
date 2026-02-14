@@ -3,6 +3,7 @@ import logging
 import mne
 import numpy as np
 from scipy.sparse.csgraph import laplacian
+from invert.util import build_source_adjacency
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
 
@@ -101,9 +102,7 @@ class SolverLORETA(BaseSolver):
 
         LTL = leadfield.T @ leadfield
         B = np.eye(leadfield.shape[1])
-        adjacency = mne.spatial_src_adjacency(
-            forward["src"], verbose=self.verbose
-        ).toarray()
+        adjacency = build_source_adjacency(forward["src"], verbose=self.verbose).toarray()
         laplace_operator = laplacian(adjacency)
         BLapTLapB = B @ laplace_operator.T @ laplace_operator @ B
 

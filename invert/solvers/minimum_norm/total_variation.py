@@ -1,4 +1,5 @@
 from __future__ import annotations
+from invert.util import build_source_adjacency
 
 import logging
 from typing import Any
@@ -98,7 +99,7 @@ class SolverTotalVariation(BaseSolver):
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
         self.prepare_whitened_forward(noise_cov)
 
-        adjacency = mne.spatial_src_adjacency(self.forward["src"], verbose=0).tocoo()
+        adjacency = build_source_adjacency(self.forward["src"], verbose=0).tocoo()
         i = adjacency.row.astype(int)
         j = adjacency.col.astype(int)
         mask = i < j

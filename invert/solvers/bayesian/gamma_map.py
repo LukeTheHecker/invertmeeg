@@ -1,4 +1,5 @@
 from copy import deepcopy
+from invert.util import build_source_adjacency
 
 import mne
 import numpy as np
@@ -75,7 +76,7 @@ class SolverGammaMAP(BaseSolver):
         data = self.unpack_data_obj(mne_obj)
         data = wf.sensor_transform @ data
         if smoothness_prior:
-            adjacency = mne.spatial_src_adjacency(self.forward["src"], verbose=0)
+            adjacency = build_source_adjacency(self.forward["src"], verbose=0)
             self.gradient = laplacian(adjacency).toarray().astype(np.float32)
             self.sigma_s = np.identity(n_dipoles) @ abs(self.gradient)
         else:

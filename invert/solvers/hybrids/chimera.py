@@ -1,4 +1,5 @@
 from __future__ import annotations
+from invert.util import build_source_adjacency
 
 import logging
 from dataclasses import dataclass
@@ -96,7 +97,7 @@ class SolverChimera(BaseSolver):
 
         # Precompute adjacency + diffusion operator for the detection ratio.
         n_dipoles = self.leadfield.shape[1]
-        adjacency = mne.spatial_src_adjacency(self.forward["src"], verbose=0)
+        adjacency = build_source_adjacency(self.forward["src"], verbose=0)
         LL = laplacian(adjacency)
         I = np.eye(n_dipoles)
         S = csr_matrix(I - self._p.diffusion_parameter * LL)

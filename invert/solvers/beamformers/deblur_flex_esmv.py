@@ -1,4 +1,5 @@
 from __future__ import annotations
+from invert.util import build_source_adjacency
 
 import logging
 from dataclasses import dataclass
@@ -80,7 +81,7 @@ class SolverDeblurFlexESMV(BaseSolver):
             self.coerce_noise_cov(noise_cov)
         self._noise_cov = noise_cov
         _ = self.unpack_data_obj(mne_obj)
-        adjacency = mne.spatial_src_adjacency(self.forward["src"], verbose=0)
+        adjacency = build_source_adjacency(self.forward["src"], verbose=0)
         self._src_laplacian = sparse_laplacian(adjacency, normed=False).tocsc()
         self._src_n_dipoles = int(self._src_laplacian.shape[0])
         self.inverse_operators = []

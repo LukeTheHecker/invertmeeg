@@ -3,6 +3,7 @@ from copy import deepcopy
 
 import mne
 import numpy as np
+from invert.util import build_source_adjacency
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
 
@@ -137,7 +138,7 @@ class SolverSSLOFO(BaseSolver):
         self.prepare_whitened_forward(noise_cov)
 
         # Get adjacency matrix for smoothing operations
-        self.adjacency = mne.spatial_src_adjacency(
+        self.adjacency = build_source_adjacency(
             forward["src"], verbose=self.verbose
         ).toarray()
 
