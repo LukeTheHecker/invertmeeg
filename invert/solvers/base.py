@@ -223,6 +223,8 @@ class BaseSolver:
         self.r1gcv_gamma = r1gcv_gamma
         self.require_recompute = True
         self.require_data = True
+        self._free_orientation = False
+        self._n_orient = 1
         # Attributes populated during operator construction.
         self.forward: Any = None
         self.leadfield: np.ndarray = np.empty((0, 0), dtype=float)
@@ -1824,16 +1826,27 @@ class BaseSolver:
         Return
         ------
         """
-        # Check whether forward model has free source orientation
-        # if yes -> convert to fixed
+        # Handle free source orientation.
         if self.forward["source_ori"] == FIFF.FIFFV_MNE_FREE_ORI:
-            logger.warning(
-                "Forward model has free source orientation. This is currently not possible, converting to fixed."
-            )
-            # convert to fixed
-            self.forward = mne.convert_forward_solution(
-                self.forward, force_fixed=True, verbose=0
-            )
+            src_types = [str(s.get("type", "")) for s in self.forward["src"]]
+            if any(t in ("vol", "discrete") for t in src_types):
+                # Volume/discrete source space: keep free orientation.
+                # The default normals are [0,0,1] which are meaningless
+                # for volume grids — forcing fixed would destroy most
+                # signal.  Instead, keep 3 components per source and
+                # combine via vector norm in source_to_object().
+                self._free_orientation = True
+                self._n_orient = 3
+            else:
+                # Surface source space: convert to fixed (cortical normal).
+                self.forward = mne.convert_forward_solution(
+                    self.forward, force_fixed=True, verbose=0
+                )
+                self._free_orientation = False
+                self._n_orient = 1
+        else:
+            self._free_orientation = False
+            self._n_orient = 1
 
         self.leadfield = deepcopy(self.forward["sol"]["data"])
 
@@ -2065,9 +2078,23 @@ class BaseSolver:
                 else source_mat / self.depth_weights
             )
 
-        # Convert source to mne.SourceEstimate object
+        # Combine free-orientation components (3 per source -> 1 via vector norm).
+        if getattr(self, "_free_orientation", False):
+            n_orient = getattr(self, "_n_orient", 3)
+            n_src = source_mat.shape[0] // n_orient
+            if source_mat.ndim == 2:
+                source_mat = np.linalg.norm(
+                    source_mat.reshape(n_src, n_orient, -1), axis=1
+                )
+            else:
+                source_mat = np.linalg.norm(
+                    source_mat.reshape(n_src, n_orient), axis=1
+                )
+
+        # Convert source to an MNE STC object matching the source-space type.
         source_model = self.forward["src"]
-        vertices = [source_model[0]["vertno"], source_model[1]["vertno"]]
+        vertices = [np.asarray(s["vertno"]) for s in source_model]
+        src_types = [str(s.get("type", "")) for s in source_model]
         tmin = self.tmin
         sfreq = self.obj_info["sfreq"]
         tstep = 1 / sfreq
@@ -2079,14 +2106,33 @@ class BaseSolver:
         else:
             subject = "fsaverage"
 
-        stc = mne.SourceEstimate(
-            source_mat,
-            vertices,
-            tmin=tmin,
-            tstep=tstep,
-            subject=subject,
-            verbose=self.verbose,
-        )
+        if len(vertices) == 2 and all(src_type == "surf" for src_type in src_types):
+            stc = mne.SourceEstimate(
+                source_mat,
+                vertices,
+                tmin=tmin,
+                tstep=tstep,
+                subject=subject,
+                verbose=self.verbose,
+            )
+        elif len(vertices) == 1 and src_types[0] in {"vol", "discrete"}:
+            stc = mne.VolSourceEstimate(
+                source_mat,
+                vertices,
+                tmin=tmin,
+                tstep=tstep,
+                subject=subject,
+                verbose=self.verbose,
+            )
+        else:
+            stc = mne.MixedSourceEstimate(
+                source_mat,
+                vertices,
+                tmin=tmin,
+                tstep=tstep,
+                subject=subject,
+                verbose=self.verbose,
+            )
         return stc
 
     def _fix_class_identity(self):
