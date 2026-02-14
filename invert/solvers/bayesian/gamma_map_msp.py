@@ -1,4 +1,5 @@
 from copy import deepcopy
+from invert.util import build_source_adjacency
 
 import mne
 import numpy as np
@@ -75,10 +76,17 @@ class SolverGammaMAPMSP(BaseSolver):
         wf = self.prepare_whitened_forward(noise_cov)
         data = self.unpack_data_obj(mne_obj)
         data = wf.sensor_transform @ data
+        leadfield = self.leadfield
         data_cov = self.data_covariance(data, center=True, ddof=1)
+        L_smooth, _gradient = self.get_smooth_prior_cov(leadfield, smoothness_order)
+        sigma_s = np.identity(L_smooth.shape[1])
+        reg_reference = L_smooth @ sigma_s @ L_smooth.T
+        reg_reference = 0.5 * (reg_reference + reg_reference.T)
+        if not np.all(np.isfinite(reg_reference)) or np.linalg.norm(reg_reference) == 0:
+            reg_reference = data_cov
 
         inverse_operators = []
-        self.get_alphas(reference=data_cov)
+        self.get_alphas(reference=reg_reference)
         for alpha in self.alphas:
             inverse_operator = self.make_source_map_inverse_operator(
                 data, alpha, max_iter=max_iter, p=p, smoothness_order=smoothness_order
@@ -128,35 +136,44 @@ class SolverGammaMAPMSP(BaseSolver):
         # Data Covariance Matrix
         # Cb = B @ B.T
         L_smooth, gradient = self.get_smooth_prior_cov(L, smoothness_order)
-        gammas = np.ones(ds)
-        sigma_e = alpha * np.identity(db)
+        gammas = np.ones(ds, dtype=float)
+        sigma_e = float(alpha) * np.identity(db)
         sigma_s = np.identity(
             ds
         )  # identity leads to weighted minimum L2 Norm-type solution
-        sigma_b = sigma_e + L_smooth @ sigma_s @ L_smooth.T
-        sigma_b_inv = np.linalg.inv(sigma_b)
 
         for _k in range(max_iter):
             # print(k)
-            old_gammas = deepcopy(gammas)
+            old_gammas = gammas.copy()
+
+            sigma_s_hat = np.diag(gammas) @ sigma_s
+            sigma_b = sigma_e + L_smooth @ sigma_s_hat @ L_smooth.T
+            sigma_b = 0.5 * (sigma_b + sigma_b.T)
+            sigma_b_inv = np.linalg.inv(sigma_b)
 
             # gammas = ((1/n) * np.sqrt(np.sum(( np.diag(gammas) @ L_smooth.T @ sigma_b_inv @ B )**2, axis=1)))**((2-p)/2)
 
             term_1 = (gammas / np.sqrt(n)) * np.sqrt(
                 np.sum((L_smooth.T @ sigma_b_inv @ B) ** 2, axis=1)
             )
-            term_2 = 1 / np.sqrt(np.diagonal(L_smooth.T @ sigma_b_inv @ L_smooth))
+            denom = np.diagonal(L_smooth.T @ sigma_b_inv @ L_smooth)
+            denom = np.maximum(denom, 1e-15)
+            term_2 = 1 / np.sqrt(denom)
             gammas = term_1 * term_2
 
-            if np.linalg.norm(gammas) == 0:
+            if not np.all(np.isfinite(gammas)) or np.linalg.norm(gammas) == 0:
                 gammas = old_gammas
                 break
             # print(gammas.min(), gammas.max())
             # gammas /= np.linalg.norm(gammas)
 
         # Smooth gammas according to smooth priors
-        gammas_final = abs(gammas @ gradient)
-        gammas_final = gammas / gammas.max()
+        gammas_final = np.abs(gammas @ gradient)
+        gamma_max = float(np.max(gammas_final))
+        if not np.isfinite(gamma_max) or gamma_max <= 0:
+            gammas_final = np.ones_like(gammas_final)
+        else:
+            gammas_final = gammas_final / gamma_max
 
         sigma_s_hat = np.diag(gammas_final) @ sigma_s
         inverse_operator = (
@@ -189,12 +206,14 @@ class SolverGammaMAPMSP(BaseSolver):
             The smoothness gradient (laplacian matrix)
 
         """
-        adjacency = mne.spatial_src_adjacency(self.forward["src"], verbose=0)
+        adjacency = build_source_adjacency(self.forward["src"], verbose=0)
         gradient = laplacian(adjacency).toarray().astype(np.float32)
 
         for _ in range(smoothness_order):
             gradient = gradient @ gradient
         L = L @ abs(gradient)
         # L -= L.mean(axis=0)
-        L /= np.linalg.norm(L, axis=0)
+        norms = np.linalg.norm(L, axis=0)
+        norms = np.maximum(norms, 1e-15)
+        L /= norms
         return L, gradient
