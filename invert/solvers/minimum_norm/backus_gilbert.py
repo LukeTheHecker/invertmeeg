@@ -25,6 +25,7 @@ class SolverBackusGilbert(BaseSolver):
             "Backus, G., & Gilbert, F. (1968). The resolving power of gross earth data. Geophysical Journal of the Royal Astronomical Society, 16(2), 169–205.",
         ],
     )
+    SUPPORTS_VECTOR_ORIENTATION: bool = True
 
     def __init__(self, name="Backus-Gilbert", **kwargs):
         self.name = name

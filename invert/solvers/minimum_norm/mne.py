@@ -37,6 +37,7 @@ class SolverMNE(BaseSolver):
             "Hämäläinen, M. S., & Ilmoniemi, R. J. (1994). Interpreting magnetic fields of the brain: minimum norm estimates. Medical & Biological Engineering & Computing, 32(1), 35–42.",
         ],
     )
+    SUPPORTS_VECTOR_ORIENTATION: bool = True
 
     def __init__(
         self,

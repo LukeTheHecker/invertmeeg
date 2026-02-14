@@ -4,6 +4,8 @@ from invert.util import build_source_adjacency
 import mne
 import numpy as np
 from scipy.sparse import csr_matrix
+from scipy.sparse import identity as sparse_identity
+from scipy.sparse import kron as sparse_kron
 from scipy.sparse.csgraph import laplacian
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
@@ -74,11 +76,20 @@ class SolverAdaptFlexESMV(BaseSolver):
 
     def _prepare_flex(self):
         """Build multi-order smoothed leadfields and gradient matrices."""
-        n_dipoles = self.leadfield.shape[1]
-        I_src = np.identity(n_dipoles)
+        n_cols = int(self.leadfield.shape[1])
+        n_orient = int(getattr(self, "_n_orient", 1))
+        if n_orient <= 0:
+            n_orient = 1
+        if n_cols % n_orient != 0:
+            raise ValueError(
+                f"AdaptFlexESMV: leadfield has {n_cols} columns which is not divisible "
+                f"by n_orient={n_orient}."
+            )
+        n_locs = int(n_cols // n_orient)
+        I_src = sparse_identity(n_cols, format="csr", dtype=float)
 
         self.leadfields = [deepcopy(self.leadfield)]
-        self.gradients = [csr_matrix(I_src)]
+        self.gradients = [I_src]
 
         if self.n_orders == 0:
             self.is_prepared = True
@@ -92,7 +103,19 @@ class SolverAdaptFlexESMV(BaseSolver):
             )
 
         LL = laplacian(adjacency)
-        smoothing_op = csr_matrix(I_src - self.diffusion_parameter * LL)
+        if LL.shape != (n_locs, n_locs):
+            raise ValueError(
+                f"AdaptFlexESMV: Laplacian has shape {LL.shape}, expected {(n_locs, n_locs)}."
+            )
+        if n_orient != 1:
+            # Expand smoothing to free-orientation columns: apply the same spatial
+            # smoothing independently to each orientation component.
+            LL = sparse_kron(LL, sparse_identity(n_orient, format="csr"), format="csr")
+        if LL.shape != (n_cols, n_cols):
+            raise ValueError(
+                f"AdaptFlexESMV: expanded Laplacian has shape {LL.shape}, expected {(n_cols, n_cols)}."
+            )
+        smoothing_op = I_src - float(self.diffusion_parameter) * LL
 
         for i in range(self.n_orders):
             S_i = smoothing_op ** (i + 1)
@@ -120,7 +143,7 @@ class SolverAdaptFlexESMV(BaseSolver):
         noise_cov: mne.Covariance | None = None,
         **kwargs,
     ):
-        super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        super().make_inverse_operator(forward, mne_obj, *args, alpha=alpha, **kwargs)
         wf = self.prepare_whitened_forward(noise_cov)
         self.is_prepared = False
         data = self.unpack_data_obj(mne_obj)

@@ -28,6 +28,7 @@ class SolverEPIFOCUS(BaseSolver):
             "Grave de Peralta Menendez, R., Gonzalez Andino, S., Lantz, G., Michel, C. M., & Landis, T. (2001). Noninvasive localization of electromagnetic epileptic activity. I. Method descriptions and simulations. Brain Topography, 14(2), 131–137.",
         ],
     )
+    SUPPORTS_VECTOR_ORIENTATION: bool = True
 
     def __init__(self, name="EPIFOCUS", **kwargs):
         self.name = name

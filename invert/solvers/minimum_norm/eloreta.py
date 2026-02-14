@@ -33,6 +33,7 @@ class SolverELORETA(BaseSolver):
             "Pascual-Marqui, R. D. (2007). Discrete, 3D distributed, linear imaging methods of electric neuronal activity. Part 1: exact, zero error localization. arXiv:0710.3341.",
         ],
     )
+    SUPPORTS_VECTOR_ORIENTATION: bool = True
 
     def __init__(
         self,

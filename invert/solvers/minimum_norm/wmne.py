@@ -33,6 +33,7 @@ class SolverWMNE(BaseSolver):
             "Lin, F.-H., Witzel, T., Ahlfors, S. P., Stufflebeam, S. M., Belliveau, J. W., & Hämäläinen, M. S. (2006). Assessing and improving the spatial accuracy in MEG source localization by depth-weighted minimum-norm estimates. NeuroImage, 31(1), 160–171.",
         ],
     )
+    SUPPORTS_VECTOR_ORIENTATION: bool = True
 
     def __init__(
         self,
