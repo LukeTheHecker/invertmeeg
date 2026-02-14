@@ -48,7 +48,7 @@ class SolverMSP(BaseSolver):
         include_sensor_noise=True,
         eta=-32.0,
         Pi=1.0 / 256.0,
-        max_iter=512,
+        max_iter=128,
         tol=1e-4,
         n_patterns=None,
         diffusion_parameter=0.1,
@@ -73,7 +73,7 @@ class SolverMSP(BaseSolver):
         max_iter : int
             Maximum number of ReML iterations.
         tol : float
-            Convergence tolerance for relative change in hyperparameters.
+            Convergence tolerance for predicted free energy change.
         n_patterns : int or None
             Number of patterns to generate if patterns is None. If None,
             a reasonable default based on the source space will be used.
@@ -82,7 +82,7 @@ class SolverMSP(BaseSolver):
             patterns automatically. Default is 0.1.
         patch_order : int
             Order of smoothing for generated patches (1 = small patches,
-            2 = medium patches, etc.). Default is 1.
+            2 = medium patches, etc.). Default is 2.
         """
         self.name = name
         self.patterns = patterns
@@ -121,7 +121,7 @@ class SolverMSP(BaseSolver):
         ------
         self : object returns itself for convenience
         """
-        super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
+        super().make_inverse_operator(forward, mne_obj, *args, alpha=alpha, **kwargs)
         wf = self.prepare_whitened_forward(noise_cov)
         data = self.unpack_data_obj(mne_obj)
         data = wf.sensor_transform @ data
@@ -140,257 +140,162 @@ class SolverMSP(BaseSolver):
         d = leadfield.shape[1]
         C = (data @ data.T) / float(v)  # sample covariance over time/epochs
 
-        # Build rank-1 vectors u_i = L @ q_i and trace normalization factors
-        # Instead of storing full m×m Q_i matrices, store m-vectors u_i
-        # so that Q_i = u_i @ u_i^T / trace_i
-        U_cols = []
-        trace_factors = []
+        # Build diagonal source priors as sensor-space covariance components
+        # Q_i = diag(q_i) in source space -> LQL_i = (L * q_i) @ L^T in sensor space
+        n_pats = len(self.patterns)
+        Q_src = np.array(self.patterns)  # n_pats x d
 
-        for q in self.patterns:
-            q = q.flatten()
-            u = leadfield @ q  # m-vector
-            trace_val = np.dot(u, u)  # trace of u @ u^T
-            if trace_val > 0:
-                U_cols.append(u / np.sqrt(trace_val))  # normalize so u@u^T has trace 1
+        LQL = np.empty((n_pats, m, m))
+        tr = np.empty(n_pats)
+        valid = np.ones(n_pats, dtype=bool)
+
+        for i in range(n_pats):
+            lq = leadfield * Q_src[i]  # m x d, broadcasting
+            LQL[i] = lq @ leadfield.T  # m x m
+            tr[i] = np.trace(LQL[i])
+            if tr[i] > 1e-20:
+                LQL[i] /= tr[i]
             else:
-                U_cols.append(u)
-            trace_factors.append(trace_val)
+                valid[i] = False
 
-        # U is m × n_patterns, each column is a normalized u_i
-        U = np.column_stack(U_cols) if U_cols else np.empty((m, 0))
-        n_source_components = U.shape[1]
+        # Remove invalid patterns
+        if not valid.all():
+            LQL = LQL[valid]
+            Q_src = Q_src[valid]
+            tr = tr[valid]
+            n_pats = int(valid.sum())
 
-        # Total number of components (with optional noise)
+        # Add noise component
         has_noise = self.include_sensor_noise
-        p = n_source_components + (1 if has_noise else 0)
+        if has_noise:
+            Q_noise = np.eye(m) / m  # trace-normalized identity
+            LQL_all = np.concatenate([LQL, Q_noise[np.newaxis]], axis=0)
+            n_comp = n_pats + 1
+        else:
+            LQL_all = LQL
+            n_comp = n_pats
 
-        eta_vec = np.full(p, self.eta, dtype=float)
-        P_hyper = self.Pi * np.eye(p)
+        # Data-driven initialization: h = log(trace(C) / n_comp)
+        trC = max(np.trace(C), 1e-20)
+        h_init = np.log(trC / n_comp)
+        h = np.full(n_comp, h_init)
+        hE = np.full(n_comp, self.eta)  # hyperprior mean
+        Pi_val = self.Pi  # hyperprior precision (scalar)
 
-        # Initialize lambdas at the hyperprior mean
-        lambdas = np.full(p, self.eta, dtype=float)
-
-        # Add small random perturbations to break symmetry
-        rng = np.random.RandomState(42)
-        lambdas += rng.randn(p) * 0.1
+        # Bounds: h_max so that a single component can explain ~exp(10)x the
+        # data variance (generous margin); h_min at hyperprior mean
+        lambda_min = -32.0
+        lambda_max = np.log(trC) + 10.0
 
         if self.verbose:
             logger.info(
-                f"Initialized {p} hyperparameters with lambda = {self.eta:.2f} (±0.1)"
+                f"MSP: {n_comp} components ({n_pats} source + "
+                f"{'1 noise' if has_noise else '0 noise'}), "
+                f"h_init={h_init:.2f}, h_bounds=[{lambda_min}, {lambda_max:.1f}]"
             )
-            logger.info(
-                f"Running ReML optimization (max_iter={self.max_iter}, tol={self.tol})..."
-            )
 
-        # Add bounds to prevent numerical overflow
-        lambda_min = -32.0
-        lambda_max = 32.0
-
-        # Pruning threshold for inactive components
-        prune_threshold = 1e-12
-
-        # ReML iterations (Fisher scoring)
-        prev = None
-        initial_grad_norm = None
-
+        # ReML iterations (SPM-style Fisher scoring with damping)
         for it in range(1, self.max_iter + 1):
-            # Clip lambdas to prevent overflow
-            lambdas = np.clip(lambdas, lambda_min, lambda_max)
-            scales = np.exp(lambdas)
+            scales = np.exp(h)
 
-            # Identify active components (pruning)
-            active_mask = scales > prune_threshold
+            # Model covariance: R = sum_i scales[i] * LQL_all[i]
+            R = np.tensordot(scales, LQL_all, axes=([0], [0]))  # m x m
 
-            # Build R = noise_scale * I/m + U_active @ diag(scales_active) @ U_active^T
-            if has_noise:
-                noise_scale = scales[0]
-                source_scales = scales[1:]
-                source_active = active_mask[1:]
-            else:
-                noise_scale = 0.0
-                source_scales = scales
-                source_active = active_mask
-
-            active_idx = np.where(source_active)[0]
-            U_active = U[:, active_idx]
-            s_active = source_scales[active_idx]
-
-            # R = noise_scale * I/m + U_active @ diag(s_active) @ U_active^T
-            R = np.eye(m) * (noise_scale / m)
-            if len(active_idx) > 0:
-                # Efficiently: R += (U_active * s_active) @ U_active^T
-                R += (U_active * s_active[np.newaxis, :]) @ U_active.T
-
-            # Check for numerical issues in R
-            if not np.isfinite(R).all():
+            # Precision
+            P = self._solve_R(R, np.eye(m))
+            if not np.isfinite(P).all():
                 if self.verbose:
-                    logger.warning(
-                        f"[MSP {it:02d}] Warning: Non-finite values in R, stopping"
-                    )
+                    logger.warning(f"[MSP {it:02d}] Non-finite precision, stopping")
                 break
 
-            invR = self._solve_R(R, np.eye(m))
+            # Residual: W = I - P @ C
+            W = np.eye(m) - P @ C
 
-            # Check for numerical issues in invR
-            if not np.isfinite(invR).all():
-                if self.verbose:
-                    logger.warning(
-                        f"[MSP {it:02d}] Warning: Non-finite values in invR, stopping"
-                    )
-                break
+            # PQ[i] = P @ LQL_all[i] * scales[i]
+            PQ = np.einsum('jk,ikl->ijl', P, LQL_all) * scales[:, None, None]
 
-            C_minus_R = C - R
+            # Vectorized gradient: g_i = -v/2 * trace(PQ[i] @ W)
+            PQ_flat = PQ.reshape(n_comp, m * m)
+            W_T_flat = W.T.ravel()
+            g = -0.5 * v * (PQ_flat @ W_T_flat)
 
-            # Precompute W = invR @ U (m × n_source_components)
-            W = invR @ U  # m × n_source_components
+            # Vectorized Hessian: H_ij = -v/2 * trace(PQ[i] @ PQ[j])
+            PQ_T_flat = PQ.transpose(0, 2, 1).reshape(n_comp, m * m)
+            H = -0.5 * v * (PQ_flat @ PQ_T_flat.T)
 
-            # Precompute CmR_W = (C - R) @ W for gradient
-            CmR_W = C_minus_R @ W  # m × n_source_components
+            # Add hyperprior terms
+            g_total = g - Pi_val * (h - hE)
+            H_total = H - Pi_val * np.eye(n_comp)
 
-            # Precompute V = R @ W for Hessian
-            V = R @ W  # m × n_source_components
-
-            # Gradient computation
-            grad = np.empty(p)
-
-            if has_noise:
-                invR_CmR = invR @ C_minus_R  # reuse
-                trace_noise = (noise_scale / m) * np.sum(invR * invR_CmR.T)
-                grad[0] = 0.5 * v * trace_noise - P_hyper[0, 0] * (
-                    lambdas[0] - eta_vec[0]
-                )
-
-                w_dot_cmrw = np.sum(W * CmR_W, axis=0)  # length n_source_components
-                grad[1:] = 0.5 * v * source_scales * w_dot_cmrw - np.diag(P_hyper)[
-                    1:
-                ] * (lambdas[1:] - eta_vec[1:])
-            else:
-                w_dot_cmrw = np.sum(W * CmR_W, axis=0)
-                grad[:] = 0.5 * v * source_scales * w_dot_cmrw - np.diag(P_hyper) * (
-                    lambdas - eta_vec
-                )
-
-            # Hessian computation
-            Fkk = np.empty((p, p))
-
-            if has_noise:
-                WtV = W.T @ V  # n_source × n_source
-                ss_outer = np.outer(source_scales, source_scales)
-                Fkk[1:, 1:] = -0.5 * v * ss_outer * (WtV**2) - P_hyper[1:, 1:]
-
-                invR_sq_trace = np.sum(invR * invR.T)
-                Fkk[0, 0] = (
-                    -0.5 * v * (noise_scale / m) ** 2 * invR_sq_trace - P_hyper[0, 0]
-                )
-
-                w_norms_sq = np.sum(W**2, axis=0)  # ||w_j||^2 for each j
-                cross = (noise_scale / m) * source_scales * w_norms_sq
-                Fkk[0, 1:] = -0.5 * v * cross - P_hyper[0, 1:]
-                Fkk[1:, 0] = Fkk[0, 1:]
-            else:
-                WtV = W.T @ V
-                ss_outer = np.outer(source_scales, source_scales)
-                Fkk[:, :] = -0.5 * v * ss_outer * (WtV**2) - P_hyper
-
-            # Check for numerical issues
-            if not np.isfinite(grad).all() or not np.isfinite(Fkk).all():
-                if self.verbose:
-                    logger.warning(
-                        f"[MSP {it:02d}] Warning: Non-finite values in grad/Fkk, stopping"
-                    )
-                break
-
-            # Newton step with regularization
+            # Newton step
             try:
-                eigvals = np.linalg.eigvalsh(Fkk)
-                cond_num = np.abs(eigvals).max() / (np.abs(eigvals).min() + 1e-12)
-
-                if cond_num > 1e12 or np.min(eigvals) > -1e-8:
-                    reg_factor = max(1e-6, 1e-4 * np.abs(np.diag(Fkk)).mean())
-                    Fkk_reg = Fkk - reg_factor * np.eye(p)
-                    step = -np.linalg.solve(Fkk_reg, grad)
-                else:
-                    step = -np.linalg.solve(Fkk, grad)
+                dh = -np.linalg.solve(H_total, g_total)
             except np.linalg.LinAlgError:
-                step = -grad / (np.abs(np.diag(Fkk)).mean() + 1e-6)
+                dh = -g_total / (np.abs(np.diag(H_total)).mean() + 1e-6)
 
-            if not np.isfinite(step).all():
+            if not np.isfinite(dh).all():
                 if self.verbose:
-                    logger.warning(f"[MSP {it:02d}] Warning: Non-finite step, stopping")
+                    logger.warning(f"[MSP {it:02d}] Non-finite step, stopping")
                 break
 
-            lambdas_new = np.clip(lambdas + step, lambda_min, lambda_max)
+            # Per-component step clipping (prevents explosive steps when
+            # Hessian is rank-deficient, i.e. n_comp > m)
+            np.clip(dh, -4, 4, out=dh)
 
-            # Convergence check
-            delta = lambdas_new - lambdas
-            rel = np.linalg.norm(delta) / (np.linalg.norm(lambdas) + 1e-12)
-            grad_norm = np.linalg.norm(grad)
+            # SPM-style damping
+            dh /= np.log(it + 2)
 
-            if initial_grad_norm is None:
-                initial_grad_norm = float(max(float(grad_norm), 1e-10))
+            # Predicted free energy change
+            dF = float(np.dot(dh, g_total) + 0.5 * dh @ H_total @ dh)
 
-            grad_rel = float(grad_norm) / float(initial_grad_norm)
+            # Update and bound
+            h += dh
+            np.clip(h, lambda_min, lambda_max, out=h)
 
-            lambdas = lambdas_new
+            # Pruning: reset very inactive components to hyperprior mean
+            prune_mask = h < -16
+            h[prune_mask] = hE[prune_mask]
 
             if self.verbose:
+                n_active = int(np.sum(np.exp(h) > 1e-6))
                 logger.debug(
-                    f"[MSP {it:02d}] grad_norm={grad_norm:.3e} (rel={grad_rel:.3e})  "
-                    f"change={rel:.3e}  lambda_range=[{lambdas.min():.2f}, {lambdas.max():.2f}]"
+                    f"[MSP {it:02d}] dF={dF:.3e}  "
+                    f"h_range=[{h.min():.1f}, {h.max():.1f}]  "
+                    f"active={n_active}/{n_comp}"
                 )
 
-            if prev is not None:
-                if rel < self.tol and grad_rel < self.tol:
-                    if self.verbose:
-                        logger.info(
-                            f"MSP converged after {it} iterations (change={rel:.3e}, grad_rel={grad_rel:.3e})"
-                        )
-                    break
-                elif rel < 1e-8:
-                    if self.verbose:
-                        logger.info(
-                            f"MSP stopped after {it} iterations (minimal change, rel={rel:.3e})"
-                        )
-                    break
-            prev = lambdas.copy()
+            # Convergence
+            if abs(dF) < self.tol:
+                if self.verbose:
+                    logger.info(
+                        f"MSP converged after {it} iterations (dF={dF:.3e})"
+                    )
+                break
 
-        # Final covariance
-        lambdas = np.clip(lambdas, lambda_min, lambda_max)
-        scales = np.exp(lambdas)
+        # Final reconstruction
+        scales = np.exp(h)
+        source_scales = scales[:n_pats]
 
-        if has_noise:
-            noise_scale = scales[0]
-            source_scales = scales[1:]
-        else:
-            noise_scale = 0.0
-            source_scales = scales
+        # Source prior diagonal: re[j] = sum_i source_scales[i] * Q_src[i,j] / tr[i]
+        re = np.zeros(d)
+        for i in range(n_pats):
+            if tr[i] > 1e-20:
+                re += source_scales[i] * Q_src[i] / tr[i]
 
-        R = np.eye(m) * (noise_scale / m)
-        if U.shape[1] > 0:
-            R += (U * source_scales[np.newaxis, :]) @ U.T
+        # Final model covariance and precision
+        R = np.tensordot(scales, LQL_all, axes=([0], [0]))
+        P = self._solve_R(R, np.eye(m))
 
-        invR = self._solve_R(R, np.eye(m))
-
-        # Build source-space prior Re = sum_i (scale_i / trace_i) * q_i @ q_i^T
-        # Using rank-1 structure for efficiency
-        Re = np.zeros((d, d))
-        for i, q in enumerate(self.patterns):
-            q = q.flatten()
-            tf = trace_factors[i]
-            coeff = source_scales[i] / tf if tf > 0 else source_scales[i]
-            q_col = q.reshape(-1, 1)
-            Re += coeff * (q_col @ q_col.T)
-
-        # Posterior mean inverse operator: M = Re L^T R^{-1}
-        M = Re @ leadfield.T @ invR
+        # MAP inverse operator: M = diag(re) @ L^T @ P
+        # Efficiently: (re[:, None] * L^T) @ P  -- no d x d matrix needed
+        M = (re[:, None] * leadfield.T) @ P
 
         # Store diagnostics
-        self.lambdas = lambdas
+        self.lambdas = h
         self.R = R
-        self.invR = invR
-        self.Re = Re
+        self.invR = P
 
-        # Create inverse operator (single operator for MSP)
+        # Create inverse operator
         self.inverse_operators = [InverseOperator(M @ wf.sensor_transform, self.name)]
         return self
 
@@ -423,9 +328,10 @@ class SolverMSP(BaseSolver):
         L_sparse = laplacian(adjacency)
         smoother = speye(n_dipoles, format="csr") + self.diffusion_parameter * L_sparse
 
-        # Determine number of patterns
+        # Determine number of patterns — use all dipoles when feasible
+        # (one pattern per source = ARD), cap at 512 for large spaces
         if self.n_patterns is None:
-            self.n_patterns = int(np.clip(np.sqrt(n_dipoles), 300, 1000))
+            self.n_patterns = min(n_dipoles, 512)
 
         if self.verbose:
             logger.info(
