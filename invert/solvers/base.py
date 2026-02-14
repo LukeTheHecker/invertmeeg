@@ -373,8 +373,8 @@ class BaseSolver:
 
         got_chans = int(np.asarray(data).shape[0])
         data_ch_names = list(
-            getattr(self, "_last_input_data_ch_names", ())
-            or getattr(self, "_last_data_ch_names", ())
+            getattr(self, "_last_data_ch_names", ())
+            or getattr(self, "_last_input_data_ch_names", ())
             or []
         )
         missing_in_data: list[str] = []
@@ -598,12 +598,28 @@ class BaseSolver:
                 self._format_channel_list(dropped_by_pick_type),
             )
 
+        canonical_ch_names = list(
+            getattr(self, "_operator_ch_names", ()) or self.forward.ch_names
+        )
         alignment = self.align_channel_sets(
-            forward_ch_names=list(self.forward.ch_names),
+            forward_ch_names=canonical_ch_names,
             data_ch_names=channels_after_pick,
             context="unpack_data_obj",
         )
         self.log_channel_alignment(alignment)
+        missing_operator_channels = list(alignment.dropped_from_forward)
+        if (
+            getattr(self, "made_inverse_operator", False)
+            and getattr(self, "_operator_ch_names", ())
+            and missing_operator_channels
+        ):
+            msg = (
+                "Data is missing channels required by the inverse operator "
+                f"({len(missing_operator_channels)} missing)"
+                f"{self._format_channel_list(missing_operator_channels, max_items=None)}. "
+                "Recompute the inverse operator on the current data channel set."
+            )
+            raise ValueError(msg)
         picks = alignment.kept_ch_names
 
         # Select only data channels in mne_obj
