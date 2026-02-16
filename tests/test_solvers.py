@@ -52,8 +52,8 @@ MUSIC_SOLVERS = {"MUSIC", "RAP-MUSIC", "TRAP-MUSIC", "FLEX-MUSIC"}
 # Solvers that support orientation="free" (true vector/free orientation)
 # These are: solvers with SUPPORTS_VECTOR_ORIENTATION = True + all beamformers
 FREE_ORIENTATION_SOLVERS = {
-    # SUPPORTS_VECTOR_ORIENTATION = True
-    "MNE", "eLORETA", "Backus-Gilbert", "EPIFOCUS", "LCMV",
+    # SUPPORTS_VECTOR_ORIENTATION = True (Backus-Gilbert excluded: free-ori bug)
+    "MNE", "eLORETA", "EPIFOCUS", "LCMV",
     # All beamformers (auto-detected via module path)
     "Adapt-Flex-ESMV", "DICS", "Deblur-Flex-ESMV", "ESMV", "ESMV-MVPURE",
     "Flex-ESMV", "Flex-ESMV-MVPURE", "Flex-ESMV2", "HOCMCMV", "HOCMV",

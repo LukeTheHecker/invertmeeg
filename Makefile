@@ -1,6 +1,6 @@
 PYTHON_VERSIONS ?= 3.10 3.11 3.12
 
-.PHONY: install lint format test test-all check clean leaderboard
+.PHONY: install lint format test test-eval test-all check clean leaderboard
 
 install:
 	uv sync --all-extras
@@ -14,7 +14,10 @@ format:
 	uv run ruff format invert tests
 
 test:
-	uv run --extra dev pytest
+	uv run --extra dev pytest -m "not slow"
+
+test-eval:
+	uv run --extra dev pytest -m slow
 
 test-all:
 	@for v in $(PYTHON_VERSIONS); do \

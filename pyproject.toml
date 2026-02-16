@@ -73,6 +73,9 @@ packages = ["invert"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "slow: evaluation/property tests that take longer to run (use -m slow to select)",
+]
 
 [tool.ruff]
 line-length = 88

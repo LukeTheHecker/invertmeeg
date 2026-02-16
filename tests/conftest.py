@@ -5,6 +5,20 @@ import pytest
 from invert.forward import create_forward_model, get_info
 
 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--update-baselines",
+        action="store_true",
+        default=False,
+        help="Update solver_baselines.json instead of asserting against it.",
+    )
+
+
+@pytest.fixture(scope="session")
+def update_baselines(request):
+    return request.config.getoption("--update-baselines")
+
+
 @pytest.fixture(scope="session")
 def sensor_info():
     """Create sensor info with sfreq (independent of forward model)."""

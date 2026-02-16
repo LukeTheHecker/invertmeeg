@@ -140,7 +140,7 @@ _SOLVER_REGISTRY: dict[str, tuple[str, str]] = {
     "SourceMAP": ("invert.solvers.bayesian.source_map", "SolverSourceMAP"),
     "GammaMAPMSP": ("invert.solvers.bayesian.gamma_map_msp", "SolverGammaMAPMSP"),
     "SourceMAPMSP": ("invert.solvers.bayesian.source_map_msp", "SolverSourceMAPMSP"),
-    # "CMEM": ("invert.solvers.bayesian.cmem", "SolverCMEM"),
+    "CMEM": ("invert.solvers.bayesian.cmem", "SolverCMEM"),
     "SubspaceSBL": ("invert.solvers.bayesian.subspace_sbl", "SolverSubspaceSBL"),
     "SubspaceSBLPlus": (
         "invert.solvers.bayesian.subspace_sbl",
@@ -437,20 +437,23 @@ def _apply_inverse_worker(
 
 def _split_solver_params(
     solver_params: dict[str, Any] | None,
-) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Split params into make/apply dictionaries using make__/apply__ prefixes."""
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    """Split params into init/make/apply dictionaries using prefixes."""
+    init_params: dict[str, Any] = {}
     make_params: dict[str, Any] = {}
     apply_params: dict[str, Any] = {}
     if not solver_params:
-        return make_params, apply_params
+        return init_params, make_params, apply_params
     for key, value in solver_params.items():
-        if key.startswith("apply__"):
+        if key.startswith("init__"):
+            init_params[key.removeprefix("init__")] = value
+        elif key.startswith("apply__"):
             apply_params[key.removeprefix("apply__")] = value
         elif key.startswith("make__"):
             make_params[key.removeprefix("make__")] = value
         else:
             make_params[key] = value
-    return make_params, apply_params
+    return init_params, make_params, apply_params
 
 
 def _compute_and_apply_worker(
@@ -475,8 +478,8 @@ def _compute_and_apply_worker(
 
     mod = importlib.import_module(solver_module)
     solver_cls = getattr(mod, solver_class)
-    solver = solver_cls()
-    make_params, apply_params = _split_solver_params(solver_params)
+    init_params, make_params, apply_params = _split_solver_params(solver_params)
+    solver = solver_cls(**init_params)
 
     evoked = mne.EvokedArray(x_sample, info, tmin=0.0, verbose=0)
     _make_inverse_operator_with_covariance(
@@ -641,10 +644,10 @@ class BenchmarkRunner:
                 for solver_name in self.solvers:
                     logger.info("  Solver: %s", solver_name)
                     solver_cls = get_solver_class(solver_name)
-                    solver = solver_cls()
-                    make_params, apply_params = _split_solver_params(
+                    init_params, make_params, apply_params = _split_solver_params(
                         self.solver_params.get(solver_name, {})
                     )
+                    solver = solver_cls(**init_params)
 
                     # Best-effort determinism for fair comparisons when a seed is provided.
                     if self.random_seed is not None:
@@ -733,7 +736,11 @@ class BenchmarkRunner:
                         else:
                             # Select optimal regularization via L-curve/GCV
                             n_ops = len(inverse_ops)
-                            if n_ops > 1:
+                            if get_solver_category(solver_name) == "beamformer":
+                                # Beamformer regularization selection: do not use
+                                # residual-based GCV/L-curve criteria.
+                                optimal_idx = 0
+                            elif n_ops > 1:
                                 try:
                                     _, optimal_idx = solver.regularise_gcv(x_batch[0])
                                 except Exception as exc:

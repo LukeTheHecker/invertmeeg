@@ -72,31 +72,31 @@ def _build_registry() -> dict[str, Any]:
     # -- Bayesian / Champagne -----------------------------------------------
     _add(["champagne", "champ"], solvers.SolverChampagne)
     _add(
-        ["emchampagne", "em-champagne", "emc"],
+        ["champagne-em", "emchampagne", "em-champagne", "emc"],
         partial(solvers.SolverChampagne, update_rule="EM"),
     )
     _add(
-        ["convexitychampagne", "convexity-champagne", "coc", "mm-champagne"],
+        ["champagne-convexity", "convexitychampagne", "convexity-champagne", "coc", "mm-champagne"],
         partial(solvers.SolverChampagne, update_rule="Convexity"),
     )
     _add(
-        ["mackaychampagne", "mackay-champagne", "mcc"],
+        ["champagne-mackay", "mackaychampagne", "mackay-champagne", "mcc"],
         partial(solvers.SolverChampagne, update_rule="MacKay"),
     )
     _add(
-        ["temchampagne", "tem-champagne", "temc", "t-em-champagne"],
+        ["champagne-tem", "temchampagne", "tem-champagne", "temc", "t-em-champagne"],
         partial(solvers.SolverChampagne, update_rule="TEM"),
     )
     _add(
-        ["aremchampagne", "arem-champagne", "aremc", "ar-em-champagne"],
+        ["champagne-ar-em", "aremchampagne", "arem-champagne", "aremc", "ar-em-champagne"],
         partial(solvers.SolverChampagne, update_rule="AR-EM"),
     )
     _add(
-        ["lowsnrchampagne", "low-snr-champagne", "lowsnr-champagne", "lsc"],
+        ["champagne-low-snr", "lowsnrchampagne", "low-snr-champagne", "lowsnr-champagne", "lsc"],
         partial(solvers.SolverChampagne, update_rule="LowSNR"),
     )
     _add(
-        ["adaptivechampagne", "adaptive-champagne", "ac"],
+        ["champagne-adaptive", "adaptivechampagne", "adaptive-champagne", "ac"],
         partial(solvers.SolverChampagne, update_rule="Adaptive"),
     )
     _add(["nlchampagne", "nl-champagne", "nlc"], solvers.SolverNLChampagne)
@@ -230,6 +230,7 @@ def _build_registry() -> dict[str, Any]:
     # -- Other --------------------------------------------------------------
     _add("epifocus", solvers.SolverEPIFOCUS)
     _add("apse", solvers.hybrids.SolverAPSE)
+    _add("chimera", solvers.hybrids.SolverChimera)
     _add(["random-noise", "random", "noise-baseline"], solvers.SolverRandomNoise)
 
     return reg
