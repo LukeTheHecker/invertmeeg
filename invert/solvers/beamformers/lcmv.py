@@ -4,6 +4,9 @@ import mne
 import numpy as np
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
+from .utils import (
+    build_covariance_candidates,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +44,7 @@ class SolverLCMV(BaseSolver):
         reduce_rank=True,
         rank="auto",
         use_robust_covariance: bool = False,
-        free_orientation_collapse: str = "amplitude",
+        free_orientation_collapse: str = "optimal",
         rank_tol: float = 1e-12,
         eps: float = 1e-15,
         **kwargs,
@@ -63,6 +66,43 @@ class SolverLCMV(BaseSolver):
     # collapse per-location outputs using an optimal-orientation criterion.
     SUPPORTS_VECTOR_ORIENTATION: bool = True
 
+    def _compute_source_mat(self, data: np.ndarray):  # type: ignore[override]
+        """Beamformer-specific alpha selection.
+
+        The BaseSolver's generic GCV/L-curve criteria are designed for
+        regularized linear inverse operators where ``G @ x ≈ y``. For
+        beamformers, those residual-based criteria are not meaningful.
+
+        For now we use the smallest diagonal-loading value in the search grid
+        (or the single user-provided alpha).
+        """
+        if self.use_last_alpha and self.last_reg_idx is not None:
+            idx = int(self.last_reg_idx)
+            return self.inverse_operators[idx].apply(data), idx
+
+        idx = 0
+        self.last_reg_idx = idx
+        return self.inverse_operators[idx].apply(data), idx
+
+    def _unpack_cov_samples(
+        self,
+        mne_obj,
+        *,
+        pick_types: list[str] | None = None,
+    ) -> tuple[np.ndarray, list[str]]:
+        """Return a (n_channels, n_samples) matrix for covariance estimation.
+
+        For beamformers, estimating covariance from an Evoked average can be
+        brittle (especially with near noise-free phantom/sim data). If Epochs
+        are provided, concatenate all epochs in time to increase sample count.
+        """
+        return self.unpack_covariance_samples(
+            mne_obj,
+            pick_types=pick_types,
+            require_forward_channel_match=True,
+            context="LCMV",
+        )
+
     def make_inverse_operator(
         self,
         forward,
@@ -70,6 +110,9 @@ class SolverLCMV(BaseSolver):
         *args,
         alpha="auto",
         noise_cov: mne.Covariance | None = None,
+        cov_reg: str = "oas",
+        cov_reg_beta: float = 0.05,
+        cov_reg_cond_target: float = 1e4,
         weight_norm=True,
         verbose=0,
         **kwargs,
@@ -111,26 +154,22 @@ class SolverLCMV(BaseSolver):
                 noise_cov_raw = None
             else:
                 noise_cov_raw = 0.5 * (noise_cov_raw + noise_cov_raw.T)
-        data = self.unpack_data_obj(mne_obj)
+        # Use more appropriate covariance samples when possible.
+        y_raw, kept_ch_names = self._unpack_cov_samples(mne_obj)
+        self._operator_ch_names = tuple(kept_ch_names)
+        # Historical / test-contract behavior: normalize the (fixed-orientation)
+        # leadfield columns prior to beamformer construction. For free
+        # orientation, avoid block normalization because it can distort
+        # max-power orientation selection on volume/discrete grids.
         leadfield = self.leadfield
-        if getattr(self, "_free_orientation", False) and int(getattr(self, "_n_orient", 1)) == 3:
-            # For free orientation, normalize per-location (block) to preserve
-            # relative tangential/normal scaling within each 3D basis.
-            n_cols = int(leadfield.shape[1])
-            n_src = n_cols // 3
-            L = leadfield.reshape(int(leadfield.shape[0]), n_src, 3)
-            block_norms = np.sqrt(np.sum(L * L, axis=(0, 2)))
-            block_norms = np.maximum(block_norms, self.eps)
-            L /= block_norms[np.newaxis, :, np.newaxis]
-        else:
-            # Match legacy behavior: column-normalize leadfield *in place* so
-            # downstream solvers/tests that relied on this side-effect keep working.
+        if not (
+            getattr(self, "_free_orientation", False)
+            and int(getattr(self, "_n_orient", 1)) == 3
+        ):
             lead_norms = np.linalg.norm(leadfield, axis=0)
             leadfield /= np.maximum(lead_norms, self.eps)
 
         _n_chans_raw = int(leadfield.shape[0])
-        y_raw = data
-
         # Optional robust path: whiten + project in sensor space using noise_cov.
         use_robust_covariance = bool(self.use_robust_covariance)
         if use_robust_covariance:
@@ -156,17 +195,22 @@ class SolverLCMV(BaseSolver):
 
         y_eff -= y_eff.mean(axis=1, keepdims=True)
         C = self.data_covariance(y_eff, center=False, ddof=1)
-        # C = OAS(assume_centered=False).fit(C.T).covariance_.T
-        # C = LedoitWolf(assume_centered=False).fit(C.T).covariance_.T
-
-        # Recompute regularization based on the max eigenvalue of the Covariance
-        # Matrix (opposed to that of the leadfield)
-        # self.alphas = np.logspace(-4, 1, self.n_reg_params) * np.diagonal(y@y.T).mean()
-        self.get_alphas(reference=C)
+        cov_mats, self.alphas, cov_meta = build_covariance_candidates(
+            C=C,
+            I=I,
+            alpha=self.alpha,
+            get_alphas_fn=self.get_alphas,
+            n_samples=int(y_eff.shape[1]),
+            cov_reg=cov_reg,
+            cov_reg_beta=float(cov_reg_beta),
+            cov_reg_cond_target=float(cov_reg_cond_target),
+        )
+        if "oas_shrinkage" in cov_meta:
+            self._cov_reg_oas_shrinkage = float(cov_meta["oas_shrinkage"])
 
         inverse_operators = []
-        for alpha in self.alphas:
-            C_inv = self.robust_inverse(C + alpha * I)
+        for cov_mat in cov_mats:
+            C_inv = self.robust_inverse(cov_mat)
 
             if getattr(self, "_free_orientation", False) and int(getattr(self, "_n_orient", 1)) == 3:
                 # Vector LCMV: per-location 3x3 solve
@@ -178,18 +222,52 @@ class SolverLCMV(BaseSolver):
                 CiL = (C_inv @ L).reshape(m, n_src, 3)
                 G = np.einsum("mni,mnj->nij", Lb, CiL, optimize=True)  # (n,3,3)
 
-                # Invert 3x3 blocks robustly.
-                G_inv = np.zeros_like(G)
-                for i in range(n_src):
-                    Gi = G[i]
-                    try:
-                        G_inv[i] = np.linalg.inv(Gi)
-                    except np.linalg.LinAlgError:
-                        G_inv[i] = np.linalg.pinv(Gi, rcond=1e-12)
+                collapse_opt = self.free_orientation_collapse == "optimal"
+                if collapse_opt:
+                    # "max-power" optimal orientation (MNE-style):
+                    #   q = argmax_q  (q^T B q) / (q^T A q),  with
+                    #   A = L^T C_inv L  and  B = L^T C_inv C C_inv L
+                    # Then scalar filter weights are:
+                    #   w = (C_inv L q) / (q^T A q)
+                    #
+                    # This yields a single (scalar) filter per location.
+                    CiL_mat = CiL.reshape(m, n_cols)  # (m, 3*n)
+                    CCiL = (C @ CiL_mat).reshape(m, n_src, 3)
+                    B = np.einsum("mni,mnj->nij", CiL, CCiL, optimize=True)  # (n,3,3)
 
-                W_eff = np.einsum("mni,nij->mnj", CiL, G_inv, optimize=True).reshape(
-                    m, n_cols
-                )
+                    q = np.zeros((n_src, 3), dtype=float)
+                    for i in range(n_src):
+                        Ai = 0.5 * (G[i] + G[i].T)
+                        Bi = 0.5 * (B[i] + B[i].T)
+                        try:
+                            M = np.linalg.solve(Ai, Bi)
+                        except np.linalg.LinAlgError:
+                            M = np.linalg.pinv(Ai, rcond=1e-12) @ Bi
+                        M = 0.5 * (M + M.T)
+                        _evals, evecs = np.linalg.eigh(M)
+                        qi = evecs[:, -1]
+                        j = int(np.argmax(np.abs(qi)))
+                        if qi[j] < 0:
+                            qi = -qi
+                        q[i] = qi
+
+                    num = np.einsum("mni,ni->mn", CiL, q, optimize=True)  # (m,n)
+                    den = np.einsum("ni,nij,nj->n", q, G, q, optimize=True)
+                    den = np.maximum(den, self.eps)
+                    W_eff = num / den[np.newaxis, :]
+                else:
+                    # Invert 3x3 blocks robustly.
+                    G_inv = np.zeros_like(G)
+                    for i in range(n_src):
+                        Gi = G[i]
+                        try:
+                            G_inv[i] = np.linalg.inv(Gi)
+                        except np.linalg.LinAlgError:
+                            G_inv[i] = np.linalg.pinv(Gi, rcond=1e-12)
+
+                    W_eff = np.einsum("mni,nij->mnj", CiL, G_inv, optimize=True).reshape(
+                        m, n_cols
+                    )
             else:
                 # Scalar LCMV: classic unit-gain per source
                 # W = (C_inv @ leadfield) / diag(leadfield^T C_inv leadfield)
@@ -234,6 +312,16 @@ class SolverLCMV(BaseSolver):
             InverseOperator(inverse_operator, self.name)
             for inverse_operator in inverse_operators
         ]
+        # If we collapsed free-orientation filters to scalar weights, mark this
+        # solver instance as scalar so SourceEstimate construction doesn't try
+        # to collapse again.
+        if (
+            getattr(self, "_free_orientation", False)
+            and int(getattr(self, "_n_orient", 1)) == 3
+            and self.free_orientation_collapse == "optimal"
+        ):
+            self._free_orientation = False
+            self._n_orient = 1
         return self
 
     def apply_inverse_operator(self, mne_obj) -> mne.SourceEstimate:
