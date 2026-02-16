@@ -1,10 +1,11 @@
 import logging
 from copy import deepcopy
-from invert.util import build_source_adjacency
 
 import mne
 import numpy as np
 from scipy.sparse.csgraph import laplacian
+
+from invert.util import build_source_adjacency
 
 from ..base import BaseSolver, SolverMeta
 from .utils import soft_threshold

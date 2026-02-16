@@ -3,8 +3,8 @@ import numpy as np
 import pytest
 
 from invert.solvers.base import BaseSolver
-from invert.solvers.orientation import estimate_orientation_pca
 from invert.solvers.minimum_norm.loreta import SolverLORETA
+from invert.solvers.orientation import estimate_orientation_pca
 
 
 def test_surface_anatomical_matches_mne_fixed_conversion(forward_model_free_surface):

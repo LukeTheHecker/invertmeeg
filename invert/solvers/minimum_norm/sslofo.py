@@ -3,6 +3,7 @@ from copy import deepcopy
 
 import mne
 import numpy as np
+
 from invert.util import build_source_adjacency
 
 from ..base import BaseSolver, InverseOperator, SolverMeta

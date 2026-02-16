@@ -1,3 +1,4 @@
+from .source_adjacency import build_source_adjacency
 from .util import (
     best_index_residual,
     calc_residual_variance,
@@ -7,7 +8,6 @@ from .util import (
     read_solver,
     thresholding,
 )
-from .source_adjacency import build_source_adjacency
 
 __all__ = [
     "read_solver",

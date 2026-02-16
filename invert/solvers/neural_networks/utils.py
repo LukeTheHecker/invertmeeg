@@ -1,11 +1,11 @@
 from copy import deepcopy
-from invert.util import build_source_adjacency
 
-import mne
 import numpy as np
 from scipy.optimize import minimize_scalar
 from scipy.sparse.csgraph import laplacian
 from scipy.stats import pearsonr
+
+from invert.util import build_source_adjacency
 
 
 def rescale_sources(leadfield, source_pred, y_original):

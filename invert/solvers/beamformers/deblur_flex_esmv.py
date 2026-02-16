@@ -1,5 +1,4 @@
 from __future__ import annotations
-from invert.util import build_source_adjacency
 
 import logging
 from dataclasses import dataclass
@@ -9,6 +8,8 @@ import numpy as np
 from scipy.sparse import identity as sparse_identity
 from scipy.sparse.csgraph import laplacian as sparse_laplacian
 from scipy.sparse.linalg import splu
+
+from invert.util import build_source_adjacency
 
 from ..base import BaseSolver, SolverMeta
 from .flex_esmv2 import SolverFlexESMV2

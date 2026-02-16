@@ -14,7 +14,6 @@ original source space.
 """
 
 from __future__ import annotations
-from invert.util import build_source_adjacency
 
 import logging
 from dataclasses import dataclass
@@ -23,6 +22,8 @@ import mne
 import numpy as np
 from scipy.sparse import csr_matrix, vstack
 from scipy.sparse.csgraph import laplacian
+
+from invert.util import build_source_adjacency
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
 

@@ -1,9 +1,10 @@
 import logging
-from invert.util import build_source_adjacency
 
 import mne
 import numpy as np
 from scipy.sparse.csgraph import laplacian
+
+from invert.util import build_source_adjacency
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
 

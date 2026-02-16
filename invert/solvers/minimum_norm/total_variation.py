@@ -1,5 +1,4 @@
 from __future__ import annotations
-from invert.util import build_source_adjacency
 
 import logging
 from typing import Any
@@ -8,6 +7,8 @@ import mne
 import numpy as np
 from scipy.sparse import coo_matrix
 from scipy.sparse.linalg import LinearOperator, cg
+
+from invert.util import build_source_adjacency
 
 from ..base import BaseSolver, SolverMeta
 

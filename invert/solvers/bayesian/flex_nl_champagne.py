@@ -10,12 +10,13 @@ Improves on FlexChampagne by:
 
 import logging
 from copy import deepcopy
-from invert.util import build_source_adjacency
 
 import mne
 import numpy as np
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import laplacian
+
+from invert.util import build_source_adjacency
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
 
