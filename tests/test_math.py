@@ -607,3 +607,332 @@ class TestWoodburyIdentity:
         ) / alpha
 
         np.testing.assert_allclose(lhs, rhs, atol=1e-10)
+
+
+# ---------------------------------------------------------------------------
+# 23. Data covariance correctness
+# ---------------------------------------------------------------------------
+
+
+class TestDataCovariance:
+    """Tests for BaseSolver.data_covariance()."""
+
+    def test_uncentered_matches_gram(self):
+        """center=False, ddof=0 should give Y @ Y.T / n_times."""
+        from invert.solvers.base import BaseSolver
+
+        rng = np.random.RandomState(0)
+        Y = rng.randn(5, 30)
+        C = BaseSolver.data_covariance(Y, center=False, ddof=0)
+        expected = (Y @ Y.T) / Y.shape[1]
+        np.testing.assert_allclose(C, expected, atol=1e-14)
+
+    def test_centered_removes_mean(self):
+        """center=True should subtract per-channel mean before computing."""
+        from invert.solvers.base import BaseSolver
+
+        rng = np.random.RandomState(1)
+        Y = rng.randn(4, 50) + 10.0  # large offset
+        C = BaseSolver.data_covariance(Y, center=True, ddof=0)
+
+        Y_c = Y - Y.mean(axis=1, keepdims=True)
+        expected = (Y_c @ Y_c.T) / Y.shape[1]
+        np.testing.assert_allclose(C, expected, atol=1e-14)
+
+    def test_bessel_correction(self):
+        """ddof=1 should divide by (n_times - 1), not n_times."""
+        from invert.solvers.base import BaseSolver
+
+        rng = np.random.RandomState(2)
+        Y = rng.randn(3, 20)
+        C_ddof0 = BaseSolver.data_covariance(Y, center=True, ddof=0)
+        C_ddof1 = BaseSolver.data_covariance(Y, center=True, ddof=1)
+
+        # ddof=1 should give a slightly larger covariance
+        ratio = np.trace(C_ddof1) / np.trace(C_ddof0)
+        expected_ratio = Y.shape[1] / (Y.shape[1] - 1)
+        np.testing.assert_allclose(ratio, expected_ratio, rtol=1e-10)
+
+    def test_single_timepoint_does_not_divide_by_zero(self):
+        """n_times=1, ddof=1 should clamp denominator to 1."""
+        from invert.solvers.base import BaseSolver
+
+        Y = np.array([[1.0], [2.0], [3.0]])
+        C = BaseSolver.data_covariance(Y, center=False, ddof=1)
+        assert np.all(np.isfinite(C))
+        # With denom clamped to 1, should be Y@Y.T / 1
+        np.testing.assert_allclose(C, Y @ Y.T, atol=1e-15)
+
+    def test_rank_deficient_input(self):
+        """When n_times < n_chans, output covariance should be rank-deficient."""
+        from invert.solvers.base import BaseSolver
+
+        rng = np.random.RandomState(3)
+        n_chans, n_times = 10, 3
+        Y = rng.randn(n_chans, n_times)
+        C = BaseSolver.data_covariance(Y, center=False, ddof=0)
+
+        # Rank should be at most n_times
+        s = np.linalg.svd(C, compute_uv=False)
+        effective_rank = np.sum(s > s[0] * 1e-10)
+        assert effective_rank <= n_times
+
+    def test_output_is_psd(self):
+        """Covariance matrix should be positive semi-definite."""
+        from invert.solvers.base import BaseSolver
+
+        rng = np.random.RandomState(4)
+        Y = rng.randn(8, 100)
+        C = BaseSolver.data_covariance(Y, center=True, ddof=1)
+
+        eigvals = np.linalg.eigvalsh(C)
+        assert np.all(eigvals >= -1e-12), (
+            f"Covariance has negative eigenvalue: {eigvals.min():.2e}"
+        )
+
+    def test_output_is_symmetric(self):
+        """Covariance should be symmetric."""
+        from invert.solvers.base import BaseSolver
+
+        rng = np.random.RandomState(5)
+        Y = rng.randn(6, 40)
+        C = BaseSolver.data_covariance(Y, center=True, ddof=1)
+        np.testing.assert_allclose(C, C.T, atol=1e-15)
+
+    def test_1d_input(self):
+        """1D input should be treated as single-timepoint column."""
+        from invert.solvers.base import BaseSolver
+
+        y = np.array([1.0, 2.0, 3.0])
+        C = BaseSolver.data_covariance(y, center=False, ddof=0)
+        expected = np.outer(y, y)
+        np.testing.assert_allclose(C, expected, atol=1e-15)
+
+
+# ---------------------------------------------------------------------------
+# 24. Whitener orthogonality
+# ---------------------------------------------------------------------------
+
+
+class TestWhitenerOrthogonality:
+    """Verify W @ C_n @ W.T ≈ I in the retained subspace."""
+
+    def test_whitened_noise_is_identity(self):
+        """After whitening, noise covariance in retained subspace should be I."""
+        from invert.solvers.base import BaseSolver
+
+        rng = np.random.RandomState(10)
+        n = 8
+        # Random PD noise covariance
+        A = rng.randn(n, n)
+        C_n = A @ A.T + 0.1 * np.eye(n)
+        C_n = 0.5 * (C_n + C_n.T)
+
+        W = BaseSolver.compute_sensor_whitener(C_n, rank_tol=1e-12, eps=1e-15)
+        whitened = W @ C_n @ W.T
+        np.testing.assert_allclose(whitened, np.eye(W.shape[0]), atol=1e-10)
+
+    def test_rank_truncation_preserves_subspace(self):
+        """Whitener should drop zero-eigenvalue dimensions."""
+        from invert.solvers.base import BaseSolver
+
+        # Covariance with rank 3 out of 5
+        V = np.eye(5)
+        eigvals = np.array([5.0, 2.0, 1.0, 0.0, 0.0])
+        C_n = V @ np.diag(eigvals) @ V.T
+
+        W = BaseSolver.compute_sensor_whitener(C_n, rank_tol=1e-12, eps=1e-15)
+        assert W.shape == (3, 5), f"Expected (3, 5), got {W.shape}"
+        whitened = W @ C_n @ W.T
+        np.testing.assert_allclose(whitened, np.eye(3), atol=1e-10)
+
+    def test_whitener_at_meg_scale(self):
+        """Whitener should work correctly at MEG scale (~1e-26 eigenvalues)."""
+        from invert.solvers.base import BaseSolver
+
+        rng = np.random.RandomState(20)
+        n = 6
+        V = np.linalg.qr(rng.randn(n, n))[0]
+        # MEG-scale eigenvalues
+        eigvals = np.array([1e-23, 5e-24, 1e-24, 5e-25, 1e-25, 1e-26])
+        C_n = V @ np.diag(eigvals) @ V.T
+        C_n = 0.5 * (C_n + C_n.T)
+
+        W = BaseSolver.compute_sensor_whitener(C_n, rank_tol=1e-6, eps=1e-15)
+        whitened = W @ C_n @ W.T
+        r = W.shape[0]
+        np.testing.assert_allclose(whitened, np.eye(r), atol=1e-6)
+
+    def test_identity_cov_is_noop(self):
+        """Whitening with identity noise cov should preserve dimensions."""
+        from invert.solvers.base import BaseSolver
+
+        C_n = np.eye(5)
+        W = BaseSolver.compute_sensor_whitener(C_n, rank_tol=1e-12, eps=1e-15)
+        assert W.shape == (5, 5)
+        np.testing.assert_allclose(W @ W.T, np.eye(5), atol=1e-12)
+
+
+# ---------------------------------------------------------------------------
+# 25. GCV / L-curve edge cases
+# ---------------------------------------------------------------------------
+
+
+class TestGCVEdgeCases:
+    """Edge case tests for regularization selection methods."""
+
+    @staticmethod
+    def _build_solver_with_operators(L, alphas):
+        """Helper: build a BaseSolver with MNE-style operators at given alphas."""
+        from invert.solvers.base import BaseSolver, InverseOperator
+
+        m = L.shape[0]
+        I = np.eye(m)
+        ops = [
+            InverseOperator(L.T @ np.linalg.inv(L @ L.T + a * I), "test")
+            for a in alphas
+        ]
+        solver = BaseSolver(n_reg_params=len(alphas))
+        solver.leadfield = L
+        solver.inverse_operators = ops
+        solver.alphas = list(alphas)
+        return solver
+
+    def test_gcv_all_inf_falls_back_to_midpoint(self):
+        """When all GCV values are inf, should fall back to middle index."""
+        from invert.solvers.base import BaseSolver, InverseOperator
+
+        # Create operators where trace(H) >= n for all, making DOF <= 0
+        n = 3
+        solver = BaseSolver(n_reg_params=3)
+        solver.leadfield = np.eye(n)
+        # Operators that make trace(A) = n (identity), so DOF = n - gamma*n = 0
+        solver.inverse_operators = [
+            InverseOperator(np.eye(n), "test") for _ in range(3)
+        ]
+        solver.alphas = [1e-3, 1e-1, 1e1]
+
+        rng = np.random.RandomState(0)
+        M = rng.randn(n, 10)
+        _, idx = solver.regularise_gcv(M, gamma=1.0)
+        # Should fall back to midpoint (index 1 for 3 operators)
+        assert idx == 1
+
+    def test_gcv_single_operator(self):
+        """Single operator should return index 0 without error."""
+        rng = np.random.RandomState(0)
+        L = rng.randn(8, 20)
+        solver = self._build_solver_with_operators(L, [0.1])
+        M = rng.randn(8, 15)
+        _, idx = solver.regularise_gcv(M, gamma=1.0)
+        assert idx == 0
+
+    def test_gcv_selects_finite_over_inf(self):
+        """If some GCV values are inf and some finite, should pick finite."""
+        from invert.solvers.base import BaseSolver, InverseOperator
+
+        n = 5
+        rng = np.random.RandomState(42)
+        L = rng.randn(n, 10)
+        I = np.eye(n)
+
+        # First operator: near-zero alpha -> trace(H) ≈ n -> DOF ≈ 0 -> inf
+        # Last operator: large alpha -> low trace -> finite GCV
+        alphas = [1e-15, 0.1, 10.0]
+        ops = [
+            InverseOperator(L.T @ np.linalg.inv(L @ L.T + a * I), "test")
+            for a in alphas
+        ]
+        solver = BaseSolver(n_reg_params=3)
+        solver.leadfield = L
+        solver.inverse_operators = ops
+        solver.alphas = alphas
+
+        M = rng.randn(n, 20)
+        _, idx = solver.regularise_gcv(M, gamma=1.0)
+        # Should NOT pick index 0 (which gives inf)
+        assert idx > 0
+
+
+class TestLCurveEdgeCases:
+
+    def test_two_points_returns_last(self):
+        """With fewer than 3 points, find_corner should return last index."""
+        from invert.util import find_corner
+
+        idx = find_corner(np.array([1.0, 2.0]), np.array([2.0, 1.0]))
+        assert idx == 1
+
+    def test_collinear_points(self):
+        """Collinear points (no corner) should still return a valid index."""
+        from invert.util import find_corner
+
+        # Points on a straight line
+        source_power = np.linspace(10, 1, 10)
+        residual = np.linspace(1, 10, 10)
+        idx = find_corner(source_power, residual)
+        assert 0 <= idx < len(source_power)
+
+    def test_monotonic_curve(self):
+        """Monotonically decreasing curve should not crash."""
+        from invert.util import find_corner
+
+        source_power = np.logspace(2, -2, 20)
+        residual = np.logspace(-2, 2, 20)
+        idx = find_corner(source_power, residual)
+        assert 0 <= idx < len(source_power)
+
+    def test_sharp_corner_detected(self):
+        """A curve with a clear corner should identify it."""
+        from invert.util import find_corner
+
+        # L-shaped curve: flat residual then steep rise
+        residual = np.concatenate([np.linspace(1, 1.01, 10), np.linspace(1.1, 10, 10)])
+        source_power = np.concatenate(
+            [np.linspace(100, 10, 10), np.linspace(9, 1, 10)]
+        )
+        idx = find_corner(source_power, residual)
+        # Corner should be near the transition (around index 9-11)
+        assert 5 <= idx <= 15, f"Corner at {idx}, expected near 10"
+
+
+# ---------------------------------------------------------------------------
+# 26. InverseOperator shape validation
+# ---------------------------------------------------------------------------
+
+
+class TestInverseOperatorValidation:
+
+    def test_valid_shape_accepted(self):
+        """Correct shape should not raise."""
+        from invert.solvers.base import InverseOperator
+
+        mat = np.zeros((50, 20))
+        op = InverseOperator(mat, "test", expected_shape=(50, 20))
+        assert op.data[0].shape == (50, 20)
+
+    def test_wrong_shape_rejected(self):
+        """Wrong shape should raise ValueError."""
+        from invert.solvers.base import InverseOperator
+
+        mat = np.zeros((50, 20))
+        with pytest.raises(ValueError, match="expected shape"):
+            InverseOperator(mat, "test", expected_shape=(40, 20))
+
+    def test_1d_array_rejected(self):
+        """1D array should raise ValueError when expected_shape given."""
+        from invert.solvers.base import InverseOperator
+
+        mat = np.zeros(50)
+        with pytest.raises(ValueError, match="expected 2D"):
+            InverseOperator(mat, "test", expected_shape=(50, 1))
+
+    def test_no_expected_shape_accepts_anything(self):
+        """Without expected_shape, any shape is accepted (backward compat)."""
+        from invert.solvers.base import InverseOperator
+
+        op = InverseOperator(np.zeros((3, 4)), "test")
+        assert op.data[0].shape == (3, 4)
+
+        op2 = InverseOperator(np.zeros(10), "test")
+        assert op2.data[0].shape == (10,)

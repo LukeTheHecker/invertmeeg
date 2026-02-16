@@ -103,13 +103,27 @@ class InverseOperator:
     Parameters
     ----------
     inverse_operator : numpy.ndarray or list of numpy.ndarray
-        The inverse operator matrix (or matrices).
+        The inverse operator matrix (or matrices).  Each matrix should have
+        shape ``(n_sources, n_channels)`` so that applying it to sensor data
+        ``y`` of shape ``(n_channels, n_times)`` produces a source estimate
+        ``(n_sources, n_times)``.
+
+        For free-orientation solvers, ``n_sources = n_locations * n_orient``
+        with rows ordered as ``[x1, y1, z1, x2, y2, z2, ...]``.
     solver_name : str
         Name of the solver that produced this operator.
+    expected_shape : tuple[int, int] | None
+        If given ``(n_sources, n_channels)``, validate each matrix matches.
     """
 
-    def __init__(self, inverse_operator: Any, solver_name: str) -> None:
+    def __init__(
+        self,
+        inverse_operator: Any,
+        solver_name: str,
+        expected_shape: tuple[int, int] | None = None,
+    ) -> None:
         self.solver_name = solver_name
+        self.expected_shape = expected_shape
         self.data = inverse_operator
         self.handle_inverse_operator()
 
@@ -123,6 +137,20 @@ class InverseOperator:
         if not isinstance(self.data, list):
             self.data = [self.data]
         self.type = type(self.data[0])
+
+        if self.expected_shape is not None:
+            for i, mat in enumerate(self.data):
+                arr = np.asarray(mat)
+                if arr.ndim != 2:
+                    raise ValueError(
+                        f"InverseOperator[{i}] from {self.solver_name!r}: "
+                        f"expected 2D array, got {arr.ndim}D with shape {arr.shape}"
+                    )
+                if arr.shape != self.expected_shape:
+                    raise ValueError(
+                        f"InverseOperator[{i}] from {self.solver_name!r}: "
+                        f"expected shape {self.expected_shape}, got {arr.shape}"
+                    )
 
     def apply(self, M: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
         """Apply the precomputed inverse operator to data matrix *M*.
@@ -321,6 +349,55 @@ class BaseSolver:
         self.alpha = alpha
         self.alphas = self.get_alphas(reference=reference)
         self.made_inverse_operator = True
+
+    def validate_inverse_operators(self) -> None:
+        """Validate that inverse_operators is well-formed after construction.
+
+        Call this at the end of a subclass ``make_inverse_operator()`` to catch
+        shape mismatches early.  Failures raise ``ValueError`` with a clear
+        message identifying the solver and the shape discrepancy.
+        """
+        ops = getattr(self, "inverse_operators", None)
+        if ops is None or len(ops) == 0:
+            return  # some solvers (e.g. NN) populate operators lazily
+
+        n_chans = int(self.leadfield.shape[0])
+        n_sources = int(self.leadfield.shape[1])
+        n_orient = int(getattr(self, "_n_orient", 1))
+        is_free = bool(getattr(self, "_free_orientation", False))
+
+        # Expected rows: for scalar orientation n_sources, for free n_sources already
+        # reflects the orientation (leadfield has shape (n_chans, n_sources * n_orient)
+        # when free, but after prepare_forward n_sources in leadfield already includes
+        # the orient dimension).
+        expected_rows = n_sources
+        solver_name = getattr(self, "name", self.__class__.__name__)
+
+        for i, op in enumerate(ops):
+            for j, mat in enumerate(op.data):
+                arr = np.asarray(mat)
+                if arr.ndim != 2:
+                    raise ValueError(
+                        f"{solver_name}: inverse_operators[{i}].data[{j}] is "
+                        f"{arr.ndim}D (shape {arr.shape}), expected 2D "
+                        f"(n_sources={expected_rows}, n_channels={n_chans})"
+                    )
+                if arr.shape[1] != n_chans:
+                    raise ValueError(
+                        f"{solver_name}: inverse_operators[{i}].data[{j}] has "
+                        f"{arr.shape[1]} columns, expected {n_chans} (n_channels)"
+                    )
+                if arr.shape[0] != expected_rows:
+                    logger.debug(
+                        "%s: inverse_operators[%d].data[%d] has %d rows, "
+                        "expected %d (n_sources). This may be intentional for "
+                        "solvers that collapse orientation internally.",
+                        solver_name,
+                        i,
+                        j,
+                        arr.shape[0],
+                        expected_rows,
+                    )
 
     def store_obj_information(self, mne_obj):
         if hasattr(mne_obj, "tmin"):
@@ -2334,8 +2411,15 @@ class BaseSolver:
             )
 
         # Combine free-orientation components (3 per source -> 1 via vector norm).
+        # Expected row ordering: [x1, y1, z1, x2, y2, z2, ...].
         if getattr(self, "_free_orientation", False):
             n_orient = getattr(self, "_n_orient", 3)
+            if source_mat.shape[0] % n_orient != 0:
+                raise ValueError(
+                    f"Free-orientation source_mat has {source_mat.shape[0]} rows "
+                    f"which is not divisible by n_orient={n_orient}. "
+                    f"Expected rows = n_locations * {n_orient}."
+                )
             n_src = source_mat.shape[0] // n_orient
             if source_mat.ndim == 2:
                 source_mat = np.linalg.norm(

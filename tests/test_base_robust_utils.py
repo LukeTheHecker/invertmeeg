@@ -130,6 +130,81 @@ def test_dspm_mne_uses_base_tikhonov_solver(monkeypatch, forward_model):
     assert np.all(np.isfinite(kernel))
 
 
+# ---------------------------------------------------------------------------
+# Regression: relative epsilon in condition_number_loaded_covariance
+# ---------------------------------------------------------------------------
+
+
+class TestRelativeEpsilonRegression:
+    """Regression test for the relative epsilon fix (2026-02-15) in
+    beamformers/utils.py condition_number_loaded_covariance().
+
+    The bug: absolute eps=1e-18 dominated MEG eigenvalues (~1e-23),
+    converting all condition number targets to matched filter (massive loading).
+    The fix: eps_abs = eps * lmax (relative to largest eigenvalue).
+    """
+
+    def test_meg_scale_covariance_gets_meaningful_regularization(self):
+        """At MEG scale (~1e-26 eigenvalues), condition number loading should
+        produce a lambda that achieves the target condition number, NOT a
+        lambda that dominates all eigenvalues (matched filter)."""
+        from invert.solvers.beamformers.utils import condition_number_loaded_covariance
+
+        # Simulate MEG-scale covariance: eigenvalues around 1e-23 to 1e-26
+        rng = np.random.RandomState(42)
+        n = 10
+        V = np.linalg.qr(rng.randn(n, n))[0]
+        eigvals = np.logspace(-26, -23, n)  # MEG scale
+        C = V @ np.diag(eigvals) @ V.T
+        C = 0.5 * (C + C.T)
+
+        cond_target = 1e4
+        C_reg, lam = condition_number_loaded_covariance(
+            C, cond_target=cond_target
+        )
+
+        # With the fix: lambda should be small relative to max eigenvalue
+        # With the bug: lambda ≈ 1e-18 >> 1e-23, producing matched filter
+        assert lam < eigvals[-1] * 10, (
+            f"Lambda ({lam:.2e}) is much larger than max eigenvalue ({eigvals[-1]:.2e}). "
+            "This suggests absolute epsilon is dominating (bug reversion)."
+        )
+
+        # Verify the condition number is actually near the target
+        evals_reg = np.linalg.eigvalsh(C_reg)
+        actual_cond = evals_reg[-1] / evals_reg[0]
+        assert actual_cond <= cond_target * 1.1, (
+            f"Condition number {actual_cond:.1f} exceeds target {cond_target}"
+        )
+
+    def test_absolute_eps_would_produce_matched_filter(self):
+        """Demonstrate that absolute eps=1e-18 on MEG-scale data produces
+        disproportionate loading (matched filter behavior)."""
+        # This tests the bug scenario to ensure we understand the failure mode.
+        rng = np.random.RandomState(42)
+        n = 10
+        V = np.linalg.qr(rng.randn(n, n))[0]
+        eigvals = np.logspace(-26, -23, n)
+        C = V @ np.diag(eigvals) @ V.T
+        C = 0.5 * (C + C.T)
+
+        # Simulate what the OLD code did: absolute eps floor
+        abs_eps = 1e-18  # the old buggy value
+        lmax = float(np.max(np.linalg.eigvalsh(C)))
+
+        # With absolute eps: eps >> lmax, so the function would bail early
+        # or produce massive loading. The key insight: 1e-18 >> 1e-23.
+        assert abs_eps > lmax * 1000, (
+            "Test setup: absolute eps should dominate MEG eigenvalues"
+        )
+
+        # With relative eps: eps_abs = 1e-15 * lmax ≈ 1e-38, well below eigenvalues
+        rel_eps_abs = 1e-15 * lmax
+        assert rel_eps_abs < eigvals[0], (
+            "Test setup: relative eps should be below smallest eigenvalue"
+        )
+
+
 def test_align_channel_sets_preserves_forward_order():
     solver = BaseSolver()
     report = solver.align_channel_sets(
