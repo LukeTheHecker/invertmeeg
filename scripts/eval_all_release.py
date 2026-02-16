@@ -26,29 +26,30 @@ if __name__ == "__main__":
             "matching_pursuit",
             "other",
         ],
-        exclude_solvers=[
+        exclude_solvers = [
             "SESAME",
             "EBB",
-            "RECI"
-            "ReciPSIICOS",
+            "ReciPSIICOS-Plain",
             "ReciPSIICOS-Whitened",
+            "CMEM",
         ],
-        solvers=[
-            "CovCNN",
-            "CovCNN-KL",
-            "CovCNN-KL-FLEXOMP",
-        ],
+        # solvers=[
+        #     "CovCNN",
+        #     "CovCNN-KL",
+        #     "CovCNN-KL-FLEXOMP",
+        # ],
         solver_params={
             # Script-level ANN speedup: keep global solver defaults unchanged.
             "CovCNN": {"epochs": 120, "patience": 40},
             "CovCNN-KL": {"epochs": 250, "patience": 80},
             "CovCNN-KL-FLEXOMP": {"epochs": 250, "patience": 80},
         },
+        random_seed=42,
         n_jobs=-1,
     )
     runner.run()
 
-    out_path = Path("results/release/leaderboard.json")
+    out_path = Path("results/release/leaderboard-test.json")
     out_path.parent.mkdir(parents=True, exist_ok=True)
     runner.save(
         out_path,
