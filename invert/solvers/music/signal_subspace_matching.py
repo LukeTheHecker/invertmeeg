@@ -190,7 +190,8 @@ class SolverSignalSubspaceMatching(BaseSolver):
             # scaler = np.std(Y[selection, :])
             Y[selection, :] /= scaler
 
-        # Old (erroneous for correlated noise)
+        # SSM projection: Y @ inv(Y'Y + reg) @ Y' approximates the signal subspace projector.
+        # Eigenvectors of the Gram matrix are scale-invariant; the reg term sets the effective rank.
         M_Y = Y.T @ Y
         if adaptive_reg:
             YY = M_Y + lambda_reg1 * (50 / n_time) * np.trace(M_Y) * np.eye(n_time)

@@ -277,6 +277,9 @@ def _reduce_and_whiten(Y, L, num_sources=1, max_rank=None):
     cumulant computation feasible (otherwise it scales as O(m^4)).
     """
     m, t = Y.shape
+    # Normalized covariance for PCA rank selection and whitening.
+    # Eigenvectors are scale-invariant, but /t gives eigenvalues on a
+    # variance scale which helps the energy-based truncation threshold below.
     C2 = (Y @ Y.T) / max(1, t)
 
     # Conservative default: enough components to represent the signal subspace.

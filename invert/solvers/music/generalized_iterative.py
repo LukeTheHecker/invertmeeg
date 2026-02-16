@@ -313,6 +313,8 @@ class SolverGeneralizedIterative(BaseSolver):
         """Compute the source covariance matrix for the SSM algorithm."""
         n_time = Y.shape[1]
 
+        # SSM projection: Y @ inv(Y'Y + reg) @ Y' approximates the signal
+        # subspace projector. Scale-invariant due to trace-relative reg.
         M_Y = Y.T @ Y
         YY = M_Y + lambda_reg1 * np.trace(M_Y) * np.eye(n_time)
         P_Y = (Y @ np.linalg.inv(YY)) @ Y.T
@@ -323,6 +325,8 @@ class SolverGeneralizedIterative(BaseSolver):
         """Compute the source covariance matrix for the SSM algorithm."""
         n_chans, n_time = Y.shape[1]
 
+        # Unnormalized Gram matrix; subspace methods are scale-invariant:
+        # eigvecs(C) == eigvecs(k*C). Only the eigenvectors are used below.
         C = Y @ Y.T
         U, _, _ = np.linalg.svd(C, full_matrices=False)
         Us = U[:, :n_comp]
@@ -336,6 +340,9 @@ class SolverGeneralizedIterative(BaseSolver):
     def get_covariance_ap(Y, *args, lambda_reg1=0.001, **kwargs):
         """Compute the source covariance matrix for the SSM algorithm."""
         n_chans, n_time = Y.shape
+        # Unnormalized Gram matrix; AP uses eigenvalue magnitudes for its
+        # metric, but the trace-relative regularization makes the result
+        # effectively scale-invariant.
         C = Y @ Y.T
         P_Y = C + lambda_reg1 * np.trace(C) * np.eye(n_chans)
         return P_Y

@@ -134,7 +134,8 @@ class SolverFLEXMUSIC_2(BaseSolver):
             k = n_chans
         # Assert common average reference
         # y -= y.mean(axis=0)
-        # Compute Data Covariance
+        # Compute Data Covariance (unnormalized Gram matrix)
+        # Subspace methods are scale-invariant: eigvecs(C) == eigvecs(k*C).
         C = y @ y.T
 
         I = np.identity(n_chans)

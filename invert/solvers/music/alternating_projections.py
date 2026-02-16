@@ -174,6 +174,8 @@ class SolverAlternatingProjections(BaseSolver):
         if k == "auto":
             k = n_chans
 
+        # Unnormalized Gram matrix; subspace methods are scale-invariant:
+        # eigvecs(C) == eigvecs(k*C).
         C = y @ y.T
         U, D, _ = np.linalg.svd(C, full_matrices=False)
 

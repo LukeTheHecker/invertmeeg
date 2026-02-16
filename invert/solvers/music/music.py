@@ -97,12 +97,11 @@ class SolverMUSIC(BaseSolver):
             Source data matrix (sources, time)
         """
         n_chans, n_dipoles = self.leadfield.shape
-        y.shape[1]
 
         leadfield = self.leadfield
-        # leadfield -= leadfield.mean(axis=0)
 
-        # Data Covariance
+        # Data Covariance (unnormalized Gram matrix)
+        # Subspace methods are scale-invariant: eigvecs(C) == eigvecs(k*C).
         C = y @ y.T
         U, D, _ = np.linalg.svd(C, full_matrices=False)
 

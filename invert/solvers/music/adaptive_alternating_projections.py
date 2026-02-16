@@ -194,6 +194,8 @@ class SolverAdaptiveAlternatingProjections(BaseSolver):
 
         # MUSIC TYPE
         if covariance_type == "MUSIC":
+            # Unnormalized Gram matrix; subspace methods are scale-invariant:
+            # eigvecs(C) == eigvecs(k*C).
             C = y @ y.T
             Q = np.identity(n_chans)
             U, D, _ = np.linalg.svd(C, full_matrices=False)
