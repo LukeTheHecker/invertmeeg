@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from ..base import BaseSolver, SolverMeta
+from ..base import SolverMeta
+from .base_beamformer import BaseBeamformer
 
 
-class SolverFlexESMV2(BaseSolver):
+class SolverFlexESMV2(BaseBeamformer):
     """Flex-extent beamformer tuned for the benchmark generator.
 
     This is a thin wrapper around `SolverAdaptFlexESMV` with `n_orders=2`

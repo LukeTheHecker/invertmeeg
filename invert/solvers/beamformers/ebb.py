@@ -3,12 +3,13 @@ import logging
 import mne
 import numpy as np
 
-from ..base import BaseSolver, InverseOperator, SolverMeta
+from ..base import InverseOperator, SolverMeta
+from .base_beamformer import BaseBeamformer
 
 logger = logging.getLogger(__name__)
 
 
-class SolverEBB(BaseSolver):
+class SolverEBB(BaseBeamformer):
     """Empirical Bayesian Beamformer (EBB) for M/EEG inverse problem.
 
     Iterative empirical-Bayes / ARD-style beamformer that estimates per-source
@@ -45,7 +46,6 @@ class SolverEBB(BaseSolver):
         rank="auto",
         **kwargs,
     ):
-        kwargs.setdefault("regularisation_method", "L")
         self.name = name
         return super().__init__(reduce_rank=reduce_rank, rank=rank, **kwargs)
 

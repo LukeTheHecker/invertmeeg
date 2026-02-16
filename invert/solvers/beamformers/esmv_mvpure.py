@@ -5,7 +5,8 @@ from typing import Any
 import mne
 import numpy as np
 
-from ..base import BaseSolver, InverseOperator, SolverMeta
+from ..base import InverseOperator, SolverMeta
+from .base_beamformer import BaseBeamformer
 from .utils import (
     _infer_mvpure_n_sources_and_rank,
     _mvpure_projected_lcmv_weights_from_inv_cov,
@@ -14,7 +15,7 @@ from .utils import (
 )
 
 
-class SolverESMVMVPURE(BaseSolver):
+class SolverESMVMVPURE(BaseBeamformer):
     """MV-PURE extension of ESMV with a projected multisource LCMV core.
 
     The vanilla ESMV core uses single-source LCMV weights followed by an

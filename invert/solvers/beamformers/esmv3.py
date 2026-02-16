@@ -1,11 +1,12 @@
 import mne
 import numpy as np
 
-from ..base import BaseSolver, InverseOperator, SolverMeta
+from ..base import InverseOperator, SolverMeta
+from .base_beamformer import BaseBeamformer
 from .utils import bayesian_pca_covariance, build_covariance_candidates
 
 
-class SolverESMV3(BaseSolver):
+class SolverESMV3(BaseBeamformer):
     """Class for the Eigenspace-based Minimum Variance (ESMV) Beamformer
         inverse solution [1].
 
@@ -36,7 +37,6 @@ class SolverESMV3(BaseSolver):
     def __init__(
         self, name="ESMV3 Beamformer", reduce_rank=True, rank="auto", **kwargs
     ):
-        kwargs.setdefault("regularisation_method", "L")
         self.name = name
         return super().__init__(reduce_rank=reduce_rank, rank=rank, **kwargs)
 
@@ -73,11 +73,11 @@ class SolverESMV3(BaseSolver):
         data = self.unpack_data_obj(mne_obj)
 
         leadfield = wf.G_white
-        leadfield /= np.linalg.norm(leadfield, axis=0)
+        epsilon = 1e-8
+        lead_norms = np.linalg.norm(leadfield, axis=0)
+        leadfield /= np.maximum(lead_norms, epsilon)
 
         n_chans, n_dipoles = leadfield.shape
-        data.shape[1]
-        epsilon = 1e-8
 
         y = wf.sensor_transform @ data
         I = np.identity(n_chans)

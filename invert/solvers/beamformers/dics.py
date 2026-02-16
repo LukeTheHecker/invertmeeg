@@ -6,12 +6,13 @@ from typing import Any
 import mne
 import numpy as np
 
-from ..base import BaseSolver, SolverMeta
+from ..base import SolverMeta
+from .base_beamformer import BaseBeamformer
 
 logger = logging.getLogger(__name__)
 
 
-class SolverDICS(BaseSolver):
+class SolverDICS(BaseBeamformer):
     """Dynamic Imaging of Coherent Sources (DICS) beamformer.
 
     This implementation estimates the sensor cross-spectral density (CSD) in a

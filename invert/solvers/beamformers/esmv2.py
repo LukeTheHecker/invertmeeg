@@ -1,11 +1,12 @@
 import mne
 import numpy as np
 
-from ..base import BaseSolver, InverseOperator, SolverMeta
+from ..base import InverseOperator, SolverMeta
+from .base_beamformer import BaseBeamformer
 from .utils import build_covariance_candidates
 
 
-class SolverESMV2(BaseSolver):
+class SolverESMV2(BaseBeamformer):
     """Class for the Eigenspace-based Minimum Variance (ESMV) Beamformer
         inverse solution [1].
 
@@ -73,7 +74,9 @@ class SolverESMV2(BaseSolver):
         data = self.unpack_data_obj(mne_obj)
 
         leadfield = wf.G_white
-        leadfield /= np.linalg.norm(leadfield, axis=0)
+        epsilon = 1e-15
+        lead_norms = np.linalg.norm(leadfield, axis=0)
+        leadfield /= np.maximum(lead_norms, epsilon)
         n_chans, n_dipoles = leadfield.shape
 
         y = wf.sensor_transform @ data
@@ -83,7 +86,6 @@ class SolverESMV2(BaseSolver):
         # Matrix (opposed to that of the leadfield)
         y -= y.mean(axis=1, keepdims=True)
         C = self.data_covariance(y, center=False, ddof=1)
-        epsilon = 1e-15
         cov_mats, self.alphas, cov_meta = build_covariance_candidates(
             C=C,
             I=I,

@@ -5,7 +5,8 @@ from dataclasses import dataclass
 import mne
 import numpy as np
 
-from ..base import BaseSolver, SolverMeta
+from ..base import SolverMeta
+from .base_beamformer import BaseBeamformer
 from .flex_esmv2 import SolverFlexESMV2
 from .utils import _estimate_rank_mdl
 
@@ -22,7 +23,7 @@ class _SafeContrastParams:
     max_sources: int = 4
 
 
-class SolverSafeFlexESMV(BaseSolver):
+class SolverSafeFlexESMV(BaseBeamformer):
     """FlexESMV6: FlexESMV2 + *safe* adaptive contrast.
 
     Unlike FlexESMV5, this caps the contrast exponent per sample so that the

@@ -3,12 +3,13 @@ import logging
 import mne
 import numpy as np
 
-from ..base import BaseSolver, SolverMeta
+from ..base import SolverMeta
+from .base_beamformer import BaseBeamformer
 
 logger = logging.getLogger(__name__)
 
 
-class SolverSSPESMV(BaseSolver):
+class SolverSSPESMV(BaseBeamformer):
     """Hybrid Simultaneous Subspace Pursuit + Eigenspace Minimum Variance solver.
 
     Combines SSP's greedy sparse support identification with ESMV's

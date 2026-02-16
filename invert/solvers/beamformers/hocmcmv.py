@@ -3,11 +3,12 @@ from copy import deepcopy
 import mne
 import numpy as np
 
-from ..base import BaseSolver, InverseOperator, SolverMeta
+from ..base import InverseOperator, SolverMeta
+from .base_beamformer import BaseBeamformer
 from .utils import build_covariance_candidates
 
 
-class SolverHOCMCMV(BaseSolver):
+class SolverHOCMCMV(BaseBeamformer):
     """Class for the Higher-Order Covariance Multiple Constrained Minimum Variance (HOCMCMV)
         Beamformer inverse solution [1].
 
@@ -37,7 +38,6 @@ class SolverHOCMCMV(BaseSolver):
     def __init__(
         self, name="HOCMCMV Beamformer", reduce_rank=True, rank="auto", **kwargs
     ):
-        kwargs.setdefault("regularisation_method", "L")
         self.name = name
         return super().__init__(reduce_rank=reduce_rank, rank=rank, **kwargs)
 

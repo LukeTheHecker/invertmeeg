@@ -11,7 +11,8 @@ from scipy.sparse.linalg import splu
 
 from invert.util import build_source_adjacency
 
-from ..base import BaseSolver, SolverMeta
+from ..base import SolverMeta
+from .base_beamformer import BaseBeamformer
 from .flex_esmv2 import SolverFlexESMV2
 
 logger = logging.getLogger(__name__)
@@ -27,7 +28,7 @@ class _FlexSharpParams:
     max_scale: float = 3.0
 
 
-class SolverDeblurFlexESMV(BaseSolver):
+class SolverDeblurFlexESMV(BaseBeamformer):
     """FlexESMV3: FlexESMV2 + graph unsharp-mask deblurring.
 
     FlexESMV2 is very strong on MLE/EMD/AP but tends to over-blur in the

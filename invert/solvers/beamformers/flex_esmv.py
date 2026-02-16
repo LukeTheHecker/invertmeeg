@@ -5,7 +5,8 @@ from dataclasses import dataclass
 import mne
 import numpy as np
 
-from ..base import BaseSolver, SolverMeta
+from ..base import SolverMeta
+from .base_beamformer import BaseBeamformer
 from .flex_esmv2 import SolverFlexESMV2
 
 
@@ -17,7 +18,7 @@ class _ContrastParams:
     patchiness_threshold: float = 0.25
 
 
-class SolverFlexESMV(BaseSolver):
+class SolverFlexESMV(BaseBeamformer):
     """FlexESMV5: FlexESMV2 + adaptive contrast (power-law) to reduce dispersion.
 
     This is a lightweight, monotone reweighting on the per-dipole mean |y|

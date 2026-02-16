@@ -5,7 +5,8 @@ from dataclasses import dataclass
 import mne
 import numpy as np
 
-from ..base import BaseSolver, SolverMeta
+from ..base import SolverMeta
+from .base_beamformer import BaseBeamformer
 from .esmv_mvpure import SolverESMVMVPURE
 
 
@@ -17,7 +18,7 @@ class _ContrastParams:
     patchiness_threshold: float = 0.25
 
 
-class SolverFlexESMVMVPURE(BaseSolver):
+class SolverFlexESMVMVPURE(BaseBeamformer):
     """FlexESMV-style adaptive contrast wrapper around ESMV MV-PURE."""
 
     meta = SolverMeta(

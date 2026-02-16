@@ -10,7 +10,8 @@ try:
 except ImportError:
     from numpy.linalg import svd
 
-from ..base import BaseSolver, InverseOperator, SolverMeta
+from ..base import InverseOperator, SolverMeta
+from .base_beamformer import BaseBeamformer
 from .utils import (
     _cov,
     _lcmv_inverse_operator,
@@ -23,7 +24,7 @@ from .utils import (
 )
 
 
-class SolverReciPSIICOSPlain(BaseSolver):
+class SolverReciPSIICOSPlain(BaseBeamformer):
     """
     Plain ReciPSIICOS Beamformer for M/EEG inverse solution.
 

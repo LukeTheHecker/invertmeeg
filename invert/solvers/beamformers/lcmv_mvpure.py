@@ -6,7 +6,8 @@ from typing import Any
 import mne
 import numpy as np
 
-from ..base import BaseSolver, InverseOperator, SolverMeta
+from ..base import InverseOperator, SolverMeta
+from .base_beamformer import BaseBeamformer
 from .utils import (
     _infer_mvpure_n_sources_and_rank,
     _mvpure_projected_lcmv_weights_from_inv_cov,
@@ -17,7 +18,7 @@ from .utils import (
 logger = logging.getLogger(__name__)
 
 
-class SolverLCMVMVPURE(BaseSolver):
+class SolverLCMVMVPURE(BaseBeamformer):
     """MV-PURE projected multi-source LCMV (alternative to vanilla single-source LCMV).
 
     Implements the Stage-2 MV-PURE spatial filter:

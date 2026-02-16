@@ -2,6 +2,7 @@
 Beamformer solvers for M/EEG source reconstruction.
 """
 
+from .base_beamformer import BaseBeamformer
 from .adapt_flex_esmv import SolverAdaptFlexESMV
 from .deblur_flex_esmv import SolverDeblurFlexESMV
 from .dics import SolverDICS
@@ -33,6 +34,7 @@ from .unit_noise_gain import SolverUnitNoiseGain
 from .wnmv import SolverWNMV
 
 __all__ = [
+    "BaseBeamformer",
     "SolverMVAB",
     "SolverLCMV",
     "SolverLCMVMVPURE",

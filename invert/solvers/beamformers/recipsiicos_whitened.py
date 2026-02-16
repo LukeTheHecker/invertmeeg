@@ -5,7 +5,8 @@ from __future__ import annotations
 import mne
 import numpy as np
 
-from ..base import BaseSolver, InverseOperator, SolverMeta
+from ..base import InverseOperator, SolverMeta
+from .base_beamformer import BaseBeamformer
 from .utils import (
     _cov,
     _lcmv_inverse_operator,
@@ -15,7 +16,7 @@ from .utils import (
 )
 
 
-class SolverReciPSIICOSWhitened(BaseSolver):
+class SolverReciPSIICOSWhitened(BaseBeamformer):
     """
     Whitened ReciPSIICOS Beamformer for M/EEG inverse solution (recommended).
 

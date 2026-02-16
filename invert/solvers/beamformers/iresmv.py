@@ -3,12 +3,13 @@ import logging
 import mne
 import numpy as np
 
-from ..base import BaseSolver, SolverMeta
+from ..base import SolverMeta
+from .base_beamformer import BaseBeamformer
 
 logger = logging.getLogger(__name__)
 
 
-class SolverIRESMV(BaseSolver):
+class SolverIRESMV(BaseBeamformer):
     """Iteratively Reweighted Eigenspace Minimum Variance (IR-ESMV) Beamformer.
 
     Applies ESMV beamforming iteratively, reweighting the leadfield at each

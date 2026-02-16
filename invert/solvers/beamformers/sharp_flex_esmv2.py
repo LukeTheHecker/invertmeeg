@@ -3,12 +3,13 @@ from __future__ import annotations
 import mne
 import numpy as np
 
-from ..base import BaseSolver, SolverMeta
+from ..base import SolverMeta
+from .base_beamformer import BaseBeamformer
 from .deblur_flex_esmv import SolverDeblurFlexESMV
 from .sharp_flex_esmv import _anchored_power, _AnchoredContrastParams
 
 
-class SolverSharpFlexESMV2(BaseSolver):
+class SolverSharpFlexESMV2(BaseBeamformer):
     """FlexESMV8: FlexESMV3 + anchored contrast shaping.
 
     Start from the graph-deblurred FlexESMV3 (often best EMD), then apply the

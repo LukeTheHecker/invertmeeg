@@ -5,7 +5,8 @@ from dataclasses import dataclass
 import mne
 import numpy as np
 
-from ..base import BaseSolver, SolverMeta
+from ..base import SolverMeta
+from .base_beamformer import BaseBeamformer
 from .flex_esmv2 import SolverFlexESMV2
 
 
@@ -40,7 +41,7 @@ def _anchored_power(rel: np.ndarray, *, anchor: float, gamma: float) -> np.ndarr
     return np.clip(out, 0.0, 1.0)
 
 
-class SolverSharpFlexESMV(BaseSolver):
+class SolverSharpFlexESMV(BaseBeamformer):
     """FlexESMV7: FlexESMV2 + anchored contrast shaping.
 
     This postprocess is designed specifically for the benchmark metrics:

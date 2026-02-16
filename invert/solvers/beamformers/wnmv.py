@@ -1,11 +1,12 @@
 import mne
 import numpy as np
 
-from ..base import BaseSolver, InverseOperator, SolverMeta
+from ..base import InverseOperator, SolverMeta
+from .base_beamformer import BaseBeamformer
 from .utils import build_covariance_candidates
 
 
-class SolverWNMV(BaseSolver):
+class SolverWNMV(BaseBeamformer):
     """Class for the Weight-normalized Minimum Variance (WNMV) Beamformer
         inverse solution [1].
 
@@ -32,7 +33,6 @@ class SolverWNMV(BaseSolver):
     )
 
     def __init__(self, name="WNMV Beamformer", reduce_rank=True, rank="auto", **kwargs):
-        kwargs.setdefault("regularisation_method", "L")
         self.name = name
         return super().__init__(reduce_rank=reduce_rank, rank=rank, **kwargs)
 

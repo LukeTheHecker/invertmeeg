@@ -244,6 +244,7 @@ class BaseSolver:
 
         self.n_reg_params = n_reg_params
         self.regularisation_method = regularisation_method
+        self._is_beamformer = getattr(self.__class__, "_is_beamformer", False)
         self.prep_leadfield = prep_leadfield
         self.use_depth_weighting = use_depth_weighting
         self.use_last_alpha = use_last_alpha
@@ -441,13 +442,7 @@ class BaseSolver:
         # beamformers (LCMV, SMV, SAM, ESMV, ...), those criteria are generally not
         # meaningful. Default to the first (typically smallest) regularization in
         # the precomputed grid, or the single provided alpha.
-        is_beamformer = False
-        meta = getattr(self, "meta", None)
-        if meta is not None:
-            is_beamformer = str(getattr(meta, "category", "")).lower() == "beamformers"
-        if not is_beamformer:
-            is_beamformer = ".beamformers." in str(self.__class__.__module__)
-        if is_beamformer and getattr(self, "inverse_operators", None):
+        if self._is_beamformer and getattr(self, "inverse_operators", None):
             idx = 0
             self.last_reg_idx = idx
             return self.inverse_operators[idx].apply(data), idx
@@ -2144,7 +2139,7 @@ class BaseSolver:
                 if not supports_vector:
                     # All beamformers can operate on free-orientation leadfields
                     # (at minimum by treating the 3 components as grouped columns).
-                    supports_vector = ".beamformers." in str(self.__class__.__module__)
+                    supports_vector = self._is_beamformer
                 if not supports_vector:
                     solver_label = getattr(self, "name", self.__class__.__name__)
                     supported = ["auto", "fixed", "pca"]

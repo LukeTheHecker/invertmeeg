@@ -3,13 +3,14 @@ import logging
 import mne
 import numpy as np
 
-from ..base import BaseSolver, InverseOperator, SolverMeta
+from ..base import InverseOperator, SolverMeta
+from .base_beamformer import BaseBeamformer
 from .utils import build_covariance_candidates
 
 logger = logging.getLogger(__name__)
 
 
-class SolverESMV(BaseSolver):
+class SolverESMV(BaseBeamformer):
     """Class for the Eigenspace-based Minimum Variance (ESMV) Beamformer
         inverse solution [1].
 

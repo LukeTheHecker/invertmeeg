@@ -3,12 +3,13 @@ import logging
 import mne
 import numpy as np
 
-from ..base import BaseSolver, SolverMeta
+from ..base import SolverMeta
+from .base_beamformer import BaseBeamformer
 
 logger = logging.getLogger(__name__)
 
 
-class SolverSSPIRESMV(BaseSolver):
+class SolverSSPIRESMV(BaseBeamformer):
     """SSP-initialized Iteratively Reweighted ESMV (SSP-IR-ESMV).
 
     Two-phase solver:

@@ -9,11 +9,12 @@ from scipy.sparse.csgraph import laplacian
 
 from invert.util import build_source_adjacency
 
-from ..base import BaseSolver, InverseOperator, SolverMeta
+from ..base import InverseOperator, SolverMeta
+from .base_beamformer import BaseBeamformer
 from .utils import build_covariance_candidates
 
 
-class SolverAdaptFlexESMV(BaseSolver):
+class SolverAdaptFlexESMV(BaseBeamformer):
     """Flexible-Extent Adaptive Eigenspace Minimum Variance Beamformer.
 
     Extends AdaptiveESMV with diffusion-smoothed leadfield dictionaries

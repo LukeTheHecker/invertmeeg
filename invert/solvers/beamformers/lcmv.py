@@ -3,7 +3,8 @@ import logging
 import mne
 import numpy as np
 
-from ..base import BaseSolver, InverseOperator, SolverMeta
+from ..base import InverseOperator, SolverMeta
+from .base_beamformer import BaseBeamformer
 from .utils import (
     build_covariance_candidates,
 )
@@ -11,7 +12,7 @@ from .utils import (
 logger = logging.getLogger(__name__)
 
 
-class SolverLCMV(BaseSolver):
+class SolverLCMV(BaseBeamformer):
     """Class for the Linearly Constrained Minimum Variance Beamformer (LCMV) inverse solution.
 
     References
@@ -49,7 +50,6 @@ class SolverLCMV(BaseSolver):
         eps: float = 1e-15,
         **kwargs,
     ):
-        kwargs.setdefault("regularisation_method", "L")
         self.name = name
         self.use_robust_covariance = bool(use_robust_covariance)
         self.free_orientation_collapse = str(free_orientation_collapse).lower()

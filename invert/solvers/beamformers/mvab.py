@@ -1,11 +1,12 @@
 import mne
 import numpy as np
 
-from ..base import BaseSolver, InverseOperator, SolverMeta
+from ..base import InverseOperator, SolverMeta
+from .base_beamformer import BaseBeamformer
 from .utils import build_covariance_candidates
 
 
-class SolverMVAB(BaseSolver):
+class SolverMVAB(BaseBeamformer):
     """Class for the Minimum Variance Adaptive Beamformer (MVAB) inverse solution.
 
     Per-source beamformer with NAI weight normalization in whitened sensor space.
@@ -41,7 +42,6 @@ class SolverMVAB(BaseSolver):
         rank="auto",
         **kwargs,
     ):
-        kwargs.setdefault("regularisation_method", "L")
         self.name = name
         return super().__init__(reduce_rank=reduce_rank, rank=rank, **kwargs)
 
