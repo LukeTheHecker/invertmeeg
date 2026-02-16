@@ -1,10 +1,11 @@
 from copy import deepcopy
-from invert.util import build_source_adjacency
 
 import mne
 import numpy as np
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import laplacian
+
+from invert.util import build_source_adjacency
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
 
@@ -42,6 +43,10 @@ class SolverFLEXMUSIC(BaseSolver):
         self.name = name
         self.is_prepared = False
         self.scale_leadfield = scale_leadfield
+        # FLEX-MUSIC patch/adjaency machinery is scalar-source based.
+        # For free-orientation volume/discrete forwards, reduce to scalar
+        # orientations by default.
+        kwargs.setdefault("orientation", "pca")
         return super().__init__(**kwargs)
 
     def make_inverse_operator(

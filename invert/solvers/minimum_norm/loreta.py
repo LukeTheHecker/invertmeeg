@@ -3,6 +3,7 @@ import logging
 import mne
 import numpy as np
 from scipy.sparse.csgraph import laplacian
+
 from invert.util import build_source_adjacency
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
@@ -12,6 +13,15 @@ logger = logging.getLogger(__name__)
 
 class SolverLORETA(BaseSolver):
     """Class for the Low Resolution Tomography (LORETA) inverse solution.
+
+    Solves ``(L^T L + α * Lap^p) J = L^T Y`` where ``Lap`` is the graph
+    Laplacian on the source mesh. The ``laplacian_power`` parameter ``p``
+    controls the smoothness order via the fractional matrix power
+    ``Lap^p = U diag(λ_i^p) U^T``:
+
+    - ``p < 1``: less smoothness than standard LORETA (more focal solutions)
+    - ``p = 1``: standard LORETA (2nd-order smoothness, default)
+    - ``p > 1``: stronger smoothness (e.g. ``p = 2`` gives the biharmonic)
 
     References
     ----------
@@ -40,6 +50,7 @@ class SolverLORETA(BaseSolver):
         use_trace_normalization: bool = True,
         rank_tol: float = 1e-12,
         eps: float = 1e-15,
+        laplacian_power: float = 1.0,
         **kwargs,
     ):
         self.name = name
@@ -47,6 +58,7 @@ class SolverLORETA(BaseSolver):
         self.use_trace_normalization = bool(use_trace_normalization)
         self.rank_tol = float(rank_tol)
         self.eps = float(eps)
+        self.laplacian_power = float(laplacian_power)
         super().__init__(**kwargs)
         # LORETA's smoothness penalty can push the optimal alpha above the
         # BaseSolver grid under low SNR; widen to avoid edge saturation.
@@ -101,23 +113,38 @@ class SolverLORETA(BaseSolver):
         sensor_transform = wf.sensor_transform
 
         LTL = leadfield.T @ leadfield
-        B = np.eye(leadfield.shape[1])
         adjacency = build_source_adjacency(forward["src"], verbose=self.verbose).toarray()
-        laplace_operator = laplacian(adjacency)
-        BLapTLapB = B @ laplace_operator.T @ laplace_operator @ B
+        Lap = laplacian(adjacency)
+
+        # Fractional Laplacian power: L^p = U diag(λ_i^p) U^T
+        p = self.laplacian_power
+        eigvals, eigvecs = np.linalg.eigh(Lap)
+        eigvals = np.maximum(eigvals, 0.0)  # clamp numerical noise
+        if p == 1.0:
+            penalty = Lap
+        else:
+            penalty = eigvecs * (eigvals ** p) @ eigvecs.T
+
+        # Free orientation: expand penalty from (n_pos, n_pos) to (n_dipoles, n_dipoles)
+        n_orient = getattr(self, "_n_orient", 1)
+        if n_orient > 1 and penalty.shape[0] != LTL.shape[0]:
+            penalty = np.kron(penalty, np.eye(n_orient))
 
         if alpha == "auto":
             r_grid = np.asarray(self.r_values, dtype=float)
         else:
             r_grid = np.asarray([float(alpha)], dtype=float)
         max_eig_LTL = float(np.linalg.svd(LTL, compute_uv=False).max())
-        max_eig_penalty = float(np.linalg.svd(BLapTLapB, compute_uv=False).max())
+        max_eig_penalty = float(eigvals.max() ** p)
         scale = max_eig_LTL / max(max_eig_penalty, 1e-15)
         self.alphas = list(r_grid * scale)
 
         inverse_operators = []
         for alpha in self.alphas:
-            kernel_eff = np.linalg.solve(LTL + float(alpha) * BLapTLapB, leadfield.T)
+            M = LTL + float(alpha) * penalty
+            # Add small diagonal for numerical stability (Laplacian has zero eigenvalues)
+            M += self.eps * np.trace(M) / M.shape[0] * np.eye(M.shape[0])
+            kernel_eff = np.linalg.solve(M, leadfield.T)
             inverse_operators.append(
                 (float(leadfield_scale) * kernel_eff) @ sensor_transform
             )

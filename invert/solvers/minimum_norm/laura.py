@@ -97,6 +97,8 @@ class SolverLAURA(BaseSolver):
         """
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
         _n_chans, n_dipoles = self.leadfield.shape
+        n_orient = getattr(self, "_n_orient", 1)
+        n_pos = n_dipoles // n_orient
         pos = pos_from_forward(forward, verbose=verbose)
 
         if noise_cov is None:
@@ -152,7 +154,7 @@ class SolverLAURA(BaseSolver):
         # Diagonal: A_ii = (N/N_i) * sum_{k in neighbors} d_ki^{-e}
         # This creates a Laplacian-like structure enforcing local autoregressive averaging
 
-        A = np.zeros((n_dipoles, n_dipoles))
+        A = np.zeros((n_pos, n_pos))
 
         # Compute inverse distance weights for adjacent sources
         mask = d_adj > 0  # Only non-zero distances (neighbors)
@@ -166,7 +168,7 @@ class SolverLAURA(BaseSolver):
         n_neighbors = (d_adj > 0).sum(axis=1)
         n_neighbors = np.maximum(n_neighbors, 1)  # avoid division by zero
         neighbor_weight_sums = inv_dist_weights.sum(axis=1)
-        A[np.diag_indices(n_dipoles)] = (n_dipoles / n_neighbors) * neighbor_weight_sums
+        A[np.diag_indices(n_pos)] = (n_pos / n_neighbors) * neighbor_weight_sums
 
         # Source space metric: W_j = (M^T M)^{-1} where M = A
         # (W matrix is identity in standard LAURA formulation)
@@ -177,8 +179,8 @@ class SolverLAURA(BaseSolver):
         # neighborhood operators.
         metric = M_j.T @ M_j
         metric = 0.5 * (metric + metric.T)
-        metric_scale = max(float(np.trace(metric)) / max(n_dipoles, 1), self.eps)
-        metric += 1e-8 * metric_scale * np.identity(n_dipoles)
+        metric_scale = max(float(np.trace(metric)) / max(n_pos, 1), self.eps)
+        metric += 1e-8 * metric_scale * np.identity(n_pos)
         try:
             W_j = np.linalg.inv(metric)
         except np.linalg.LinAlgError:
@@ -187,8 +189,13 @@ class SolverLAURA(BaseSolver):
         # Apply depth weighting to correct for depth bias
         # Key fix: Use NEGATIVE exponent to down-weight superficial sources
         if self.depth_weight > 0:
-            # Compute source strengths (leadfield norms)
-            source_norms = np.linalg.norm(leadfield, axis=0)
+            # Compute source strengths per position (combine orientation components)
+            if n_orient > 1:
+                source_norms = np.linalg.norm(
+                    leadfield.reshape(_n_chans, n_pos, n_orient), axis=(0, 2)
+                )
+            else:
+                source_norms = np.linalg.norm(leadfield, axis=0)
             # Avoid division by zero
             source_norms = np.maximum(source_norms, 1e-12)
 
@@ -196,8 +203,6 @@ class SolverLAURA(BaseSolver):
             source_norms_normalized = source_norms / np.mean(source_norms)
 
             # Depth weighting: NEGATIVE exponent to down-weight superficial (strong) sources
-            # depth_weight=0: no correction (weights all = 1)
-            # depth_weight=1: full inverse weighting (deep sources up-weighted by leadfield ratio)
             depth_weights = source_norms_normalized ** (-self.depth_weight)
 
             if verbose > 0:
@@ -212,7 +217,11 @@ class SolverLAURA(BaseSolver):
 
         # Ensure numerical stability
         # Add small regularization to ensure positive definiteness
-        W_j += 1e-8 * np.trace(W_j) / n_dipoles * np.identity(n_dipoles)
+        W_j += 1e-8 * np.trace(W_j) / n_pos * np.identity(n_pos)
+
+        # Free orientation: expand W_j from (n_pos, n_pos) to (n_dipoles, n_dipoles)
+        if n_orient > 1:
+            W_j = np.kron(W_j, np.eye(n_orient))
 
         # Noise covariance in sensor space
         # Ensure it's symmetric and positive definite

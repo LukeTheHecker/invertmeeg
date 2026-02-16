@@ -57,16 +57,17 @@ class SolverBackusGilbert(BaseSolver):
         leadfield = wf.G_white
         _, n_dipoles = leadfield.shape
         pos = pos_from_forward(forward, verbose=self.verbose)
+        n_sources = len(pos)
+        n_orient = n_dipoles // n_sources  # 1 for fixed, 3 for free
         dist = cdist(pos, pos)
-
-        W_BG = []
-        for i in range(n_dipoles):
-            W_gamma_BG = np.diag(dist[i, :])
-            W_BG.append(W_gamma_BG)
 
         C = []
         for i in range(n_dipoles):
-            C_gamma = leadfield @ W_BG[i] @ leadfield.T
+            # Map dipole index to source index (all components of a source
+            # share the same spatial distances)
+            source_idx = i // n_orient
+            d = np.repeat(dist[source_idx, :], n_orient)
+            C_gamma = (leadfield * d) @ leadfield.T
             C.append(C_gamma)
 
         F = leadfield @ leadfield.T

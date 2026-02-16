@@ -1,11 +1,12 @@
 import logging
-from invert.util import build_source_adjacency
 
 import mne
 import numpy as np
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import laplacian
 from scipy.sparse.linalg import splu
+
+from invert.util import build_source_adjacency
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
 
@@ -94,6 +95,9 @@ class SolverMSP(BaseSolver):
         self.n_patterns = n_patterns
         self.diffusion_parameter = diffusion_parameter
         self.patch_order = patch_order
+        # MSP operates on scalar source amplitudes; for free-orientation
+        # volume/discrete forwards, reduce to scalar orientations by default.
+        kwargs.setdefault("orientation", "pca")
         return super().__init__(reduce_rank=reduce_rank, rank=rank, **kwargs)
 
     def make_inverse_operator(
