@@ -45,6 +45,7 @@ __all__ = [
     "SolverFlexChampagne",
     "SolverFlexNLChampagne",
     "SolverOmniChampagne",
+    "SolverBlockChampagne",
     "SolverGammaMAP",
     "SolverSourceMAP",
     "SolverGammaMAPMSP",

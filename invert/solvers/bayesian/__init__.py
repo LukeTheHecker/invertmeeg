@@ -1,6 +1,7 @@
 """Bayesian solvers for M/EEG source reconstruction."""
 
 from .bcs import SolverBCS
+from .block_champagne import SolverBlockChampagne
 from .champagne import SolverChampagne
 from .cmem import SolverCMEM
 from .flex_champagne import SolverFlexChampagne
@@ -21,6 +22,7 @@ __all__ = [
     "SolverFlexChampagne",
     "SolverFlexNLChampagne",
     "SolverOmniChampagne",
+    "SolverBlockChampagne",
     "SolverBCS",
     "SolverGammaMAP",
     "SolverSourceMAP",

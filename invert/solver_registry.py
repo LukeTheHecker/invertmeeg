@@ -236,6 +236,13 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         class_name="SolverFlexNLChampagne",
         aliases=("flexnlchampagne", "flex-nl-champagne", "fnlc"),
     ),
+    SolverSpec(
+        solver_id="block-champagne",
+        module_path="invert.solvers.bayesian.block_champagne",
+        class_name="SolverBlockChampagne",
+        aliases=("blockchampagne", "block-champagne", "bc-champ"),
+        display_name="Block-Champagne",
+    ),
     # -- Other Bayesian -----------------------------------------------------
     SolverSpec(
         solver_id="gamma-map",

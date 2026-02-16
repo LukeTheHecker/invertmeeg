@@ -112,6 +112,10 @@ def _build_registry() -> dict[str, Any]:
         ["flexnlchampagne", "flex-nl-champagne", "fnlc"],
         solvers.SolverFlexNLChampagne,
     )
+    _add(
+        ["blockchampagne", "block-champagne", "bc-champ"],
+        solvers.SolverBlockChampagne,
+    )
 
     # -- Other Bayesian -----------------------------------------------------
     _add(["gamma-map", "gmap"], solvers.SolverGammaMAP)
