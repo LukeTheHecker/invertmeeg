@@ -1617,6 +1617,89 @@ class BaseSolver:
             raise ValueError(msg)
 
         method = method.lower()
+        if gamma is None:
+            gamma = self._resolve_gcv_gamma(method)
+
+        gcv_values = self.compute_gcv_scores(M, method=method, gamma=gamma)
+
+        # Find optimal regularization parameter
+        valid_indices = np.isfinite(gcv_values)
+        if not np.any(valid_indices):
+            optimum_idx = len(gcv_values) // 2
+        else:
+            valid_gcv = gcv_values[valid_indices]
+            valid_idx_positions = np.where(valid_indices)[0]
+            min_pos = np.argmin(valid_gcv)
+            optimum_idx = valid_idx_positions[min_pos]
+
+        if plot and len(self.alphas) == len(gcv_values):
+            plt.figure()
+            plt.semilogx(
+                self.alphas, gcv_values, "o-", label=f"{method.upper()} values"
+            )
+            plt.semilogx(
+                self.alphas[optimum_idx],
+                gcv_values[optimum_idx],
+                "r*",
+                markersize=10,
+                label=f"Optimal α = {self.alphas[optimum_idx]:.2e}",
+            )
+            plt.xlabel("Regularization parameter α")
+            plt.ylabel(f"{method.upper()} value")
+            plt.title(
+                f"{method.upper()} (γ={gamma:g}): Optimal α = {self.alphas[optimum_idx]:.2e}"
+            )
+            plt.legend()
+            plt.grid(True)
+
+        self.log_regularisation_edge_choice(
+            optimum_idx=optimum_idx,
+            method=method.upper(),
+        )
+        source_mat = self.inverse_operators[optimum_idx].apply(M)  # type: ignore[attr-defined]
+        return source_mat, optimum_idx
+
+    def _resolve_gcv_gamma(self, method: str) -> float:
+        """Return the default gamma parameter for the given GCV method."""
+        if method == "mgcv":
+            return self.mgcv_gamma
+        elif method in {"rgcv", "composite"}:
+            return self.rgcv_gamma
+        elif method == "r1gcv":
+            return self.r1gcv_gamma
+        return self.gcv_gamma
+
+    def compute_gcv_scores(
+        self,
+        M,
+        method: str = "gcv",
+        gamma: float | None = None,
+    ) -> np.ndarray:
+        """Compute GCV scores for each inverse operator without selecting one.
+
+        This is the scoring component of ``regularise_gcv``, exposed separately
+        so that the benchmark runner can aggregate scores across multiple data
+        samples before choosing the optimal regularization level.
+
+        Parameters
+        ----------
+        M : numpy.ndarray
+            Data matrix (n_channels, n_timepoints).
+        method : str
+            GCV variant (``"gcv"``, ``"mgcv"``, ``"rgcv"``, ``"r1gcv"``,
+            ``"composite"``).
+        gamma : float | None
+            Method-specific parameter.  If *None*, uses instance default.
+
+        Returns
+        -------
+        numpy.ndarray
+            Array of GCV scores, one per inverse operator.
+        """
+        method = method.lower()
+        if gamma is None:
+            gamma = self._resolve_gcv_gamma(method)
+
         # Trace: use ORIGINAL leadfield (correct by cyclic property of trace)
         _lo = getattr(self, "_leadfield_orig", None)
         L_orig = _lo if _lo is not None else self.leadfield
@@ -1624,17 +1707,6 @@ class BaseSolver:
         L_resid = self.leadfield  # G_white if whitened, else original
         n_eff = L_resid.shape[0]
         _st = getattr(self, "_sensor_transform", None)
-
-        # Resolve default gamma per method
-        if gamma is None:
-            if method == "mgcv":
-                gamma = self.mgcv_gamma
-            elif method in {"rgcv", "composite"}:
-                gamma = self.rgcv_gamma
-            elif method == "r1gcv":
-                gamma = self.r1gcv_gamma
-            else:
-                gamma = self.gcv_gamma
 
         need_trace_A2 = method in {"rgcv", "r1gcv", "composite"}
 
@@ -1694,45 +1766,7 @@ class BaseSolver:
             else:
                 gcv_values.append(weight * V_gcv)
 
-        # Find optimal regularization parameter
-        gcv_values = np.array(gcv_values)  # type: ignore[assignment]
-
-        # Filter out invalid values (inf, nan)
-        valid_indices = np.isfinite(gcv_values)
-        if not np.any(valid_indices):
-            optimum_idx = len(gcv_values) // 2
-        else:
-            valid_gcv = gcv_values[valid_indices]
-            valid_idx_positions = np.where(valid_indices)[0]
-            min_pos = np.argmin(valid_gcv)
-            optimum_idx = valid_idx_positions[min_pos]
-
-        if plot and len(self.alphas) == len(gcv_values):
-            plt.figure()
-            plt.semilogx(
-                self.alphas, gcv_values, "o-", label=f"{method.upper()} values"
-            )
-            plt.semilogx(
-                self.alphas[optimum_idx],
-                gcv_values[optimum_idx],
-                "r*",
-                markersize=10,
-                label=f"Optimal α = {self.alphas[optimum_idx]:.2e}",
-            )
-            plt.xlabel("Regularization parameter α")
-            plt.ylabel(f"{method.upper()} value")
-            plt.title(
-                f"{method.upper()} (γ={gamma:g}): Optimal α = {self.alphas[optimum_idx]:.2e}"
-            )
-            plt.legend()
-            plt.grid(True)
-
-        self.log_regularisation_edge_choice(
-            optimum_idx=optimum_idx,
-            method=method.upper(),
-        )
-        source_mat = self.inverse_operators[optimum_idx].apply(M)  # type: ignore[attr-defined]
-        return source_mat, optimum_idx
+        return np.array(gcv_values)
 
     def regularise_product(self, M, plot=False):
         """Find optimally regularized inverse solution using the product method [1].

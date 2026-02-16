@@ -742,7 +742,22 @@ class BenchmarkRunner:
                                 optimal_idx = 0
                             elif n_ops > 1:
                                 try:
-                                    _, optimal_idx = solver.regularise_gcv(x_batch[0])
+                                    # Aggregate GCV scores across multiple samples
+                                    # for more robust regularization selection.
+                                    n_gcv = min(5, len(x_batch))
+                                    all_scores = np.stack([
+                                        solver.compute_gcv_scores(x_batch[k])
+                                        for k in range(n_gcv)
+                                    ])
+                                    median_scores = np.median(all_scores, axis=0)
+                                    valid = np.isfinite(median_scores)
+                                    if np.any(valid):
+                                        valid_idx = np.where(valid)[0]
+                                        optimal_idx = valid_idx[
+                                            np.argmin(median_scores[valid])
+                                        ]
+                                    else:
+                                        optimal_idx = len(median_scores) // 2
                                 except Exception as exc:
                                     logger.warning(
                                         "Regularisation selection failed for %s on %s; "
