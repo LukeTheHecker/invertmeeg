@@ -212,7 +212,8 @@ class BaseSolver:
     SUPPORTS_VECTOR_ORIENTATION: bool = False
     # Default regularization grid exponents for r_values = logspace(min_exp, max_exp, n_reg_params).
     # Solver subclasses can override this to widen/shift the search grid without affecting others.
-    R_VALUE_EXPONENTS: tuple[float, float] = (-10.0, 1.0)
+    # Note: the upper end was widened to reduce frequent "edge-of-grid" GCV picks in practice.
+    R_VALUE_EXPONENTS: tuple[float, float] = (-10.0, 2.0)
 
     def __init__(
         self,
@@ -272,7 +273,9 @@ class BaseSolver:
             raise ValueError(
                 f"orientation_pca_reg must be a finite non-negative float, got {orientation_pca_reg!r}"
             )
-        self.orientation_pca_deterministic_sign = bool(orientation_pca_deterministic_sign)
+        self.orientation_pca_deterministic_sign = bool(
+            orientation_pca_deterministic_sign
+        )
         self.require_recompute = True
         self.require_data = True
         self._free_orientation = False
@@ -364,8 +367,6 @@ class BaseSolver:
 
         n_chans = int(self.leadfield.shape[0])
         n_sources = int(self.leadfield.shape[1])
-        n_orient = int(getattr(self, "_n_orient", 1))
-        is_free = bool(getattr(self, "_free_orientation", False))
 
         # Expected rows: for scalar orientation n_sources, for free n_sources already
         # reflects the orientation (leadfield has shape (n_chans, n_sources * n_orient)
@@ -479,7 +480,10 @@ class BaseSolver:
         and will collapse free-orientation outputs by vector norm.
         """
 
-        if not getattr(self, "_free_orientation", False) or int(getattr(self, "_n_orient", 1)) != 3:
+        if (
+            not getattr(self, "_free_orientation", False)
+            or int(getattr(self, "_n_orient", 1)) != 3
+        ):
             raise ValueError(
                 "apply_inverse_operator_vector() requires a 3-component source model. "
                 "Build the operator with orientation='free' (vector-capable solvers only), "
@@ -1495,7 +1499,9 @@ class BaseSolver:
             inverse_operator.apply(M) for inverse_operator in self.inverse_operators
         ]
 
-        l2_norms = np.asarray([np.linalg.norm(source_mat) for source_mat in source_mats])
+        l2_norms = np.asarray(
+            [np.linalg.norm(source_mat) for source_mat in source_mats]
+        )
 
         M_eff = _st @ M if _st is not None else M
         residual_norms = np.asarray(
@@ -2148,13 +2154,17 @@ class BaseSolver:
                         "orientation='pca' requires passing an MNE data object to "
                         "make_inverse_operator(forward, mne_obj, ...)."
                     )
-                logger.info("%s orientation: using PCA reduction (free->scalar).", solver_label)
+                logger.info(
+                    "%s orientation: using PCA reduction (free->scalar).", solver_label
+                )
                 # Extract data using the same preprocessing/picking pipeline.
                 Y = self.unpack_data_obj(self._orientation_data_obj)
                 kept_ch_names = list(getattr(self, "_last_data_ch_names", ()) or [])
                 if kept_ch_names:
                     # Pick forward channels to match the PCA data channels.
-                    self.forward = self.forward.pick_channels(kept_ch_names, ordered=True)
+                    self.forward = self.forward.pick_channels(
+                        kept_ch_names, ordered=True
+                    )
 
                 G_free = np.asarray(self.forward["sol"]["data"], dtype=float)
                 q = estimate_orientation_pca(
@@ -2169,7 +2179,9 @@ class BaseSolver:
                 self._n_orient = 1
 
             else:  # orientation == "free"
-                supports_vector = bool(getattr(self, "SUPPORTS_VECTOR_ORIENTATION", False))
+                supports_vector = bool(
+                    getattr(self, "SUPPORTS_VECTOR_ORIENTATION", False)
+                )
                 if not supports_vector:
                     # All beamformers can operate on free-orientation leadfields
                     # (at minimum by treating the 3 components as grouped columns).
@@ -2185,7 +2197,10 @@ class BaseSolver:
                     self.forward = ensure_surface_free_surf_ori(self.forward)
                 self._free_orientation = True
                 self._n_orient = 3
-                logger.info("%s orientation: using true free orientation (3-component).", solver_label)
+                logger.info(
+                    "%s orientation: using true free orientation (3-component).",
+                    solver_label,
+                )
         else:
             if orientation == "free":
                 raise ValueError(
@@ -2455,9 +2470,7 @@ class BaseSolver:
                     source_mat.reshape(n_src, n_orient, -1), axis=1
                 )
             else:
-                source_mat = np.linalg.norm(
-                    source_mat.reshape(n_src, n_orient), axis=1
-                )
+                source_mat = np.linalg.norm(source_mat.reshape(n_src, n_orient), axis=1)
 
         # Convert source to an MNE STC object matching the source-space type.
         source_model = self.forward["src"]

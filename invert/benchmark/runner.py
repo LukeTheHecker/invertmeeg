@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import random
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
@@ -542,6 +543,12 @@ def _make_inverse_operator_with_covariance(
         solver.make_inverse_operator(forward, alpha=alpha, noise_cov=noise_cov, **kwargs)
 
 
+class TimingInfo(BaseModel):
+    total_seconds: float
+    make_inverse_operator_seconds: float | None = None
+    apply_inverse_seconds: float | None = None
+
+
 class SampleMetrics(BaseModel):
     mle: float
     emd: float
@@ -564,6 +571,7 @@ class BenchmarkResult(BaseModel):
     category: str | None = None
     metrics: dict[str, AggregateStats]
     samples: list[SampleMetrics]
+    timing: TimingInfo | None = None
 
 
 class BenchmarkRunner:
@@ -665,6 +673,9 @@ class BenchmarkRunner:
 
                     # Neural-network solvers train from SimulationConfig and then
                     # apply the trained model to each sample.
+                    t_solver_start = time.perf_counter()
+                    timing_info: TimingInfo | None = None
+
                     if _expects_simulation_config(solver_cls):
                         train_sim_config = sim_config.model_copy(
                             update={"batch_size": _default_nn_batch_size(self.forward)}
@@ -676,9 +687,12 @@ class BenchmarkRunner:
                         )
                         params = dict(make_params)
                         alpha = params.pop("alpha", "auto")
+                        t_make = time.perf_counter()
                         solver.make_inverse_operator(
                             self.forward, train_sim_config, alpha=alpha, **params
                         )
+                        make_seconds = time.perf_counter() - t_make
+                        t_apply = time.perf_counter()
                         sample_metrics: list[SampleMetrics] = []
                         for i in tqdm(
                             range(self.n_samples),
@@ -695,6 +709,13 @@ class BenchmarkRunner:
                                 y_batch[i], y_pred, adjacency, adjacency, pos, pos
                             )
                             sample_metrics.append(self._metrics_from_dict(metrics))
+                        apply_seconds = time.perf_counter() - t_apply
+                        total_seconds = time.perf_counter() - t_solver_start
+                        timing_info = TimingInfo(
+                            total_seconds=total_seconds,
+                            make_inverse_operator_seconds=make_seconds,
+                            apply_inverse_seconds=apply_seconds,
+                        )
 
                     # Parallelize based on require_recompute
                     elif not solver.require_recompute:
@@ -704,6 +725,7 @@ class BenchmarkRunner:
                             evoked = mne.EvokedArray(
                                 x_batch[0], self.info, tmin=0.0, verbose=0
                             )
+                        t_make = time.perf_counter()
                         _make_inverse_operator_with_covariance(
                             solver=solver,
                             forward=self.forward,
@@ -713,10 +735,12 @@ class BenchmarkRunner:
                             noise_cov=noise_cov,
                             make_kwargs=make_params,
                         )
+                        make_seconds = time.perf_counter() - t_make
 
                         # Some solvers do not expose inverse operators, or may leave the
                         # list empty for data-dependent paths. In both cases, fall back
                         # to direct per-sample application.
+                        t_apply = time.perf_counter()
                         inverse_ops = getattr(solver, "inverse_operators", None)
                         if not inverse_ops:
                             # Fall back to direct application for each sample
@@ -796,6 +820,13 @@ class BenchmarkRunner:
                                 ds_name,
                                 solver_name,
                             )
+                        apply_seconds = time.perf_counter() - t_apply
+                        total_seconds = time.perf_counter() - t_solver_start
+                        timing_info = TimingInfo(
+                            total_seconds=total_seconds,
+                            make_inverse_operator_seconds=make_seconds,
+                            apply_inverse_seconds=apply_seconds,
+                        )
                     else:
                         # Parallelize full computation (require_recompute=True)
                         module_path, class_name = _SOLVER_REGISTRY[solver_name]
@@ -815,8 +846,11 @@ class BenchmarkRunner:
                             noise_cov,
                             self.solver_params.get(solver_name, {}),
                         )
+                        total_seconds = time.perf_counter() - t_solver_start
+                        timing_info = TimingInfo(total_seconds=total_seconds)
 
                     result = self._aggregate(solver_name, ds_name, sample_metrics)
+                    result.timing = timing_info
                     results.append(result)
                     pbar_overall.update(1)
                     pbar_overall.set_postfix(
@@ -1255,6 +1289,7 @@ class BenchmarkRunner:
                             }
                             for metric, stats in r.metrics.items()
                         },
+                        "timing": r.timing.model_dump() if r.timing else None,
                         "samples": [],
                     }
                     for r in self._results
