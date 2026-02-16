@@ -26,6 +26,7 @@ from scipy.sparse.csgraph import laplacian
 from invert.util import build_source_adjacency
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
+from .sbl_core import sbl_iterate
 
 logger = logging.getLogger(__name__)
 
@@ -215,89 +216,21 @@ class SolverOmniChampagne(BaseSolver):
         conv_crit: float,
         update_rule: str,
     ) -> _SBLFit:
-        n_chans, n_atoms = L_orig.shape
-        n_times = Y_scaled.shape[1]
-
-        L = L_orig
-
-        gammas = np.ones(n_atoms)
-        active_set = np.arange(n_atoms)
-
-        # Start with full set
-        L_act = L
-        gam_act = gammas
-
-        loss_prev = None
-        for _ in range(max_iter):
-            # Posterior for current active set
-            Sigma_y = noise_cov + (L_act * gam_act) @ L_act.T
-            Sigma_y = 0.5 * (Sigma_y + Sigma_y.T)
-            Sigma_y_inv = self._robust_inv(Sigma_y)
-            mu_x = (L_act.T @ Sigma_y_inv @ Y_scaled) * gam_act[:, None]
-
-            # Update gammas
-            upper = np.mean(mu_x**2, axis=1)
-            L_Sigma = Sigma_y_inv @ L_act
-            z_diag = np.sum(L_act * L_Sigma, axis=0)
-
-            rule = update_rule.lower()
-            if rule == "convexity" or rule == "mm":
-                gam_new = np.sqrt(upper / (z_diag + 1e-20))
-            elif rule == "em":
-                diag_sigma_x = gam_act - gam_act**2 * z_diag
-                gam_new = diag_sigma_x + upper
-            else:  # MacKay default
-                gam_new = upper / (gam_act * z_diag + 1e-20)
-
-            gam_new[~np.isfinite(gam_new)] = 0.0
-            gam_new = np.maximum(gam_new, 0.0)
-            if float(np.linalg.norm(gam_new)) == 0.0:
-                break
-
-            # Prune
-            thresh = pruning_thresh * float(gam_new.max())
-            keep = np.where(gam_new > thresh)[0]
-            if keep.size == 0:
-                break
-
-            active_set = active_set[keep]
-            gam_act = gam_new[keep]
-            L_act = L_act[:, keep]
-
-            # Recompute after pruning for loss and convergence
-            Sigma_y = noise_cov + (L_act * gam_act) @ L_act.T
-            Sigma_y = 0.5 * (Sigma_y + Sigma_y.T)
-            Sigma_y_inv = self._robust_inv(Sigma_y)
-
-            data_fit = float(np.trace(Sigma_y_inv @ Y_scaled @ Y_scaled.T) / n_times)
-            eigvals = np.linalg.eigvalsh(Sigma_y)
-            log_det = float(np.sum(np.log(np.maximum(eigvals, 1e-20))))
-            loss = data_fit + log_det
-
-            if loss_prev is not None:
-                rel_change = (loss_prev - loss) / (abs(loss_prev) + 1e-20)
-                if rel_change > 0 and rel_change < conv_crit:
-                    loss_prev = loss
-                    break
-            loss_prev = loss
-
-        # Final loss on the last active set state
-        if loss_prev is None:
-            Sigma_y = noise_cov + (L_act * gam_act) @ L_act.T
-            Sigma_y = 0.5 * (Sigma_y + Sigma_y.T)
-            Sigma_y_inv = self._robust_inv(Sigma_y)
-            data_fit = float(np.trace(Sigma_y_inv @ Y_scaled @ Y_scaled.T) / n_times)
-            eigvals = np.linalg.eigvalsh(Sigma_y)
-            log_det = float(np.sum(np.log(np.maximum(eigvals, 1e-20))))
-            loss_prev = data_fit + log_det
-        else:
-            Sigma_y_inv = Sigma_y_inv
-
+        result = sbl_iterate(
+            L=L_orig,
+            Y=Y_scaled,
+            noise_cov=noise_cov,
+            update_rule=update_rule,
+            max_iter=max_iter,
+            pruning_thresh=pruning_thresh,
+            conv_crit=conv_crit,
+            inverse_fn=self._robust_inv,
+        )
         return _SBLFit(
-            active_set=active_set.astype(int, copy=False),
-            gammas=gam_act.astype(float, copy=False),
-            sigma_y_inv=Sigma_y_inv,
-            loss=float(loss_prev),
+            active_set=result.active_set.astype(int, copy=False),
+            gammas=result.gammas.astype(float, copy=False),
+            sigma_y_inv=result.Sigma_y_inv,
+            loss=result.loss,
         )
 
     @staticmethod

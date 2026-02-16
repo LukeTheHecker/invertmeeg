@@ -16,6 +16,7 @@ from scipy.sparse.csgraph import laplacian
 from invert.util import build_source_adjacency
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
+from .sbl_core import sbl_iterate
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +136,6 @@ class SolverFlexChampagne(BaseSolver):
     # ------------------------------------------------------------------
     def _flex_champagne(self, Y, pruning_thresh, max_iter, conv_crit):
         n_chans, n_dipoles = self.leadfield.shape
-        n_times = Y.shape[1]
         n_orders = len(self.leadfields)
 
         # Build extended leadfield: (n_chans, n_orders * n_dipoles)
@@ -145,71 +145,20 @@ class SolverFlexChampagne(BaseSolver):
         # Noise estimate from data covariance
         C_y = self.data_covariance(Y, center=True, ddof=1)
         alpha_noise = float(np.trace(C_y) / n_chans)
-        I_c = np.identity(n_chans)
-        noise_cov = alpha_noise * I_c
+        noise_cov = alpha_noise * np.identity(n_chans)
 
-        Y_scaled = Y
-
-        # Gammas: one per extended-dictionary atom
-        gammas = np.ones(n_ext)
-        active_set = np.arange(n_ext)
-        L = deepcopy(L_ext)
-
-        Sigma_y = noise_cov + (L * gammas) @ L.T
-        Sigma_y = 0.5 * (Sigma_y + Sigma_y.T)
-        Sigma_y_inv = self._robust_inv(Sigma_y)
-        mu_x = (L.T @ Sigma_y_inv @ Y_scaled) * gammas[:, None]
-
-        loss_list = []
-
-        for _i_iter in range(max_iter):
-            old_gammas = deepcopy(gammas)
-
-            # MacKay update
-            upper = np.mean(mu_x**2, axis=1)
-            L_Sigma = Sigma_y_inv @ L
-            z_diag = np.sum(L * L_Sigma, axis=0)
-
-            if self.update_rule == "MacKay":
-                gammas = upper / (gammas * z_diag + 1e-20)
-            elif self.update_rule == "Convexity":
-                gammas = np.sqrt(upper / (z_diag + 1e-20))
-            else:
-                gammas = upper / (gammas * z_diag + 1e-20)
-
-            gammas[~np.isfinite(gammas)] = 0.0
-            gammas = np.maximum(gammas, 0.0)
-
-            if np.linalg.norm(gammas) == 0:
-                gammas = old_gammas
-                break
-
-            # Pruning
-            thresh = pruning_thresh * gammas.max()
-            keep = np.where(gammas > thresh)[0]
-            if len(keep) == 0:
-                gammas = old_gammas
-                break
-            active_set = active_set[keep]
-            gammas = gammas[keep]
-            L = L[:, keep]
-
-            Sigma_y = noise_cov + (L * gammas) @ L.T
-            Sigma_y = 0.5 * (Sigma_y + Sigma_y.T)
-            Sigma_y_inv = self._robust_inv(Sigma_y)
-            mu_x = (L.T @ Sigma_y_inv @ Y_scaled) * gammas[:, None]
-
-            # Loss
-            data_fit = np.trace(Sigma_y_inv @ Y_scaled @ Y_scaled.T) / n_times
-            eigvals = np.linalg.eigvalsh(Sigma_y)
-            log_det = float(np.sum(np.log(np.maximum(eigvals, 1e-20))))
-            loss = float(data_fit + log_det)
-            loss_list.append(loss)
-
-            if len(loss_list) > 1:
-                rel_change = (loss_list[-2] - loss) / (abs(loss_list[-2]) + 1e-20)
-                if rel_change > 0 and rel_change < conv_crit:
-                    break
+        result = sbl_iterate(
+            L=L_ext,
+            Y=Y,
+            noise_cov=noise_cov,
+            update_rule=self.update_rule,
+            max_iter=max_iter,
+            pruning_thresh=pruning_thresh,
+            conv_crit=conv_crit,
+            inverse_fn=self._robust_inv,
+        )
+        active_set = result.active_set
+        gammas = result.gammas
 
         # Reconstruct: map extended gammas back to (order, dipole) pairs
         gammas_full = np.zeros(n_ext)

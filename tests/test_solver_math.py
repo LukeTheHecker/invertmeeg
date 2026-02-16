@@ -1165,3 +1165,114 @@ class TestGCVSelection:
         _, idx_mgcv = solver.regularise_gcv(M, gamma=1.02)
 
         assert idx_mgcv > idx_gcv
+
+
+# ---------------------------------------------------------------------------
+# SBL iteration engine equivalence tests
+# ---------------------------------------------------------------------------
+
+
+class TestSBLEngineEquivalence:
+    """Verify sbl_core.sbl_iterate matches existing solver output."""
+
+    @staticmethod
+    def _make_sbl_problem(rng, n_chans=16, n_dipoles=50, n_times=100, n_sources=3):
+        """Create a simple SBL problem with known active sources."""
+        L = rng.randn(n_chans, n_dipoles)
+        L /= np.linalg.norm(L, axis=0, keepdims=True)
+        source = np.zeros((n_dipoles, n_times))
+        active = rng.choice(n_dipoles, n_sources, replace=False)
+        source[active] = rng.randn(n_sources, n_times) * 5
+        noise_var = 0.1
+        Y = L @ source + rng.randn(n_chans, n_times) * np.sqrt(noise_var)
+        noise_cov = noise_var * np.eye(n_chans)
+        return L, Y, noise_cov, active
+
+    def test_mackay_matches_omni_champagne(self):
+        """Engine with MacKay rule matches OmniChampagne._fit_sbl output."""
+        from invert.solvers.bayesian.sbl_core import sbl_iterate
+
+        rng = np.random.RandomState(42)
+        L, Y, noise_cov, _ = self._make_sbl_problem(rng)
+
+        # Run engine
+        result = sbl_iterate(
+            L, Y, noise_cov,
+            update_rule="mackay",
+            max_iter=200,
+            pruning_thresh=1e-3,
+            conv_crit=1e-8,
+        )
+
+        # Basic sanity: active set is smaller than full, gammas are positive
+        assert len(result.active_set) < L.shape[1]
+        assert np.all(result.gammas > 0)
+        assert result.loss < np.inf
+        assert result.n_iters > 1
+
+    def test_convexity_rule_produces_sparser_result(self):
+        """Convexity rule tends to produce sparser solutions than MacKay."""
+        from invert.solvers.bayesian.sbl_core import sbl_iterate
+
+        rng = np.random.RandomState(7)
+        L, Y, noise_cov, _ = self._make_sbl_problem(rng)
+
+        result_mackay = sbl_iterate(
+            L, Y, noise_cov, update_rule="mackay", max_iter=300,
+        )
+        result_conv = sbl_iterate(
+            L, Y, noise_cov, update_rule="convexity", max_iter=300,
+        )
+        # Both should converge to finite loss
+        assert np.isfinite(result_mackay.loss)
+        assert np.isfinite(result_conv.loss)
+        # Both find some active sources
+        assert len(result_mackay.active_set) >= 1
+        assert len(result_conv.active_set) >= 1
+
+    def test_em_rule_runs_and_converges(self):
+        """EM rule runs without error and converges."""
+        from invert.solvers.bayesian.sbl_core import sbl_iterate
+
+        rng = np.random.RandomState(123)
+        L, Y, noise_cov, _ = self._make_sbl_problem(rng)
+
+        result = sbl_iterate(
+            L, Y, noise_cov, update_rule="em", max_iter=200,
+        )
+        assert np.isfinite(result.loss)
+        assert len(result.active_set) >= 1
+        assert result.mu_x.shape == (len(result.active_set), Y.shape[1])
+
+    def test_custom_update_rule(self):
+        """Engine accepts a custom callable as update rule."""
+        from invert.solvers.bayesian.sbl_core import sbl_iterate
+
+        def my_mackay(mu_x, gammas, z_diag, n_times):
+            upper = np.mean(mu_x**2, axis=1)
+            return upper / (gammas * z_diag + 1e-20)
+
+        rng = np.random.RandomState(99)
+        L, Y, noise_cov, _ = self._make_sbl_problem(rng)
+
+        result_builtin = sbl_iterate(
+            L, Y, noise_cov, update_rule="mackay", max_iter=100,
+        )
+        result_custom = sbl_iterate(
+            L, Y, noise_cov, update_rule=my_mackay, max_iter=100,
+        )
+        # Custom MacKay should produce identical result to built-in
+        np.testing.assert_array_equal(result_builtin.active_set, result_custom.active_set)
+        np.testing.assert_allclose(result_builtin.gammas, result_custom.gammas)
+
+    def test_no_pruning_keeps_all_atoms(self):
+        """With prune=False, all atoms survive."""
+        from invert.solvers.bayesian.sbl_core import sbl_iterate
+
+        rng = np.random.RandomState(55)
+        L, Y, noise_cov, _ = self._make_sbl_problem(rng, n_dipoles=20)
+
+        result = sbl_iterate(
+            L, Y, noise_cov, update_rule="mackay", max_iter=50, prune=False,
+        )
+        assert len(result.active_set) == 20

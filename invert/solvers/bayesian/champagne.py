@@ -6,6 +6,7 @@ import numpy as np
 from scipy.sparse import diags
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
+from .sbl_core import sbl_iterate
 
 logger = logging.getLogger(__name__)
 EPSILON = 1e-10
@@ -267,6 +268,31 @@ class SolverChampagne(BaseSolver):
                 base_noise_cov = I
         noise_cov = float(alpha) * base_noise_cov
 
+        # Fast path: delegate to shared SBL engine for standard rules
+        rule_lower = self.update_rule.lower()
+        if (rule_lower in {"mackay", "convexity", "mm", "em", "lowsnr"}
+                and self.noise_learning != "learn"):
+            sbl_rule = "convexity" if rule_lower == "lowsnr" else rule_lower
+            result = sbl_iterate(
+                L=L_full_scaled,
+                Y=Y_scaled,
+                noise_cov=noise_cov,
+                update_rule=sbl_rule,
+                max_iter=self.max_iter,
+                prune=self.prune,
+                pruning_thresh=pruning_thresh,
+                conv_crit=self.convergence_criterion,
+                inverse_fn=self.robust_inverse,
+            )
+            gammas_scaled = np.zeros(n_dipoles)
+            gammas_scaled[result.active_set] = result.gammas
+            gammas_final = gammas_scaled / (L_norms**2)
+            Gamma_final = diags(gammas_final, 0)
+            Sigma_y_final = noise_cov + L_orig @ Gamma_final @ L_orig.T
+            Sigma_y_final_inv = self.robust_inverse(Sigma_y_final)
+            return Gamma_final @ L_orig.T @ Sigma_y_final_inv
+
+        # Legacy path: complex update rules (AR-EM, TEM, adaptive) or noise learning
         Sigma_y = noise_cov + L @ Gamma @ L.T
         Sigma_y_inv = self.robust_inverse(Sigma_y)
         mu_x = Gamma @ L.T @ Sigma_y_inv @ Y_scaled
