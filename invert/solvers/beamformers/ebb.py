@@ -9,8 +9,18 @@ logger = logging.getLogger(__name__)
 
 
 class SolverEBB(BaseSolver):
-    """
-    Empirical Bayesian Beamformer (EBB) solver for M/EEG inverse problem.
+    """Empirical Bayesian Beamformer (EBB) for M/EEG inverse problem.
+
+    Iterative empirical-Bayes / ARD-style beamformer that estimates per-source
+    variances (hyperparameters) via EM and forms corresponding spatial filters.
+
+    This is equivalent to Champagne with EM updates, using the efficient
+    sensor-space (n_channels x n_channels) formulation.
+
+    References
+    ----------
+    [1] Wipf, D., & Nagarajan, S. (2009). A unified Bayesian framework for
+        MEG/EEG source imaging. NeuroImage, 44(3), 947-966.
     """
 
     meta = SolverMeta(
@@ -22,7 +32,10 @@ class SolverEBB(BaseSolver):
             "variances (hyperparameters) from the data and forms corresponding spatial "
             "filters."
         ),
-        references=["tbd"],
+        references=[
+            "Wipf, D., & Nagarajan, S. (2009). A unified Bayesian framework for "
+            "MEG/EEG source imaging. NeuroImage, 44(3), 947-966.",
+        ],
     )
 
     def __init__(
@@ -44,46 +57,38 @@ class SolverEBB(BaseSolver):
         weight_norm=True,
         noise_cov: mne.Covariance | None = None,
         alpha="auto",
-        max_iter=100,
+        max_iter=300,
         tol=1e-6,
         **kwargs,
     ):
-        """
-        Solve the inverse problem using the Empirical Bayesian Beamformer method.
+        """Compute the EBB inverse operator.
 
-        This implements an iterative algorithm that estimates source variances (hyperparameters)
-        from the data using an empirical Bayes approach, similar to Champagne/ARD methods.
-
-        Parameters:
-        -----------
-        data : array, shape (n_channels, n_times)
-            The sensor data.
-        forward : array, shape (n_channels, n_sources)
-            The forward solution.
-        noise_cov : array, shape (n_channels, n_channels), optional
-            The noise covariance matrix.
+        Parameters
+        ----------
+        forward : mne.Forward
+            Forward model.
+        mne_obj : mne.Evoked | mne.Epochs | mne.io.Raw
+            The MNE data object.
+        weight_norm : bool
+            Apply unit-noise-gain weight normalization.
+        noise_cov : mne.Covariance | None
+            Noise covariance. None uses identity.
+        alpha : float | str
+            Regularization parameter.
         max_iter : int
-            Maximum number of iterations for the EM algorithm.
+            Maximum EM iterations.
         tol : float
             Convergence tolerance for source variance updates.
-
-        Returns:
-        --------
-        sources : array, shape (n_sources, n_times)
-            The estimated source time series.
         """
         super().make_inverse_operator(forward, mne_obj, *args, alpha=alpha, **kwargs)
 
         data = self.unpack_data_obj(mne_obj)
 
         wf = self.prepare_whitened_forward(noise_cov)
-        leadfield = wf.G_white.copy()
+        L = wf.G_white.copy()
         sensor_transform = wf.sensor_transform
         n_channels = wf.n_eff
-        n_sources = leadfield.shape[1]
-
-        # normalize leadfield
-        leadfield /= np.linalg.norm(leadfield, axis=0)
+        n_sources = L.shape[1]
 
         # Whiten data and compute covariance
         data_w = sensor_transform @ data
@@ -92,91 +97,60 @@ class SolverEBB(BaseSolver):
         inverse_operators = []
         self.alphas = self.get_alphas(reference=data_cov)
 
-        # In whitened space, noise covariance is identity
-        I_eff = np.identity(n_channels)
+        I_m = np.identity(n_channels)
 
         for alpha in self.alphas:
-            # Initialize source variances (diagonal of source covariance)
-            # Start with uniform prior
             gamma = np.ones(n_sources)
+            Cn = alpha * I_m
 
-            # Regularized noise covariance (identity in whitened space)
-            Cn = alpha * I_eff
-
-            # Iterative empirical Bayes updates
             for n_iter in range(max_iter):
-                logger.debug(f"EBB iteration {n_iter + 1} of {max_iter}")
-                # Build current model covariance: C = L @ diag(gamma) @ L.T + Cn
-                # For efficiency, compute using woodbury: C^-1 = Cn^-1 - Cn^-1 @ L @ (I/gamma + L.T @ Cn^-1 @ L)^-1 @ L.T @ Cn^-1
+                # Model covariance: Sigma_y = L @ diag(gamma) @ L^T + Cn
+                # Invert in sensor space: O(m^3) where m = n_channels
+                Sigma_y = L @ (gamma[:, None] * L.T) + Cn
+                Sigma_y_inv = self.robust_inverse(Sigma_y)
 
-                Cn_inv = self.robust_inverse(Cn)
+                # Posterior source estimates: mu = gamma * L^T @ Sigma_y^{-1} @ Y
+                LT_Sy_inv = L.T @ Sigma_y_inv
+                mu = (gamma[:, None] * LT_Sy_inv) @ data_w
 
-                # Compute L.T @ Cn^-1 @ L efficiently
-                Cn_inv_L = Cn_inv @ leadfield
-                LT_Cn_inv_L = leadfield.T @ Cn_inv_L
+                # Posterior variance (diagonal only):
+                # diag(Sigma_s) = gamma - gamma^2 * diag(L^T Sigma_y^{-1} L)
+                z_diag = np.sum(L * (Sigma_y_inv @ L), axis=0)
+                diag_Sigma_s = gamma - gamma ** 2 * z_diag
 
-                # Add diagonal loading: (I/gamma + L.T @ Cn^-1 @ L)
-                middle = np.diag(1.0 / gamma) + LT_Cn_inv_L
-                middle_inv = self.robust_inverse(middle)
+                # EM update: gamma_new = diag(Sigma_s) + mean(mu^2, axis=1)
+                gamma_new = diag_Sigma_s + np.mean(mu ** 2, axis=1)
+                gamma_new = np.maximum(gamma_new, 1e-12)
 
-                # Woodbury identity for C^-1
-                Cn_inv - Cn_inv_L @ middle_inv @ Cn_inv_L.T
-
-                # Compute posterior source covariance: Sigma_s = (I/gamma + L.T @ C^-1 @ L)^-1
-                # This is actually just middle_inv from above!
-                Sigma_s = middle_inv
-
-                # Compute beamformer weights for this iteration
-                W = Sigma_s @ leadfield.T @ Cn_inv  # shape: (n_sources, n_channels)
-
-                # Estimate source activity (in whitened space)
-                source_estimates = W @ data_w  # shape: (n_sources, n_times)
-
-                # Update source variances using empirical estimates
-                # gamma_new[i] = trace(Sigma_s[i,i]) + (source_estimates[i,:]^2).mean()
-                # Simplified: use source power + trace correction
-                source_power = np.mean(
-                    source_estimates**2, axis=1
-                )  # shape: (n_sources,)
-                gamma_new = source_power + np.diag(Sigma_s)
-
-                # Check convergence
+                # Convergence check
                 rel_change = np.abs(gamma_new - gamma) / (np.abs(gamma) + 1e-10)
                 max_change = np.max(rel_change)
 
+                gamma = gamma_new
+
                 if max_change < tol:
                     logger.info(
-                        f"EBB converged after {n_iter + 1} iterations (max change: {max_change:.2e})"
+                        "EBB converged after %d iterations (max change: %.2e)",
+                        n_iter + 1, max_change,
                     )
                     break
-
-                # Update with damping for stability
-                damping = 0.5
-                gamma = damping * gamma_new + (1 - damping) * gamma
-
-                # Prevent numerical issues
-                gamma = np.maximum(gamma, 1e-12)
-
             else:
                 logger.warning(
-                    f"EBB reached max iterations ({max_iter}), max change: {max_change:.2e}"
+                    "EBB reached max iterations (%d), max change: %.2e",
+                    max_iter, max_change,
                 )
 
             # Final beamformer weights with converged hyperparameters
-            Cn_inv = self.robust_inverse(Cn)
-            Cn_inv_L = Cn_inv @ leadfield
-            LT_Cn_inv_L = leadfield.T @ Cn_inv_L
-            middle = np.diag(1.0 / gamma) + LT_Cn_inv_L
-            middle_inv = self.robust_inverse(middle)
-            Cn_inv - Cn_inv_L @ middle_inv @ Cn_inv_L.T
+            Sigma_y = L @ (gamma[:, None] * L.T) + Cn
+            Sigma_y_inv = self.robust_inverse(Sigma_y)
+            W = (gamma[:, None] * L.T) @ Sigma_y_inv
 
-            W = middle_inv @ leadfield.T @ Cn_inv
-
-            # Optional weight normalization (in whitened space where noise cov is I)
+            # Unit-noise-gain normalization
             if weight_norm:
-                W /= np.linalg.norm(W, axis=1, keepdims=True)
+                # noise_gain_i = W_i @ Cn @ W_i^T = alpha * ||W_i||^2
+                noise_gain = alpha * np.sum(W ** 2, axis=1)
+                W /= np.sqrt(np.maximum(noise_gain, 1e-30))[:, None]
 
-            # Map back to raw sensor space: W_raw @ data = W_eff @ sensor_transform @ data
             W_raw = W @ sensor_transform
             inverse_operators.append(W_raw)
 
