@@ -8,10 +8,14 @@ from .utils import build_covariance_candidates
 class SolverMVAB(BaseSolver):
     """Class for the Minimum Variance Adaptive Beamformer (MVAB) inverse solution.
 
+    Per-source beamformer with NAI weight normalization in whitened sensor space.
+
     References
     ----------
-    [1] Vorobyov, S. A. (2013). Principles of minimum variance robust adaptive
-        beamforming design. Signal Processing, 93(12), 3264-3277.
+    [1] Sekihara, K., Nagarajan, S. S., Poeppel, D., & Marantz, A. (2004).
+        Asymptotic SNR of scalar and vector minimum-variance beamformers for
+        neuromagnetic source reconstruction. IEEE Transactions on Biomedical
+        Engineering, 51(10), 1726-1734.
     """
 
     meta = SolverMeta(
@@ -19,12 +23,14 @@ class SolverMVAB(BaseSolver):
         full_name="Minimum Variance Adaptive Beamformer",
         category="Beamformers",
         description=(
-            "Minimum-variance adaptive beamformer implementation, including "
-            "regularization (as implemented here)."
+            "Per-source minimum-variance adaptive beamformer (Sekihara) with "
+            "NAI weight normalization in whitened sensor space."
         ),
         references=[
-            "Vorobyov, S. A. (2013). Principles of minimum variance robust adaptive "
-            "beamforming design. Signal Processing, 93(12), 3264-3277.",
+            "Sekihara, K., Nagarajan, S. S., Poeppel, D., & Marantz, A. (2004). "
+            "Asymptotic SNR of scalar and vector minimum-variance beamformers for "
+            "neuromagnetic source reconstruction. IEEE Transactions on Biomedical "
+            "Engineering, 51(10), 1726-1734.",
         ],
     )
 
@@ -49,6 +55,7 @@ class SolverMVAB(BaseSolver):
         cov_reg: str = "oas",
         cov_reg_beta: float = 0.05,
         cov_reg_cond_target: float = 1e4,
+        weight_norm=True,
         **kwargs,
     ):
         """Calculate inverse operator.
@@ -61,15 +68,15 @@ class SolverMVAB(BaseSolver):
             The MNE data object.
         alpha : float
             The regularization parameter.
+        weight_norm : bool
+            Apply NAI weight normalization (in whitened space, equivalent to
+            dividing by ||w||).
 
         Return
         ------
         self : object returns itself for convenience
 
         """
-
-        # NOTE: For MVAB we treat `alpha` as a dimensionless ratio r and apply it
-        # separately in sensor- and source-space matrices (which have different scales).
         super().make_inverse_operator(forward, mne_obj, *args, alpha=alpha, **kwargs)
         wf = self.prepare_whitened_forward(noise_cov)
         data = self.unpack_data_obj(mne_obj)
@@ -79,51 +86,44 @@ class SolverMVAB(BaseSolver):
 
         y = wf.sensor_transform @ data
         I = np.identity(n_chans)
-        eps = 1e-12
+        eps = 1e-15
 
         C = self.data_covariance(y, center=True, ddof=1)
-        cov_reg_l = str(cov_reg).strip().lower()
-        if alpha == "auto" and cov_reg_l not in {"grid", "legacy", "maxeig"}:
-            cov_mats, _alpha_eff, cov_meta = build_covariance_candidates(
-                C=C,
-                I=I,
-                alpha="auto",
-                get_alphas_fn=lambda reference: [0.0],
-                n_samples=int(y.shape[1]),
-                cov_reg=cov_reg,
-                cov_reg_beta=float(cov_reg_beta),
-                cov_reg_cond_target=float(cov_reg_cond_target),
-            )
-            if "oas_shrinkage" in cov_meta:
-                self._cov_reg_oas_shrinkage = float(cov_meta["oas_shrinkage"])
-            r_grid = np.zeros(len(cov_mats), dtype=float)
-        else:
-            if alpha == "auto":
-                r_grid = np.asarray(self.r_values, dtype=float)
-            else:
-                r_grid = np.asarray([float(alpha)], dtype=float)
-            cov_mats = [C for _ in range(len(r_grid))]
-
-        # For MVAB the public "alpha" remains the dimensionless r.
-        self.alphas = [float(r) for r in r_grid]
+        cov_mats, self.alphas, cov_meta = build_covariance_candidates(
+            C=C,
+            I=I,
+            alpha=self.alpha,
+            get_alphas_fn=self.get_alphas,
+            n_samples=int(y.shape[1]),
+            cov_reg=cov_reg,
+            cov_reg_beta=float(cov_reg_beta),
+            cov_reg_cond_target=float(cov_reg_cond_target),
+        )
+        if "oas_shrinkage" in cov_meta:
+            self._cov_reg_oas_shrinkage = float(cov_meta["oas_shrinkage"])
 
         inverse_operators = []
-        for C_base, r in zip(cov_mats, r_grid, strict=False):
-            if float(r) != 0.0:
-                max_eig_C = float(np.linalg.svd(C_base, compute_uv=False).max())
-                alpha_cov = float(r) * max_eig_C
-                R_inv = self.robust_inverse(C_base + alpha_cov * I)
-            else:
-                R_inv = self.robust_inverse(C_base)
-            G = leadfield.T @ R_inv @ leadfield
-            max_eig_G = float(np.linalg.svd(G, compute_uv=False).max())
-            alpha_src = max(float(r) * max_eig_G, eps)
-            inverse_operator = np.linalg.solve(
-                G + alpha_src * np.identity(n_dipoles),
-                leadfield.T @ R_inv,
-            )
+        for cov_mat in cov_mats:
+            C_inv = self.robust_inverse(cov_mat)
 
-            inverse_operators.append(inverse_operator @ wf.sensor_transform)
+            # Per-source scalar MVAB: w_i = R⁻¹ l_i / (l_i^T R⁻¹ l_i)
+            CiL = C_inv @ leadfield
+            denom = np.einsum("ij,ji->i", leadfield.T, CiL)  # l_i^T R⁻¹ l_i
+            W = np.zeros_like(CiL)
+            valid = np.abs(denom) > eps
+            if np.any(valid):
+                W[:, valid] = CiL[:, valid] / denom[valid]
+
+            # NAI weight normalization: in whitened space noise cov = I,
+            # so NAI reduces to dividing by ||w||.
+            if weight_norm:
+                norms = np.sqrt(np.sum(W * W, axis=0))
+                norms = np.maximum(norms, eps)
+                W /= norms
+
+            # Map back to raw sensor space
+            inverse_operator = (wf.sensor_transform.T @ W).T
+            inverse_operators.append(inverse_operator)
 
         self.inverse_operators = [
             InverseOperator(inverse_operator, self.name)
