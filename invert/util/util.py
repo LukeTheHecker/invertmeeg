@@ -81,6 +81,31 @@ def read_solver(path, name="instance", custom_objects=None):
     return solver
 
 
+def sorted_eigh(C, descending=True):
+    """Eigendecomposition with sorted output.
+
+    Wraps ``np.linalg.eigh`` and returns eigenvalues/vectors in
+    descending (default) or ascending order.
+
+    Parameters
+    ----------
+    C : numpy.ndarray
+        Symmetric matrix.
+    descending : bool
+        If True (default), sort eigenvalues from largest to smallest.
+
+    Returns
+    -------
+    eigvals : numpy.ndarray, shape (n,)
+    eigvecs : numpy.ndarray, shape (n, n)
+    """
+    eigvals, eigvecs = np.linalg.eigh(C)
+    if descending:
+        idx = np.argsort(eigvals)[::-1]
+        eigvals, eigvecs = eigvals[idx], eigvecs[:, idx]
+    return eigvals, eigvecs
+
+
 def pos_from_forward(forward, verbose=0):
     """Get vertex/dipole positions from mne.Forward model
 
