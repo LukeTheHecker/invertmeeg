@@ -1,11 +1,14 @@
 import mne
 import numpy as np
+from scipy.spatial.distance import cdist
 
-from ..base import BaseSolver, InverseOperator, SolverMeta
+from ...util.util import pos_from_forward
+from ..base import InverseOperator, SolverMeta
+from .base_beamformer import BaseBeamformer
 from .utils import build_covariance_candidates
 
 
-class SolverMCMV(BaseSolver):
+class SolverMCMV(BaseBeamformer):
     """Class for the Multiple Constrained Minimum Variance (MCMV) Beamformer
     inverse solution [1].
 
@@ -37,7 +40,6 @@ class SolverMCMV(BaseSolver):
     )
 
     def __init__(self, name="MCMV Beamformer", reduce_rank=True, rank="auto", **kwargs):
-        kwargs.setdefault("regularisation_method", "L")
         self.name = name
         return super().__init__(reduce_rank=reduce_rank, rank=rank, **kwargs)
 
@@ -53,6 +55,9 @@ class SolverMCMV(BaseSolver):
         cov_reg_beta: float = 0.05,
         cov_reg_cond_target: float = 1e4,
         k_constraints=3,
+        constraint_mode="distance",
+        constraint_indices=None,
+        n_preloc_peaks=5,
         verbose=0,
         **kwargs,
     ):
@@ -71,6 +76,22 @@ class SolverMCMV(BaseSolver):
         k_constraints : int
             Number of constraints per source. When k=1, reduces to LCMV.
             For k>1, includes k-1 nearest neighbors in constraint matrix.
+            Ignored when constraint_mode="lcmv_preloc" (auto-determined)
+            or when constraint_indices is provided.
+        constraint_mode : str
+            How to select constraint sources for each grid point:
+            - "distance": k-1 physically nearest sources (Euclidean, default)
+            - "similarity": k-1 most correlated leadfield columns
+            - "lcmv_preloc": LCMV pre-localization peaks as constraints
+            Ignored when constraint_indices is provided.
+        constraint_indices : list of array-like, optional
+            User-supplied constraint indices, one entry per source. Each
+            entry is an array of source indices where the first element is
+            the target source and the rest are constraint sources. When
+            provided, constraint_mode and k_constraints are ignored.
+        n_preloc_peaks : int
+            Number of LCMV power peaks to use as constraints (only for
+            constraint_mode="lcmv_preloc"). Default 5.
 
         Return
         ------
@@ -79,7 +100,7 @@ class SolverMCMV(BaseSolver):
         Notes
         -----
         Implements the MCMV formula: w = C_inv @ G @ inv(G.T @ C_inv @ G) @ f
-        where G is the constraint matrix (m × k) and f is the constraint vector.
+        where G is the constraint matrix (m x k) and f is the constraint vector.
         """
         super().make_inverse_operator(forward, mne_obj, *args, alpha=alpha, **kwargs)
         data = self.unpack_data_obj(mne_obj)
@@ -91,9 +112,7 @@ class SolverMCMV(BaseSolver):
         n_chans, n_dipoles = leadfield.shape
 
         self.weight_norm = weight_norm
-        self.k_constraints = min(
-            k_constraints, n_dipoles
-        )  # Ensure k doesn't exceed n_dipoles
+        self.constraint_mode = constraint_mode
 
         y = sensor_transform @ data
         I = np.identity(n_chans)
@@ -115,11 +134,22 @@ class SolverMCMV(BaseSolver):
         if "oas_shrinkage" in cov_meta:
             self._cov_reg_oas_shrinkage = float(cov_meta["oas_shrinkage"])
 
-        # Precompute spatial distances for finding nearest neighbors
-        if self.k_constraints > 1:
-            # Compute pairwise correlations/similarities between leadfield columns
-            leadfield_norm = leadfield / (np.linalg.norm(leadfield, axis=0) + 1e-10)
-            similarity_matrix = leadfield_norm.T @ leadfield_norm
+        # Build per-source constraint index lists
+        if constraint_indices is not None:
+            constraint_indices_per_source = [
+                np.asarray(idx, dtype=int) for idx in constraint_indices
+            ]
+        else:
+            constraint_indices_per_source = self._build_constraint_indices(
+                forward=forward,
+                leadfield=leadfield,
+                C=C,
+                cov_mats=cov_mats,
+                k_constraints=k_constraints,
+                constraint_mode=constraint_mode,
+                n_preloc_peaks=n_preloc_peaks,
+                n_dipoles=n_dipoles,
+            )
 
         inverse_operators = []
         for cov_mat in cov_mats:
@@ -127,26 +157,15 @@ class SolverMCMV(BaseSolver):
             W = np.zeros((n_chans, n_dipoles))
 
             for i in range(n_dipoles):
-                # Construct constraint matrix G for source i
-                if self.k_constraints == 1:
-                    # Single constraint (LCMV special case)
-                    G = leadfield[:, i : i + 1]  # Keep as column vector
+                indices = constraint_indices_per_source[i]
+                k = len(indices)
+
+                if k == 1:
+                    G = leadfield[:, i : i + 1]
                     f = np.array([1.0])
                 else:
-                    # Multiple constraints: include k-1 nearest neighbors
-                    # Find k-1 most similar sources (excluding self)
-                    similarities = similarity_matrix[i, :].copy()
-                    similarities[i] = -np.inf  # Exclude self
-                    neighbor_indices = np.argsort(similarities)[::-1][
-                        : self.k_constraints - 1
-                    ]
-
-                    # G = [target_source, neighbor_1, neighbor_2, ...]
-                    constraint_indices = np.concatenate([[i], neighbor_indices])
-                    G = leadfield[:, constraint_indices]
-
-                    # f = [1, 0, 0, ...] - unit gain for target, zero for neighbors
-                    f = np.zeros(self.k_constraints)
+                    G = leadfield[:, indices]
+                    f = np.zeros(k)
                     f[0] = 1.0
 
                 # Apply MCMV formula: w = C_inv @ G @ inv(G.T @ C_inv @ G) @ f
@@ -157,10 +176,8 @@ class SolverMCMV(BaseSolver):
                 try:
                     G_T_C_inv_G_inv = np.linalg.inv(G_T_C_inv_G)
                 except np.linalg.LinAlgError:
-                    # Fallback to pseudo-inverse if singular
                     G_T_C_inv_G_inv = np.linalg.pinv(G_T_C_inv_G)
 
-                # w = C_inv @ G @ inv(G.T @ C_inv @ G) @ f
                 w = C_inv @ G @ G_T_C_inv_G_inv @ f
                 W[:, i] = w
 
@@ -177,3 +194,105 @@ class SolverMCMV(BaseSolver):
         ]
 
         return self
+
+    def _build_constraint_indices(
+        self,
+        *,
+        forward,
+        leadfield,
+        C,
+        cov_mats,
+        k_constraints,
+        constraint_mode,
+        n_preloc_peaks,
+        n_dipoles,
+    ):
+        """Return list of constraint index arrays, one per source.
+
+        Each entry is an array where the first element is the target source
+        and the remaining are constraint sources.
+        """
+        if constraint_mode == "similarity":
+            k = min(k_constraints, n_dipoles)
+            if k <= 1:
+                return [np.array([i]) for i in range(n_dipoles)]
+            leadfield_norm = leadfield / (np.linalg.norm(leadfield, axis=0) + 1e-10)
+            sim = leadfield_norm.T @ leadfield_norm
+            result = []
+            for i in range(n_dipoles):
+                row = sim[i, :].copy()
+                row[i] = -np.inf
+                neighbors = np.argsort(row)[::-1][: k - 1]
+                result.append(np.concatenate([[i], neighbors]))
+            return result
+
+        elif constraint_mode == "distance":
+            k = min(k_constraints, n_dipoles)
+            if k <= 1:
+                return [np.array([i]) for i in range(n_dipoles)]
+            pos = pos_from_forward(forward, verbose=0)
+            dists = cdist(pos, pos)
+            result = []
+            for i in range(n_dipoles):
+                row = dists[i, :].copy()
+                row[i] = np.inf
+                neighbors = np.argsort(row)[: k - 1]
+                result.append(np.concatenate([[i], neighbors]))
+            return result
+
+        elif constraint_mode == "lcmv_preloc":
+            # Compute LCMV power map using the first covariance candidate
+            C_reg = cov_mats[0]
+            C_inv = self.robust_inverse(C_reg)
+            CiL = C_inv @ leadfield  # (n_chans, n_dipoles)
+
+            # power_i = (CiL_i^T C CiL_i) / (l_i^T CiL_i)^2
+            numerator = np.einsum("ji,jk,ki->i", CiL, C, CiL)  # CiL^T C CiL diag
+            denominator = np.einsum("ji,ji->i", leadfield, CiL)  # l^T CiL diag
+            denominator = denominator**2
+            denominator = np.maximum(denominator, 1e-30)
+            power = numerator / denominator
+
+            # Find local maxima using source-space adjacency
+            adjacency = mne.spatial_src_adjacency(forward["src"], verbose=0)
+            peak_indices = _find_local_maxima(power, adjacency, n_preloc_peaks)
+
+            # For each source: constraints = [i] + peaks (excluding i)
+            result = []
+            for i in range(n_dipoles):
+                peers = [p for p in peak_indices if p != i]
+                result.append(np.array([i] + peers, dtype=int))
+            return result
+
+        else:
+            raise ValueError(
+                f"Unknown constraint_mode={constraint_mode!r}. "
+                "Expected 'similarity', 'distance', or 'lcmv_preloc'."
+            )
+
+
+def _find_local_maxima(values, adjacency, n_peaks):
+    """Find top local maxima in a source-space scalar map.
+
+    A vertex is a local maximum if its value is >= all adjacent vertices.
+    Returns indices of the top ``n_peaks`` local maxima sorted by value.
+    """
+    from scipy.sparse import issparse
+
+    n = len(values)
+    if issparse(adjacency):
+        adj_csr = adjacency.tocsr()
+    else:
+        from scipy.sparse import csr_array
+        adj_csr = csr_array(adjacency)
+    is_max = np.ones(n, dtype=bool)
+    for i in range(n):
+        row_start = adj_csr.indptr[i]
+        row_end = adj_csr.indptr[i + 1]
+        neighbors = adj_csr.indices[row_start:row_end]
+        if len(neighbors) > 0 and np.any(values[neighbors] > values[i]):
+            is_max[i] = False
+    maxima_idx = np.where(is_max)[0]
+    # Sort by descending value and take top n_peaks
+    order = np.argsort(values[maxima_idx])[::-1]
+    return list(maxima_idx[order[:n_peaks]])
