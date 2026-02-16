@@ -532,8 +532,8 @@ class SolverChampagne(BaseSolver):
             data_fit = np.trace(Sigma_y_inv @ Y_scaled @ Y_scaled.T) / n_times
             with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
                 sign, log_det = np.linalg.slogdet(Sigma_y)
-            if sign <= 0:
-                log_det = -np.inf
+            if sign <= 0 or not np.isfinite(log_det):
+                log_det = np.finfo(float).max / 2
             loss = data_fit + log_det
 
             # Compute the residuals

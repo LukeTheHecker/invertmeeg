@@ -1,5 +1,3 @@
-from copy import deepcopy
-
 import mne
 import numpy as np
 from scipy.sparse.csgraph import laplacian
@@ -80,8 +78,9 @@ class SolverGammaMAPMSP(BaseSolver):
         leadfield = self.leadfield
         data_cov = self.data_covariance(data, center=True, ddof=1)
         L_smooth, _gradient = self.get_smooth_prior_cov(leadfield, smoothness_order)
-        sigma_s = np.identity(L_smooth.shape[1])
-        reg_reference = L_smooth @ sigma_s @ L_smooth.T
+        # Scale alphas against the raw leadfield (not the column-normalised
+        # L_smooth) because alpha enters the *final* inverse via raw L.
+        reg_reference = leadfield @ leadfield.T
         reg_reference = 0.5 * (reg_reference + reg_reference.T)
         if not np.all(np.isfinite(reg_reference)) or np.linalg.norm(reg_reference) == 0:
             reg_reference = data_cov
@@ -126,7 +125,7 @@ class SolverGammaMAPMSP(BaseSolver):
             The inverse operator which can be used to compute inverse solutions from new data.
 
         """
-        L = deepcopy(self.leadfield)
+        L = self.leadfield.copy()
         db, n = B.shape
         ds = L.shape[1]
 
@@ -134,30 +133,28 @@ class SolverGammaMAPMSP(BaseSolver):
         B -= B.mean(axis=0)
         L -= L.mean(axis=0)
 
-        # Data Covariance Matrix
-        # Cb = B @ B.T
         L_smooth, gradient = self.get_smooth_prior_cov(L, smoothness_order)
         gammas = np.ones(ds, dtype=float)
         sigma_e = float(alpha) * np.identity(db)
-        sigma_s = np.identity(
-            ds
-        )  # identity leads to weighted minimum L2 Norm-type solution
 
         for _k in range(max_iter):
-            # print(k)
             old_gammas = gammas.copy()
 
-            sigma_s_hat = np.diag(gammas) @ sigma_s
-            sigma_b = sigma_e + L_smooth @ sigma_s_hat @ L_smooth.T
+            # sigma_b = alpha*I + L_smooth @ diag(gammas) @ L_smooth.T
+            # Since sigma_s = I: diag(gammas) @ I = diag(gammas)
+            sigma_b = sigma_e + (L_smooth * gammas) @ L_smooth.T
             sigma_b = 0.5 * (sigma_b + sigma_b.T)
             sigma_b_inv = np.linalg.inv(sigma_b)
 
-            # gammas = ((1/n) * np.sqrt(np.sum(( np.diag(gammas) @ L_smooth.T @ sigma_b_inv @ B )**2, axis=1)))**((2-p)/2)
+            # Compute sigma_b_inv @ L_smooth once, reuse for both terms
+            SiL = sigma_b_inv @ L_smooth  # (m, d)
+            LtSiB = SiL.T @ B  # (d, t)
 
             term_1 = (gammas / np.sqrt(n)) * np.sqrt(
-                np.sum((L_smooth.T @ sigma_b_inv @ B) ** 2, axis=1)
+                np.sum(LtSiB ** 2, axis=1)
             )
-            denom = np.diagonal(L_smooth.T @ sigma_b_inv @ L_smooth)
+            # diag(L.T @ sigma_b_inv @ L) via column-wise dot product
+            denom = np.sum(L_smooth * SiL, axis=0)
             denom = np.maximum(denom, 1e-15)
             term_2 = 1 / np.sqrt(denom)
             gammas = term_1 * term_2
@@ -165,8 +162,6 @@ class SolverGammaMAPMSP(BaseSolver):
             if not np.all(np.isfinite(gammas)) or np.linalg.norm(gammas) == 0:
                 gammas = old_gammas
                 break
-            # print(gammas.min(), gammas.max())
-            # gammas /= np.linalg.norm(gammas)
 
         # Smooth gammas according to smooth priors
         gammas_final = np.abs(gammas @ gradient)
@@ -176,11 +171,9 @@ class SolverGammaMAPMSP(BaseSolver):
         else:
             gammas_final = gammas_final / gamma_max
 
-        sigma_s_hat = np.diag(gammas_final) @ sigma_s
-        inverse_operator = (
-            sigma_s_hat @ L.T @ np.linalg.inv(sigma_e + L @ sigma_s_hat @ L.T)
-        )
-        # S = inverse_operator @ B
+        # Final: diag(gammas_final) @ L.T @ inv(alpha*I + L @ diag(gammas_final) @ L.T)
+        sigma_b_final = sigma_e + (L * gammas_final) @ L.T
+        inverse_operator = (gammas_final[:, None] * L.T) @ np.linalg.inv(sigma_b_final)
         return inverse_operator
 
     @staticmethod

@@ -1,9 +1,7 @@
 import logging
-from copy import deepcopy
 
 import mne
 import numpy as np
-from scipy.sparse import csr_matrix
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
 
@@ -141,69 +139,59 @@ class SolverNLChampagne(BaseSolver):
         """
         n_chans, n_dipoles = self.leadfield.shape
         _, n_times = Y.shape
-        L = deepcopy(self.leadfield)
-
-        # re-reference data
-        # Y -= Y.mean(axis=0)
+        L = self.leadfield.copy()
 
         # Scaling of the data (necessary for convergence criterion and pruning
         # threshold)
-        Y_scaled = deepcopy(Y)
+        Y_scaled = Y.copy()
         Y_scaled /= abs(Y_scaled).mean()
 
-        np.identity(n_chans)
-
         alpha = np.random.rand(n_dipoles)
-        Alpha = csr_matrix(np.diag(alpha))
-
         llambda = np.random.rand(n_chans)
-        LLambda = csr_matrix(np.diag(llambda))
-
-        # Sigma_y = L @ Alpha @ L.T + LLambda
-        # Sigma_y_inv = np.linalg.inv(Sigma_y)
-
-        # Sigma_x = Gamma - Gamma @ L.T @ Sigma_y_inv @ L @ Gamma
-        # z_0 = L.T @ Sigma_y_inv @ L
-        # mu_x = Gamma @ L.T @ Sigma_y_inv @ Y_scaled
 
         loss_list = []
 
         for i in range(max_iter):
-            previous_Alpha = deepcopy(Alpha)
-            Sigma_y = L @ Alpha @ L.T + LLambda
+            previous_alpha = alpha.copy()
+
+            # Sigma_y = L @ diag(alpha) @ L.T + diag(llambda)
+            # Using broadcasting: (L * alpha) @ L.T avoids d×d matrix
+            Sigma_y = (L * alpha) @ L.T + np.diag(llambda)
             Sigma_y_inv = np.linalg.inv(Sigma_y)
 
-            # 1) Alpha (formerly Gamma) update
-            s_bar = np.squeeze(np.asarray(Alpha @ L.T @ Sigma_y_inv @ Y_scaled))
-            z_hat = np.einsum("ij,ji->i", L.T @ Sigma_y_inv, L)
-            C_s_bar = np.sum(s_bar**2, axis=1)
+            # 1) Alpha update
+            # s_bar = diag(alpha) @ L.T @ Sigma_y_inv @ Y_scaled
+            SiL = Sigma_y_inv @ L  # (m, d), compute once
+            SiY = Sigma_y_inv @ Y_scaled  # (m, t)
+            s_bar = alpha[:, None] * (L.T @ SiY)  # (d, t)
 
-            alpha = np.sqrt(C_s_bar / z_hat)
-            Alpha = csr_matrix(np.diag(alpha))
+            # z_hat = diag(L.T @ Sigma_y_inv @ L) via column-wise dot
+            z_hat = np.sum(L * SiL, axis=0)  # (d,)
+            C_s_bar = np.sum(s_bar**2, axis=1)  # (d,)
+
+            alpha = np.sqrt(C_s_bar / (z_hat + 1e-20))
 
             # 2) LLambda update
             Y_hat = L @ s_bar
 
-            ## Convex Bound update
+            # Convex Bound update
             llambda = np.sqrt(
-                np.sum((Y_scaled - Y_hat) ** 2, axis=1) / np.diag(Sigma_y_inv)
+                np.sum((Y_scaled - Y_hat) ** 2, axis=1) / (np.diag(Sigma_y_inv) + 1e-20)
             )
-            LLambda = csr_matrix(np.diag(llambda))
 
             # 3) Check convergence
             with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
                 sign, log_det_Sigma_y = np.linalg.slogdet(Sigma_y)
-            if sign <= 0:
-                log_det_Sigma_y = -np.inf
-            summation = (1 / n_times) * np.sum(
-                np.einsum("ti,ij,tj->t", Y_scaled.T, Sigma_y_inv, Y_scaled.T)
-            )
+            if sign <= 0 or not np.isfinite(log_det_Sigma_y):
+                log_det_Sigma_y = np.finfo(float).max / 2
+            # tr(Sigma_y_inv @ Y @ Y.T) / n_times
+            summation = float(np.sum(SiY * Y_scaled)) / n_times
             loss = log_det_Sigma_y + summation
 
             loss_list.append(loss)
             if self.verbose > 1:
                 logger.debug(
-                    f"iter {i}: loss {loss:.2f} ({log_det_Sigma_y:.2f} + {(1 / n_times) * summation:.2f})"
+                    f"iter {i}: loss {loss:.2f} ({log_det_Sigma_y:.2f} + {summation / n_times:.2f})"
                 )
 
             if (
@@ -211,7 +199,7 @@ class SolverNLChampagne(BaseSolver):
                 or loss == float("inf")
                 or np.linalg.norm(alpha) == 0
             ):
-                Alpha = previous_Alpha
+                alpha = previous_alpha
                 break
 
             # Check convergence only after first iteration
@@ -225,11 +213,10 @@ class SolverNLChampagne(BaseSolver):
             if prune:
                 prune_candidates = alpha < (pruning_thresh * alpha.max())
                 alpha[prune_candidates] = 0
-                Alpha = csr_matrix(np.diag(alpha))
 
-        # update rest
-        Sigma_y = L @ Alpha @ L.T + LLambda
+        # Final inverse: diag(alpha) @ L.T @ Sigma_y_inv
+        Sigma_y = (L * alpha) @ L.T + np.diag(llambda)
         Sigma_y_inv = np.linalg.inv(Sigma_y)
-        inverse_operator = np.asarray(Alpha @ L.T @ Sigma_y_inv)
+        inverse_operator = alpha[:, None] * (L.T @ Sigma_y_inv)
 
         return inverse_operator

@@ -149,18 +149,13 @@ class SolverMSP(BaseSolver):
         n_pats = len(self.patterns)
         Q_src = np.array(self.patterns)  # n_pats x d
 
-        LQL = np.empty((n_pats, m, m))
-        tr = np.empty(n_pats)
-        valid = np.ones(n_pats, dtype=bool)
-
-        for i in range(n_pats):
-            lq = leadfield * Q_src[i]  # m x d, broadcasting
-            LQL[i] = lq @ leadfield.T  # m x m
-            tr[i] = np.trace(LQL[i])
-            if tr[i] > 1e-20:
-                LQL[i] /= tr[i]
-            else:
-                valid[i] = False
+        # Vectorized LQL computation: LQL[i] = (L * Q_src[i]) @ L.T
+        # Using einsum: LQL[i,j,k] = sum_d L[j,d] * Q_src[i,d] * L[k,d]
+        LQL = np.einsum('jd,id,kd->ijk', leadfield, Q_src, leadfield)  # (n_pats, m, m)
+        tr = np.trace(LQL, axis1=1, axis2=2)  # (n_pats,)
+        valid = tr > 1e-20
+        # Normalize valid components by their trace
+        LQL[valid] /= tr[valid, None, None]
 
         # Remove invalid patterns
         if not valid.all():
@@ -281,10 +276,12 @@ class SolverMSP(BaseSolver):
         source_scales = scales[:n_pats]
 
         # Source prior diagonal: re[j] = sum_i source_scales[i] * Q_src[i,j] / tr[i]
-        re = np.zeros(d)
-        for i in range(n_pats):
-            if tr[i] > 1e-20:
-                re += source_scales[i] * Q_src[i] / tr[i]
+        valid = tr > 1e-20
+        if valid.any():
+            weights = source_scales[valid] / tr[valid]  # (n_valid,)
+            re = weights @ Q_src[valid]  # (n_valid,) @ (n_valid, d) = (d,)
+        else:
+            re = np.zeros(d)
 
         # Final model covariance and precision
         R = np.tensordot(scales, LQL_all, axes=([0], [0]))

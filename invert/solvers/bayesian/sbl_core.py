@@ -168,14 +168,17 @@ def sbl_iterate(
     Sigma_y = noise_cov + (L_act * gammas) @ L_act.T
     Sigma_y = 0.5 * (Sigma_y + Sigma_y.T)
     Sigma_y_inv = inverse_fn(Sigma_y)
-    mu_x = (L_act.T @ Sigma_y_inv @ Y) * gammas[:, None]
+    SiL = Sigma_y_inv @ L_act  # cached for z_diag and mu_x
+    mu_x = (SiL.T @ Y) * gammas[:, None]
 
     # Compute initial loss so we have a valid value even if the loop breaks
     # on iteration 0 (e.g. all gammas go to zero immediately).
     _data_fit_init = float(np.trace(Sigma_y_inv @ Y @ Y.T) / n_times)
-    _eigvals_init = np.linalg.eigvalsh(Sigma_y)
-    _log_det_init = float(np.sum(np.log(np.maximum(_eigvals_init, 1e-20))))
-    final_loss = _data_fit_init + _log_det_init
+    with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+        _sign_init, _log_det_init = np.linalg.slogdet(Sigma_y)
+    if _sign_init <= 0 or not np.isfinite(_log_det_init):
+        _log_det_init = np.finfo(float).max / 2
+    final_loss = _data_fit_init + float(_log_det_init)
 
     loss_prev: float | None = None
     n_iters = 0
@@ -183,9 +186,9 @@ def sbl_iterate(
     for i_iter in range(max_iter):
         n_iters = i_iter + 1
 
-        # Fisher information diagonal
-        L_Sigma = Sigma_y_inv @ L_act
-        z_diag = np.sum(L_act * L_Sigma, axis=0)
+        # Fisher information diagonal: diag(L.T @ Sigma_y_inv @ L)
+        # SiL is cached from posterior recompute (or initial)
+        z_diag = np.sum(L_act * SiL, axis=0)
 
         # Gamma update (rule-specific)
         gammas_new = rule_fn(mu_x, gammas, z_diag, n_times)
@@ -212,13 +215,17 @@ def sbl_iterate(
         Sigma_y = noise_cov + (L_act * gammas) @ L_act.T
         Sigma_y = 0.5 * (Sigma_y + Sigma_y.T)
         Sigma_y_inv = inverse_fn(Sigma_y)
-        mu_x = (L_act.T @ Sigma_y_inv @ Y) * gammas[:, None]
+        SiL = Sigma_y_inv @ L_act  # cached for z_diag in next iteration
+        mu_x = (SiL.T @ Y) * gammas[:, None]
 
         # Loss: negative log-marginal-likelihood
+        # slogdet is faster than eigvalsh for just the log-determinant
         data_fit = float(np.trace(Sigma_y_inv @ Y @ Y.T) / n_times)
-        eigvals = np.linalg.eigvalsh(Sigma_y)
-        log_det = float(np.sum(np.log(np.maximum(eigvals, 1e-20))))
-        loss = data_fit + log_det
+        with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+            sign, log_det = np.linalg.slogdet(Sigma_y)
+        if sign <= 0 or not np.isfinite(log_det):
+            log_det = np.finfo(float).max / 2
+        loss = data_fit + float(log_det)
         final_loss = loss
 
         # Convergence check

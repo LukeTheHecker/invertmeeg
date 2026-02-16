@@ -130,33 +130,29 @@ class SolverBCS(BaseSolver):
         sigma = np.linalg.inv(alpha_0 * LLT + D)
         mu = alpha_0 * sigma @ L.T @ y
 
-        residual_norms = [1e99]
-        mus = []
         for _i in range(max_iter):
-            gammas = np.array(
-                [1 - alphas[ii] * sigma[ii, ii] for ii in range(n_dipoles)]
-            )
-            gammas[np.isnan(gammas)] = 0
+            gammas = 1 - alphas * np.diag(sigma)
+            gammas = np.clip(gammas, 0, 1)
 
-            mu_sq_norm = np.sum(mu**2, axis=1)
-            alphas = gammas / np.maximum(mu_sq_norm, eps)
-            # Noise precision: (N - sum(gamma)) / ||residual||^2
-            # Use squared Frobenius norm averaged over timepoints (Eq. 11 of [1]).
+            # MMV alpha update: average mu² over timepoints (Eq. 12 of [1])
+            mu_sq_avg = np.mean(mu**2, axis=1)
+            alphas_new = gammas / np.maximum(mu_sq_avg, eps)
+
+            # Noise precision (Eq. 11 of [1]), averaged over timepoints
             residual = y - L @ mu
             residual_sq = np.sum(residual**2) / n_times
-            denom = max(residual_sq, eps)
-            alpha_0 = max((n_chans - gammas.sum()), eps) / denom
+            alpha_0 = max((n_chans - gammas.sum()), eps) / max(residual_sq, eps)
+
+            # Convergence check on alphas (log-scale)
+            delta = np.max(np.abs(np.log(alphas_new + eps) - np.log(alphas + eps)))
+            alphas = alphas_new
+
             D = np.diag(alphas) + eps
             sigma = np.linalg.inv(alpha_0 * LLT + D)
             mu = alpha_0 * sigma @ L.T @ y
 
-            # Convergence check: monitor residual in normalized space
-            residual_norm = np.linalg.norm(y - L @ mu)
-            if residual_norm > residual_norms[-1]:
-                mu = mus[-1]
+            if delta < 1e-3:
                 break
-            residual_norms.append(residual_norm)
-            mus.append(mu.copy())
 
         # Convert from normalized source space to original amplitudes
         return mu / self._col_norms[:, np.newaxis]

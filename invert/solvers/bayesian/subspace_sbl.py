@@ -344,8 +344,8 @@ class SolverSubspaceSBL(BaseSolver):
             # Convergence
             with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
                 sign, log_det = np.linalg.slogdet(Sigma_y)
-            if sign <= 0:
-                log_det = -np.inf
+            if sign <= 0 or not np.isfinite(log_det):
+                log_det = np.finfo(float).max / 2
             summation = (
                 np.sum(np.einsum("ti,ij,tj->t", Y_scaled.T, Sigma_y_inv, Y_scaled.T))
                 / n_times

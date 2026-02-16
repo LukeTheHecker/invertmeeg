@@ -1,5 +1,3 @@
-from copy import deepcopy
-
 import mne
 import numpy as np
 from scipy.sparse.csgraph import laplacian
@@ -125,7 +123,7 @@ class SolverGammaMAP(BaseSolver):
             The inverse operator which can be used to compute inverse solutions from new data.
 
         """
-        L = deepcopy(self.leadfield)
+        L = self.leadfield.copy()
         db, n = B.shape
         ds = L.shape[1]
 
@@ -133,24 +131,34 @@ class SolverGammaMAP(BaseSolver):
         B -= B.mean(axis=0)
         L -= L.mean(axis=0)
 
-        # Data Covariance Matrix
         gammas = np.ones(ds, dtype=float)
         sigma_e = float(alpha) * np.identity(db)
+        sigma_s_is_identity = np.array_equal(self.sigma_s, np.identity(ds))
 
         for _k in range(max_iter):
             old_gammas = gammas.copy()
 
-            # Update the effective sensor covariance given current gammas.
-            sigma_s_hat = np.diag(gammas) @ self.sigma_s
-            sigma_b = sigma_e + L @ sigma_s_hat @ L.T
+            # sigma_b = alpha*I + L @ diag(gammas) @ sigma_s @ L.T
+            if sigma_s_is_identity:
+                # (L * gammas) @ L.T avoids creating d×d diagonal matrix
+                sigma_b = sigma_e + (L * gammas) @ L.T
+            else:
+                sigma_s_hat = gammas[:, None] * self.sigma_s
+                sigma_b = sigma_e + L @ sigma_s_hat @ L.T
             sigma_b = 0.5 * (sigma_b + sigma_b.T)
             sigma_b_inv = np.linalg.inv(sigma_b)
 
-            # according to equation (30)
+            # Compute sigma_b_inv @ L once, reuse for both terms
+            SiL = sigma_b_inv @ L  # (m, d)
+
+            # term_1: gamma-scaled RMS of projected data
+            # L.T @ sigma_b_inv @ B = SiL.T @ B (reuse SiL transposed)
+            LtSiB = SiL.T @ B  # (d, t)
             term_1 = (gammas / np.sqrt(n)) * np.sqrt(
-                np.sum((L.T @ sigma_b_inv @ B) ** 2, axis=1)
+                np.sum(LtSiB ** 2, axis=1)
             )
-            denom = np.diagonal(L.T @ sigma_b_inv @ L)
+            # diag(L.T @ sigma_b_inv @ L) = column-wise dot product
+            denom = np.sum(L * SiL, axis=0)  # (d,)
             denom = np.maximum(denom, 1e-15)
             term_2 = 1 / np.sqrt(denom)
 
@@ -164,15 +172,16 @@ class SolverGammaMAP(BaseSolver):
             gammas_final = np.ones_like(gammas)
         else:
             gammas_final = gammas / gamma_max
-        sigma_s_hat = (
-            np.diag(gammas_final) @ self.sigma_s
-        )  #  np.array([gammas_final[i] * C[i] for i in range(ds)])
-        inverse_operator = (
-            sigma_s_hat @ L.T @ np.linalg.inv(sigma_e + L @ sigma_s_hat @ L.T)
-        )
 
-        # This way the inverse operator would be applied to M/EEG matrix B:
-        # S = inverse_operator @ B
+        # Final inverse: diag(gammas_final) @ sigma_s @ L.T @ inv(...)
+        if sigma_s_is_identity:
+            sigma_b_final = sigma_e + (L * gammas_final) @ L.T
+            inverse_operator = (gammas_final[:, None] * L.T) @ np.linalg.inv(sigma_b_final)
+        else:
+            sigma_s_hat = gammas_final[:, None] * self.sigma_s
+            inverse_operator = (
+                sigma_s_hat @ L.T @ np.linalg.inv(sigma_e + L @ sigma_s_hat @ L.T)
+            )
 
         return inverse_operator
 
