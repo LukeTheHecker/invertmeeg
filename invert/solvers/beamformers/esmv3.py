@@ -2,7 +2,7 @@ import mne
 import numpy as np
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
-from .utils import bayesian_pca_covariance
+from .utils import bayesian_pca_covariance, build_covariance_candidates
 
 
 class SolverESMV3(BaseSolver):
@@ -47,6 +47,9 @@ class SolverESMV3(BaseSolver):
         *args,
         alpha="auto",
         noise_cov: mne.Covariance | None = None,
+        cov_reg: str = "oas",
+        cov_reg_beta: float = 0.05,
+        cov_reg_cond_target: float = 1e4,
         **kwargs,
     ):
         """Calculate inverse operator.
@@ -93,13 +96,21 @@ class SolverESMV3(BaseSolver):
         # C = LedoitWolf(assume_centered=True).fit(C).covariance_
         # C = OAS(assume_centered=True).fit(C).covariance_
         # C = ShrunkCovariance().fit(C).covariance_
-
-        self.alphas = self.get_alphas(reference=C)
-        # self.alphas = [0]
+        cov_mats, self.alphas, cov_meta = build_covariance_candidates(
+            C=C,
+            I=I,
+            alpha=self.alpha,
+            get_alphas_fn=self.get_alphas,
+            n_samples=int(y.shape[1]),
+            cov_reg=cov_reg,
+            cov_reg_beta=float(cov_reg_beta),
+            cov_reg_cond_target=float(cov_reg_cond_target),
+        )
+        if "oas_shrinkage" in cov_meta:
+            self._cov_reg_oas_shrinkage = float(cov_meta["oas_shrinkage"])
 
         inverse_operators = []
-        for alpha in self.alphas:
-            C_reg = C + alpha * I
+        for C_reg in cov_mats:
 
             # Robust inverse
             C_inv = self.robust_inverse(C_reg)

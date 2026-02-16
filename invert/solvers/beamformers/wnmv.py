@@ -2,6 +2,7 @@ import mne
 import numpy as np
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
+from .utils import build_covariance_candidates
 
 
 class SolverWNMV(BaseSolver):
@@ -43,6 +44,9 @@ class SolverWNMV(BaseSolver):
         weight_norm=True,
         alpha="auto",
         noise_cov: mne.Covariance | None = None,
+        cov_reg: str = "oas",
+        cov_reg_beta: float = 0.05,
+        cov_reg_cond_target: float = 1e4,
         **kwargs,
     ):
         """Calculate inverse operator.
@@ -78,11 +82,22 @@ class SolverWNMV(BaseSolver):
         # Matrix (opposed to that of the leadfield)
         y -= y.mean(axis=1, keepdims=True)
         C = self.data_covariance(y, center=False, ddof=1)
-        self.alphas = self.get_alphas(reference=C)
+        cov_mats, self.alphas, cov_meta = build_covariance_candidates(
+            C=C,
+            I=I,
+            alpha=self.alpha,
+            get_alphas_fn=self.get_alphas,
+            n_samples=int(y.shape[1]),
+            cov_reg=cov_reg,
+            cov_reg_beta=float(cov_reg_beta),
+            cov_reg_cond_target=float(cov_reg_cond_target),
+        )
+        if "oas_shrinkage" in cov_meta:
+            self._cov_reg_oas_shrinkage = float(cov_meta["oas_shrinkage"])
 
         inverse_operators = []
-        for alpha in self.alphas:
-            C_inv = self.robust_inverse(C + alpha * I)
+        for cov_mat in cov_mats:
+            C_inv = self.robust_inverse(cov_mat)
             C_inv_2 = C_inv @ C_inv
             W = (C_inv @ leadfield) / np.sqrt(
                 abs(np.diagonal(leadfield.T @ C_inv_2 @ leadfield))

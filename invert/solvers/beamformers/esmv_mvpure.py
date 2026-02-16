@@ -10,6 +10,7 @@ from .utils import (
     _infer_mvpure_n_sources_and_rank,
     _mvpure_projected_lcmv_weights_from_inv_cov,
     _select_top_diverse_indices,
+    build_covariance_candidates,
 )
 
 
@@ -82,6 +83,9 @@ class SolverESMVMVPURE(BaseSolver):
         alpha: str | float = "auto",
         weight_norm: bool = False,
         noise_cov: mne.Covariance | None = None,
+        cov_reg: str = "oas",
+        cov_reg_beta: float = 0.05,
+        cov_reg_cond_target: float = 1e4,
         **kwargs: Any,
     ) -> Any:
         self.weight_norm = bool(weight_norm)
@@ -101,13 +105,24 @@ class SolverESMVMVPURE(BaseSolver):
         I = np.identity(n_chans)
         C = self.data_covariance(y, center=False, ddof=1)
         C_sub = self.select_signal_subspace(C)
-        self.get_alphas(reference=C)
+        cov_mats, self.alphas, cov_meta = build_covariance_candidates(
+            C=C,
+            I=I,
+            alpha=self.alpha,
+            get_alphas_fn=self.get_alphas,
+            n_samples=int(y.shape[1]),
+            cov_reg=cov_reg,
+            cov_reg_beta=float(cov_reg_beta),
+            cov_reg_cond_target=float(cov_reg_cond_target),
+        )
+        if "oas_shrinkage" in cov_meta:
+            self._cov_reg_oas_shrinkage = float(cov_meta["oas_shrinkage"])
 
         inverse_operators = []
         selected_sources_per_alpha: list[np.ndarray] = []
         selected_rank_per_alpha: list[int] = []
-        for alpha_val in self.alphas:
-            C_inv = self.robust_inverse(C + alpha_val * I)
+        for cov_mat in cov_mats:
+            C_inv = self.robust_inverse(cov_mat)
 
             if self.source_indices is not None:
                 sel = np.unique(self.source_indices)

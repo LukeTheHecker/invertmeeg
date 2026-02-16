@@ -4,6 +4,7 @@ import mne
 import numpy as np
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
+from .utils import build_covariance_candidates
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +66,9 @@ class SolverESMV(BaseSolver):
         *args,
         alpha="auto",
         noise_cov: mne.Covariance | None = None,
+        cov_reg: str = "oas",
+        cov_reg_beta: float = 0.05,
+        cov_reg_cond_target: float = 1e4,
         **kwargs,
     ):
         """Calculate inverse operator.
@@ -86,7 +90,15 @@ class SolverESMV(BaseSolver):
         super().make_inverse_operator(forward, mne_obj, *args, alpha=alpha, **kwargs)
         if noise_cov is not None:
             self.coerce_noise_cov(noise_cov)
-        data = self.unpack_data_obj(mne_obj)
+        # For beamformers, covariance estimation should use many samples.
+        # If Epochs are provided, concatenate epochs rather than averaging.
+        data, kept = self.unpack_covariance_samples(
+            mne_obj,
+            pick_types=["meg", "eeg", "fnirs"],
+            require_forward_channel_match=True,
+            context="ESMV",
+        )
+        self._operator_ch_names = tuple(kept)
 
         leadfield = self.leadfield
         _n_chans_raw, _n_dipoles = leadfield.shape
@@ -153,12 +165,22 @@ class SolverESMV(BaseSolver):
         subspace_operator = signal_subspace @ (
             subspace_weights[:, np.newaxis] * signal_subspace.T
         )
-
-        self.alphas = self.get_alphas(reference=C)
+        cov_mats, self.alphas, cov_meta = build_covariance_candidates(
+            C=C,
+            I=I,
+            alpha=self.alpha,
+            get_alphas_fn=self.get_alphas,
+            n_samples=int(y_eff.shape[1]),
+            cov_reg=cov_reg,
+            cov_reg_beta=float(cov_reg_beta),
+            cov_reg_cond_target=float(cov_reg_cond_target),
+        )
+        if "oas_shrinkage" in cov_meta:
+            self._cov_reg_oas_shrinkage = float(cov_meta["oas_shrinkage"])
 
         inverse_operators = []
-        for alpha in self.alphas:
-            C_inv = self.robust_inverse(C + alpha * I)
+        for cov_mat in cov_mats:
+            C_inv = self.robust_inverse(cov_mat)
             C_inv_leadfield = C_inv @ leadfield_eff
             diag_elements = np.einsum("ij,ji->i", leadfield_eff.T, C_inv_leadfield)
             W_mv = np.zeros_like(C_inv_leadfield)

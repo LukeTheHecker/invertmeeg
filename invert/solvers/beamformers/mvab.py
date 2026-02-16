@@ -2,6 +2,7 @@ import mne
 import numpy as np
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
+from .utils import build_covariance_candidates
 
 
 class SolverMVAB(BaseSolver):
@@ -45,6 +46,9 @@ class SolverMVAB(BaseSolver):
         *args,
         alpha="auto",
         noise_cov: mne.Covariance | None = None,
+        cov_reg: str = "oas",
+        cov_reg_beta: float = 0.05,
+        cov_reg_cond_target: float = 1e4,
         **kwargs,
     ):
         """Calculate inverse operator.
@@ -75,24 +79,45 @@ class SolverMVAB(BaseSolver):
 
         y = wf.sensor_transform @ data
         I = np.identity(n_chans)
+        eps = 1e-12
 
         C = self.data_covariance(y, center=True, ddof=1)
-        if alpha == "auto":
-            r_grid = np.asarray(self.r_values, dtype=float)
+        cov_reg_l = str(cov_reg).strip().lower()
+        if alpha == "auto" and cov_reg_l not in {"grid", "legacy", "maxeig"}:
+            cov_mats, _alpha_eff, cov_meta = build_covariance_candidates(
+                C=C,
+                I=I,
+                alpha="auto",
+                get_alphas_fn=lambda reference: [0.0],
+                n_samples=int(y.shape[1]),
+                cov_reg=cov_reg,
+                cov_reg_beta=float(cov_reg_beta),
+                cov_reg_cond_target=float(cov_reg_cond_target),
+            )
+            if "oas_shrinkage" in cov_meta:
+                self._cov_reg_oas_shrinkage = float(cov_meta["oas_shrinkage"])
+            r_grid = np.zeros(len(cov_mats), dtype=float)
         else:
-            r_grid = np.asarray([float(alpha)], dtype=float)
+            if alpha == "auto":
+                r_grid = np.asarray(self.r_values, dtype=float)
+            else:
+                r_grid = np.asarray([float(alpha)], dtype=float)
+            cov_mats = [C for _ in range(len(r_grid))]
 
-        # For MVAB the "grid parameter" is r (dimensionless).
-        self.alphas = list(r_grid)
-        max_eig_C = float(np.linalg.svd(C, compute_uv=False).max())
+        # For MVAB the public "alpha" remains the dimensionless r.
+        self.alphas = [float(r) for r in r_grid]
 
         inverse_operators = []
-        for r in r_grid:
-            alpha_cov = float(r) * max_eig_C
-            R_inv = self.robust_inverse(C + alpha_cov * I)
+        for C_base, r in zip(cov_mats, r_grid, strict=False):
+            if float(r) != 0.0:
+                max_eig_C = float(np.linalg.svd(C_base, compute_uv=False).max())
+                alpha_cov = float(r) * max_eig_C
+                R_inv = self.robust_inverse(C_base + alpha_cov * I)
+            else:
+                R_inv = self.robust_inverse(C_base)
             G = leadfield.T @ R_inv @ leadfield
             max_eig_G = float(np.linalg.svd(G, compute_uv=False).max())
-            alpha_src = float(r) * max_eig_G
+            alpha_src = max(float(r) * max_eig_G, eps)
             inverse_operator = np.linalg.solve(
                 G + alpha_src * np.identity(n_dipoles),
                 leadfield.T @ R_inv,

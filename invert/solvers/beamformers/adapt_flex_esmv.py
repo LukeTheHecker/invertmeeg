@@ -1,5 +1,4 @@
 from copy import deepcopy
-from invert.util import build_source_adjacency
 
 import mne
 import numpy as np
@@ -8,7 +7,10 @@ from scipy.sparse import identity as sparse_identity
 from scipy.sparse import kron as sparse_kron
 from scipy.sparse.csgraph import laplacian
 
+from invert.util import build_source_adjacency
+
 from ..base import BaseSolver, InverseOperator, SolverMeta
+from .utils import build_covariance_candidates
 
 
 class SolverAdaptFlexESMV(BaseSolver):
@@ -141,6 +143,9 @@ class SolverAdaptFlexESMV(BaseSolver):
         *args,
         alpha="auto",
         noise_cov: mne.Covariance | None = None,
+        cov_reg: str = "oas",
+        cov_reg_beta: float = 0.05,
+        cov_reg_cond_target: float = 1e4,
         **kwargs,
     ):
         super().make_inverse_operator(forward, mne_obj, *args, alpha=alpha, **kwargs)
@@ -159,12 +164,21 @@ class SolverAdaptFlexESMV(BaseSolver):
         I = np.identity(n_chans)
         y -= y.mean(axis=1, keepdims=True)
         C = self.data_covariance(y, center=False, ddof=1)
-
-        self.alphas = self.get_alphas(reference=C)
+        cov_mats, self.alphas, cov_meta = build_covariance_candidates(
+            C=C,
+            I=I,
+            alpha=self.alpha,
+            get_alphas_fn=self.get_alphas,
+            n_samples=int(y.shape[1]),
+            cov_reg=cov_reg,
+            cov_reg_beta=float(cov_reg_beta),
+            cov_reg_cond_target=float(cov_reg_cond_target),
+        )
+        if "oas_shrinkage" in cov_meta:
+            self._cov_reg_oas_shrinkage = float(cov_meta["oas_shrinkage"])
 
         inverse_operators = []
-        for alpha_reg in self.alphas:
-            C_reg = C + alpha_reg * I
+        for C_reg in cov_mats:
 
             # Eigendecomposition for adaptive Wiener (computed once)
             eigvals, eigvecs = np.linalg.eigh(C_reg)

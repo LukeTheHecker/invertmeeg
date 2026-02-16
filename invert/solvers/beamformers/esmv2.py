@@ -2,6 +2,7 @@ import mne
 import numpy as np
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
+from .utils import build_covariance_candidates
 
 
 class SolverESMV2(BaseSolver):
@@ -46,6 +47,9 @@ class SolverESMV2(BaseSolver):
         *args,
         alpha="auto",
         noise_cov: mne.Covariance | None = None,
+        cov_reg: str = "oas",
+        cov_reg_beta: float = 0.05,
+        cov_reg_cond_target: float = 1e4,
         **kwargs,
     ):
         """Calculate inverse operator.
@@ -79,13 +83,22 @@ class SolverESMV2(BaseSolver):
         # Matrix (opposed to that of the leadfield)
         y -= y.mean(axis=1, keepdims=True)
         C = self.data_covariance(y, center=False, ddof=1)
-
-        self.alphas = self.get_alphas(reference=C)
         epsilon = 1e-15
+        cov_mats, self.alphas, cov_meta = build_covariance_candidates(
+            C=C,
+            I=I,
+            alpha=self.alpha,
+            get_alphas_fn=self.get_alphas,
+            n_samples=int(y.shape[1]),
+            cov_reg=cov_reg,
+            cov_reg_beta=float(cov_reg_beta),
+            cov_reg_cond_target=float(cov_reg_cond_target),
+        )
+        if "oas_shrinkage" in cov_meta:
+            self._cov_reg_oas_shrinkage = float(cov_meta["oas_shrinkage"])
 
         inverse_operators = []
-        for alpha in self.alphas:
-            C_reg = C + alpha * I
+        for C_reg in cov_mats:
 
             # 2. Eigendecomposition
             eigvals, eigvecs = np.linalg.eigh(C_reg)
