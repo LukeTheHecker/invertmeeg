@@ -192,26 +192,28 @@ def _cmem(Y, L, A=None, num_parcels=200, max_iter=100, batch_size=100):
     msp_all = _compute_msp_coefficients(Y, L)
     parcels = _data_driven_parcellation(Y, L, num_parcels, A=A, msp_scores=msp_all)
 
-    # Step 2: MNE estimate for energy scaling of prior covariance
-    J_mne = np.linalg.lstsq(L, Y, rcond=None)[0]
+    # Step 2: Regularized MNE estimate for energy scaling and alpha init
+    LtL = L.T @ L
+    reg = 0.1 * np.trace(LtL) / n
+    J_mne = np.linalg.solve(LtL + reg * np.eye(n), L.T @ Y)
     J_mne_power = np.mean(J_mne**2, axis=1)  # per-source RMS power
-    global_power = np.mean(J_mne_power)
-
-    # Activation probability from MNE power (more discriminative than MSP
-    # when number of channels is small relative to source count)
-    log_power = np.log(J_mne_power + 1e-30)
-    lp_median = np.median(log_power)
-    lp_std = np.std(log_power)
-    if lp_std < 1e-10:
-        power_z = np.zeros(n)
-    else:
-        power_z = (log_power - lp_median) / lp_std
 
     # Step 3: Initialize parcel parameters
     logger.info("Initializing parcel parameters...")
     unique_parcels = np.unique(parcels)
 
+    # Rank parcels by mean MNE power for alpha initialization
+    parcel_powers = {}
+    for parcel_id in unique_parcels:
+        verts = np.where(parcels == parcel_id)[0]
+        parcel_powers[parcel_id] = np.mean(J_mne_power[verts])
+    power_vals = np.array([parcel_powers[p] for p in unique_parcels])
+    power_ranks = np.argsort(np.argsort(power_vals)).astype(float)
+    power_quantiles = power_ranks / max(len(power_ranks) - 1, 1)
+    parcel_quantile = dict(zip(unique_parcels, power_quantiles))
+
     precomputed = {}
+    max_E_k = 0.0  # track for calibration
     for parcel_id in unique_parcels:
         verts = np.where(parcels == parcel_id)[0]
         n_v = len(verts)
@@ -223,19 +225,24 @@ def _cmem(Y, L, A=None, num_parcels=200, max_iter=100, batch_size=100):
             W_k = _compute_spatial_covariance(verts, A)
         else:
             W_k = np.eye(n_v)
+        # Normalize W_k to have per-source trace = 1
+        W_k *= n_v / (np.trace(W_k) + 1e-30)
 
-        # Energy scaling: eta_k proportional to relative MNE power in parcel
-        # Average parcel gets eta ~ 1, active parcels get eta >> 1
-        parcel_power = np.mean(J_mne_power[verts])
-        eta_k = parcel_power / (global_power + 1e-30)
-        eta_k = max(eta_k, 1e-6)
-        Sigma_k = eta_k * W_k
+        # Per-source prior variance from MNE power, with spatial structure
+        parcel_power = parcel_powers[parcel_id]
+        Sigma_k = parcel_power * W_k
 
         L_k = L[:, verts]
 
-        # Activation probability: sigmoid of max z-scored MNE power in parcel
-        z_max = np.max(power_z[verts])
-        alpha_k = np.clip(1.0 / (1.0 + np.exp(-5.0 * z_max)), 0.01, 0.99)
+        # Estimate E_k scale: E_k = 0.5 * xi^T Sigma xi for reference lambda
+        # Use y as reference lambda direction (near-optimal for small Sigma)
+        xi_ref = L_k.T @ Y[:, 0]
+        E_ref = 0.5 * np.dot(xi_ref, Sigma_k @ xi_ref)
+        max_E_k = max(max_E_k, E_ref)
+
+        # Alpha from power rank: quadratic mapping for sparsity bias
+        q = parcel_quantile[parcel_id]
+        alpha_k = np.clip(0.01 + 0.98 * q**2, 0.01, 0.99)
 
         precomputed[parcel_id] = {
             "L_k": L_k,
@@ -245,19 +252,36 @@ def _cmem(Y, L, A=None, num_parcels=200, max_iter=100, batch_size=100):
             "vertices": verts,
         }
 
-    # Step 4: MEM optimization (noise cov = identity after whitening)
-    logger.info("Running MEM optimization...")
-    J = np.zeros((n, t))
-    num_batches = (t + batch_size - 1) // batch_size
+    # Calibrate Sigma scale so max E_k ≈ target at the optimum.
+    # Without this, E_k >> 1 saturates exp(E_k) and disables alpha.
+    target_E = 10.0
+    if max_E_k > 1e-30:
+        sigma_scale = target_E / max_E_k
+        for precomp in precomputed.values():
+            precomp["Sigma_k"] *= sigma_scale
 
-    for batch_idx in tqdm(range(num_batches)):
-        batch_start = batch_idx * batch_size
-        batch_end = min(batch_start + batch_size, t)
-        Y_batch = Y[:, batch_start:batch_end]
+    # Step 4: Iterative MEM optimization with alpha/eta updates
+    # Outer EM loop: optimize lambda (E-step), update alpha/eta (M-step)
+    n_outer = 5
+    logger.info("Running MEM optimization (%d outer iterations)...", n_outer)
 
-        lambda_batch = _optimize_lambda_batch(Y_batch, precomputed, max_iter)
-        J_batch = _compute_sources_batch(lambda_batch, precomputed, n)
-        J[:, batch_start:batch_end] = J_batch
+    for outer in range(n_outer):
+        J = np.zeros((n, t))
+        num_batches = (t + batch_size - 1) // batch_size
+
+        for batch_idx in tqdm(
+            range(num_batches), desc=f"MEM iter {outer + 1}/{n_outer}", disable=True
+        ):
+            batch_start = batch_idx * batch_size
+            batch_end = min(batch_start + batch_size, t)
+            Y_batch = Y[:, batch_start:batch_end]
+
+            lambda_batch = _optimize_lambda_batch(Y_batch, precomputed, max_iter)
+            J_batch = _compute_sources_batch(lambda_batch, precomputed, n)
+            J[:, batch_start:batch_end] = J_batch
+
+        if outer < n_outer - 1:
+            _update_parcel_params(J, precomputed, L)
 
     return J, parcels
 
@@ -366,6 +390,29 @@ def _compute_spatial_covariance(vertices, A, alpha=0.2):
         Sigma = np.eye(n_v)
 
     return Sigma
+
+
+def _update_parcel_params(J, precomputed, L):
+    """Update alpha from posterior source estimates (M-step).
+
+    After solving MEM with current parameters, use the estimated source
+    power to sharpen activation probabilities.  Sigma is kept fixed
+    (already calibrated in the initialization).
+    """
+    J_power = np.mean(J**2, axis=1)
+
+    # Rank parcels by posterior power
+    parcel_powers = []
+    for precomp in precomputed.values():
+        verts = precomp["vertices"]
+        parcel_powers.append(np.mean(J_power[verts]))
+    power_arr = np.array(parcel_powers)
+    ranks = np.argsort(np.argsort(power_arr)).astype(float)
+    quantiles = ranks / max(len(ranks) - 1, 1)
+
+    for i, precomp in enumerate(precomputed.values()):
+        q = quantiles[i]
+        precomp["alpha_k"] = np.clip(0.01 + 0.98 * q**2, 0.01, 0.99)
 
 
 def _mem_dual_obj_grad(lambda_vec, y_t, precomputed):
