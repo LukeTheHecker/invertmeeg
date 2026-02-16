@@ -1,4 +1,5 @@
 """Evaluate focal-source solvers on 4D BTi phantom dataset."""
+import argparse
 import os.path as op
 import warnings
 import traceback
@@ -26,18 +27,18 @@ actual_pos = 0.01 * np.array([
 ]) @ np.array([[0, 1, 0], [-1, 0, 0], [0, 0, 1]])
 
 # Solvers to test - focal source methods
-SOLVERS = [
-    "mne",
-    "wmne",
+ALL_SOLVERS = [
+    "MNE",
+    "wMNE",
     "loreta",
-    "sloreta",
-    "esmv",
-    "lcmv",
-    "champagne",
-    "gamma_map",
-    "rap_music",
-    "ecd",
+    "eLORETA",
+    "ESMV",
+    "LCMV",
+    # "MSP",
+    "laura",
+    "ECD",
 ]
+FAST_SOLVERS = ["MNE", "wMNE", "eLORETA", "ESMV", "LCMV"]
 
 def load_run(run_id, data_path):
     raw = mne.io.read_raw_bti(
@@ -49,14 +50,29 @@ def load_run(run_id, data_path):
     epochs = mne.Epochs(raw, events=events, event_id=8192, tmin=-0.2, tmax=0.4,
                         preload=True, baseline=(None, 0.0), verbose=False)
     evoked = epochs.average()
+    evoked.drop_channels(evoked.info["bads"])
     cov = mne.compute_covariance(epochs, tmax=0.0, verbose=False)
-    return evoked, cov
+    return epochs, evoked, cov
 
 def make_fwd(info):
     sphere = mne.make_sphere_model(r0=(0.0, 0.0, 0.0), head_radius=0.080, verbose=False)
-    src = mne.setup_volume_source_space(
+    # Start from a regular volume grid, then ensure the *true* phantom dipole
+    # locations are included exactly (removes source-space sampling as a confound).
+    src_grid = mne.setup_volume_source_space(
         subject=None, pos=8.0, sphere=(0.0, 0.0, 0.0, 0.072),
         mindist=5.0, exclude=0.0, verbose=False
+    )
+    rr_used = src_grid[0]["rr"][src_grid[0]["vertno"]]
+    rr = np.vstack([rr_used, actual_pos])
+    rr = np.unique(np.round(rr, 6), axis=0)  # ~1 µm tolerance in meters
+    norms = np.linalg.norm(rr, axis=1, keepdims=True)
+    nn = np.zeros_like(rr)
+    mask = norms.squeeze() > 0
+    nn[mask] = rr[mask] / norms[mask]
+    nn[~mask] = np.array([1.0, 0.0, 0.0])
+    src = mne.setup_volume_source_space(
+        subject=None, pos={"rr": rr, "nn": nn}, sphere=(0.0, 0.0, 0.0, 0.072),
+        mindist=0.0, exclude=0.0, verbose=False
     )
     fwd = mne.make_forward_solution(info, trans=None, src=src, bem=sphere,
                                      meg=True, eeg=False, verbose=False)
@@ -71,13 +87,29 @@ def peak_position(source_mat, fwd):
     return source_positions(fwd)[idx]
 
 # Load data
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument(
+    "--solvers",
+    nargs="+",
+    default=None,
+    help="Solver names to run (default: all solvers listed in the script).",
+)
+parser.add_argument(
+    "--fast",
+    action="store_true",
+    help=f"Run only a fast subset ({', '.join(FAST_SOLVERS)}).",
+)
+args = parser.parse_args()
+
+SOLVERS = FAST_SOLVERS if args.fast else (args.solvers if args.solvers is not None else ALL_SOLVERS)
+
 print("Loading phantom data...")
 data_path = phantom_4dbti.data_path(verbose=False)
 runs = {}
 for rid in RUN_IDS:
-    evoked, cov = load_run(rid, data_path)
+    epochs, evoked, cov = load_run(rid, data_path)
     fwd, sphere = make_fwd(evoked.info)
-    runs[rid] = {"evoked": evoked, "cov": cov, "fwd": fwd, "sphere": sphere}
+    runs[rid] = {"epochs": epochs, "evoked": evoked, "cov": cov, "fwd": fwd, "sphere": sphere}
 
 # MNE dipole fit baseline
 print("\nMNE Dipole Fit baseline:")
@@ -93,14 +125,16 @@ print(f"{'Solver':<20} {'Run1':>8} {'Run2':>8} {'Run3':>8} {'Run4':>8} {'Mean':>
 print(f"{'='*70}")
 
 results = []
+USE_EPOCHS_FOR_COV = {"LCMV", "ESMV"}
 for solver_name in SOLVERS:
     errors = []
     failed = False
     for rid in RUN_IDS:
         r = runs[rid]
         try:
-            solver = Solver(solver_name)
-            solver.make_inverse_operator(r["fwd"], r["evoked"], noise_cov=r["cov"])
+            solver = Solver(solver_name, plot_reg=True)
+            cov_obj = r["epochs"] if solver_name in USE_EPOCHS_FOR_COV else r["evoked"]
+            solver.make_inverse_operator(r["fwd"], cov_obj)#, noise_cov=r["cov"])
             stc = solver.apply_inverse_operator(r["evoked"].copy().crop(PEAK_TIME, PEAK_TIME))
             pos_hat = peak_position(stc.data, r["fwd"])
             err = 1e3 * np.linalg.norm(pos_hat - actual_pos[rid-1])
