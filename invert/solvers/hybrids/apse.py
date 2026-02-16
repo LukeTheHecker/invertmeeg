@@ -101,6 +101,11 @@ class SolverAPSE(BaseSolver):
         self : object
             Returns itself for convenience
         """
+        # APSE estimates noise variance internally; the alpha parameter only
+        # provides a small additive regularisation nudge.  Force a single
+        # fixed value so no grid search / GCV edge warning is triggered.
+        if alpha == "auto":
+            alpha = 0.01
         super().make_inverse_operator(forward, mne_obj, *args, alpha=alpha, **kwargs)
         wf = self.prepare_whitened_forward(noise_cov)
 
@@ -110,8 +115,7 @@ class SolverAPSE(BaseSolver):
         leadfield = self.leadfield
         n_chans, n_dipoles = leadfield.shape
 
-        # Regularization scale should match the sensor-space covariance matrices
-        # that are diagonal-loaded inside this solver (Sigma_y + alpha * I).
+        # Scale the single alpha against the data covariance.
         data_cov = self.data_covariance(data, center=True, ddof=1)
         self.get_alphas(reference=data_cov)
 
@@ -205,12 +209,14 @@ class SolverAPSE(BaseSolver):
         C_reg = C + reg * np.eye(n_chans)
         C_inv = np.linalg.inv(C_reg)
 
-        # Beamformer spatial filter for each dipole
-        source_power = np.zeros(n_dipoles)
-        for i in range(n_dipoles):
-            l = leadfield[:, i : i + 1]
-            w = C_inv @ l / (l.T @ C_inv @ l)
-            source_power[i] = np.real(w.T @ C @ w).item()
+        # Vectorized beamformer spatial filter for all dipoles at once
+        # CiL[:,i] = C_inv @ l_i, denom[i] = l_i.T @ C_inv @ l_i
+        CiL = C_inv @ leadfield                      # (m, d)
+        denom = np.sum(leadfield * CiL, axis=0)      # (d,) = diag(L.T @ C_inv @ L)
+        denom = np.maximum(denom, 1e-15)
+        W = CiL / denom                              # (m, d) all filter weights
+        # power[i] = w_i.T @ C @ w_i
+        source_power = np.sum(W * (C @ W), axis=0)   # (d,)
 
         # Step 2: Find peaks using adaptive thresholding
         # Normalize source power
@@ -401,9 +407,8 @@ class SolverAPSE(BaseSolver):
         for iteration in range(max_iter):
             gamma_old = gamma.copy()
 
-            # E-step: Compute posterior mean and covariance
-            Gamma = np.diag(gamma)
-            Sigma_y = L_patch @ Gamma @ L_patch.T + noise_var * np.eye(n_chans)
+            # E-step: Sigma_y = L @ diag(gamma) @ L.T + noise_var * I
+            Sigma_y = (L_patch * gamma) @ L_patch.T + noise_var * np.eye(n_chans)
 
             try:
                 Sigma_y_inv = np.linalg.inv(Sigma_y + alpha * np.eye(n_chans))
@@ -411,20 +416,20 @@ class SolverAPSE(BaseSolver):
                 # Add more regularization if singular
                 Sigma_y_inv = np.linalg.inv(Sigma_y + (alpha + 0.1) * np.eye(n_chans))
 
-            # Posterior covariance
-            Sigma_post = Gamma - Gamma @ L_patch.T @ Sigma_y_inv @ L_patch @ Gamma
+            # Posterior mean: Gamma @ L_patch.T @ Sigma_y_inv @ data
+            # = diag(gamma) @ L_patch.T @ Sigma_y_inv @ data
+            SiL = Sigma_y_inv @ L_patch  # (m, d_patch)
+            mu_post = (gamma[:, None] * (SiL.T @ data))  # (d_patch, t)
 
-            # Posterior mean
-            mu_post = Gamma @ L_patch.T @ Sigma_y_inv @ data
+            # Posterior variance diagonal: gamma - gamma^2 * diag(L.T @ Sinv @ L)
+            z_diag = np.sum(L_patch * SiL, axis=0)  # (d_patch,)
+            sigma_post_diag = gamma - gamma ** 2 * z_diag
 
-            # M-step: Update hyperparameters with patch-aware updates
-            for j in range(n_patch_sources):
-                data_term = np.real(
-                    np.linalg.norm(mu_post[j, :]) ** 2 / n_time + Sigma_post[j, j]
-                )
-                gamma[j] = (
-                    1 - self.sparsity_param
-                ) * data_term + self.sparsity_param * gamma[j]
+            # M-step: vectorized hyperparameter update
+            # data_term[j] = ||mu_post[j,:]||^2 / n_time + Sigma_post[j,j]
+            data_term = np.sum(mu_post ** 2, axis=1) / n_time + sigma_post_diag
+            data_term = np.real(data_term)
+            gamma = (1 - self.sparsity_param) * data_term + self.sparsity_param * gamma
 
             # Update noise variance with regularization to prevent over-fitting
             residual = data - L_patch @ mu_post
@@ -444,12 +449,11 @@ class SolverAPSE(BaseSolver):
                 break
 
         # Compute final inverse operator
-        Gamma = np.diag(gamma)
-        Sigma_y = L_patch @ Gamma @ L_patch.T + noise_var * np.eye(n_chans)
+        Sigma_y = (L_patch * gamma) @ L_patch.T + noise_var * np.eye(n_chans)
         Sigma_y_inv = np.linalg.inv(Sigma_y + alpha * np.eye(n_chans))
 
-        # Create sparse inverse operator
-        W_patch = np.real(Gamma @ L_patch.T @ Sigma_y_inv)
+        # diag(gamma) @ L_patch.T @ Sigma_y_inv
+        W_patch = np.real(gamma[:, None] * (L_patch.T @ Sigma_y_inv))
 
         # Map back to full source space with continuous spatial interpolation
         W = np.zeros((n_dipoles, n_chans))
@@ -501,12 +505,18 @@ class SolverAPSE(BaseSolver):
         W_smooth = W.copy()
         n_dipoles = W.shape[0]
 
+        # Build set of all patch vertices for fast lookup
+        all_patch_vertices = set()
+        for patch in patches:
+            all_patch_vertices.update(patch)
+        outside_mask = np.ones(n_dipoles, dtype=bool)
+        outside_mask[list(all_patch_vertices)] = False
+
         # For each patch, create smooth spatial gradients extending outward
         for patch in patches:
             if len(patch) == 0:
                 continue
 
-            # Get patch center and activity
             patch_pos = pos[patch]
             patch_weights = W[patch, :]
 
@@ -515,35 +525,26 @@ class SolverAPSE(BaseSolver):
             if np.sum(patch_activity) > 0:
                 centroid_weights = patch_activity / np.sum(patch_activity)
                 centroid_pos = np.average(patch_pos, axis=0, weights=centroid_weights)
-            else:
-                centroid_pos = np.mean(patch_pos, axis=0)
-
-            # Compute distances from centroid to all source locations
-            distances = cdist(centroid_pos.reshape(1, -1), pos).flatten()
-
-            # Create smooth spatial kernel extending beyond patch
-            max_patch_dist = np.max(distances[patch]) if len(patch) > 0 else 1.0
-            smooth_radius = max_patch_dist * 2.0  # Extend beyond patch boundaries
-
-            # Gaussian-like smoothing kernel
-            spatial_weights = np.exp(-((distances / smooth_radius) ** 2))
-
-            # Get representative patch activity (weighted average)
-            if np.sum(patch_activity) > 0:
                 representative_activity = np.average(
                     patch_weights, axis=0, weights=patch_activity
                 )
             else:
+                centroid_pos = np.mean(patch_pos, axis=0)
                 representative_activity = np.mean(patch_weights, axis=0)
 
-            # Apply smooth spatial distribution
-            for i in range(n_dipoles):
-                # Blend existing activity with smooth patch influence
-                if i not in patch:  # Only modify locations outside the patch
-                    blend_factor = spatial_weights[i] * 0.3  # 30% influence max
-                    W_smooth[i, :] = (1 - blend_factor) * W_smooth[
-                        i, :
-                    ] + blend_factor * representative_activity
+            distances = cdist(centroid_pos.reshape(1, -1), pos).flatten()
+            max_patch_dist = np.max(distances[patch]) if len(patch) > 0 else 1.0
+            smooth_radius = max_patch_dist * 2.0
+
+            # Gaussian-like smoothing kernel, only for outside vertices
+            spatial_weights = np.exp(-((distances / smooth_radius) ** 2))
+
+            # Vectorized blend for all outside dipoles at once
+            blend_factors = spatial_weights[outside_mask] * 0.3  # (n_outside,)
+            W_smooth[outside_mask, :] = (
+                (1 - blend_factors[:, None]) * W_smooth[outside_mask, :]
+                + blend_factors[:, None] * representative_activity
+            )
 
         return W_smooth
 
@@ -614,17 +615,23 @@ class SolverAPSE(BaseSolver):
 
         data = stc.data.copy()
         pos = pos_from_forward(self.forward)
+        n_dipoles = len(pos)
+
+        # Build set of all patch vertices for fast lookup
+        all_patch_vertices = set()
+        for patch in self.patches:
+            all_patch_vertices.update(patch)
+        outside_mask = np.ones(n_dipoles, dtype=bool)
+        outside_mask[list(all_patch_vertices)] = False
 
         # Create smooth spatial distributions around each patch
         for patch in self.patches:
             if len(patch) <= 1:
                 continue
 
-            # Get patch characteristics
             patch_data = data[patch, :]
             patch_pos = pos[patch]
 
-            # Find patch centroid weighted by activity
             patch_power = np.linalg.norm(patch_data, axis=1)
             if patch_power.sum() > 0:
                 weights = patch_power / patch_power.sum()
@@ -634,27 +641,20 @@ class SolverAPSE(BaseSolver):
                 centroid_pos = np.mean(patch_pos, axis=0)
                 representative_signal = np.mean(patch_data, axis=0)
 
-            # Compute distances from centroid to all sources
             distances = cdist(centroid_pos.reshape(1, -1), pos).flatten()
-
-            # Create extended smooth kernel (larger than discrete patch)
             max_patch_dist = np.max(distances[patch])
-            smooth_radius = max_patch_dist * 1.5  # Extend 50% beyond patch
+            smooth_radius = max_patch_dist * 1.5
 
-            # Exponential decay kernel for smooth spatial gradients
             spatial_kernel = np.exp(-((distances / smooth_radius) ** 2))
 
-            # Apply smooth spatial distribution to nearby sources
-            for i in range(len(pos)):
-                if (
-                    i not in patch and spatial_kernel[i] > 0.1
-                ):  # Threshold for efficiency
-                    blend_factor = spatial_kernel[i] * 0.4  # Up to 40% influence
-                    data[i, :] = (1 - blend_factor) * data[
-                        i, :
-                    ] + blend_factor * representative_signal
+            # Vectorized: apply to all outside dipoles where kernel > 0.1
+            eligible = outside_mask & (spatial_kernel > 0.1)
+            blend_factors = spatial_kernel[eligible] * 0.4  # (n_eligible,)
+            data[eligible, :] = (
+                (1 - blend_factors[:, None]) * data[eligible, :]
+                + blend_factors[:, None] * representative_signal
+            )
 
-        # Create new source estimate with continuous spatial structure
         stc_continuous = mne.SourceEstimate(
             data=data,
             vertices=stc.vertices,
