@@ -1,5 +1,4 @@
 import logging
-from copy import deepcopy
 
 import mne
 import numpy as np
@@ -212,7 +211,7 @@ class SolverGFTMinimumL1Norm(BaseSolver):
             Estimated CSDs.
         """
 
-        A = deepcopy(self.leadfield) @ self.U
+        A = self.leadfield.copy() @ self.U
 
         y_mat = np.asarray(y, dtype=float)
         if y_mat.ndim == 1:
@@ -228,16 +227,20 @@ class SolverGFTMinimumL1Norm(BaseSolver):
         L = max(float(L), 1e-12)
         lr = 1.0 / L
 
+        # Pre-compute A.T @ A and A.T @ Y to halve per-iteration matmul cost
+        ATA = A.T @ A  # (d, d)
+        ATY = A.T @ Y  # (d, t)
+
         if scale_l1_by_lmax:
-            weighted_proj = np.abs(A.T @ Y) / self.mode_weights[:, np.newaxis]
+            weighted_proj = np.abs(ATY) / self.mode_weights[:, np.newaxis]
             lambda_max = float(np.max(weighted_proj))
             lambda_eff = float(l1_reg) * lambda_max
         else:
             lambda_eff = float(l1_reg)
         lambda_eff = max(lambda_eff, 0.0)
 
-        # Calculate initial guess
-        x0 = np.linalg.pinv(A) @ Y
+        # Least-squares warm start
+        x0, _, _, _ = np.linalg.lstsq(A, Y, rcond=None)
 
         x = x0.copy()
         z = x0.copy()
@@ -245,8 +248,8 @@ class SolverGFTMinimumL1Norm(BaseSolver):
         t = 1.0
         for _i in range(max_iter):
             x_prev = x.copy()
-            # Gradient descent step on momentum variable
-            grad = A.T @ (A @ z - Y) + l2_reg * z
+            # grad = A.T @ (A @ z - Y) + l2_reg * z = ATA @ z - ATY + l2_reg * z
+            grad = ATA @ z - ATY + l2_reg * z
             x = z - lr * grad
             # Soft thresholding step (proximal for L1)
             thresholds = (lambda_eff * lr) * self.mode_weights[:, np.newaxis]

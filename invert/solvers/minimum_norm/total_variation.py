@@ -146,7 +146,6 @@ class SolverTotalVariation(BaseSolver):
         if auto_scale_hyperparams is None:
             auto_scale_hyperparams = self.auto_scale_hyperparams
 
-        LLT = L @ L.T
         if auto_scale_hyperparams:
             lam, ridge_eff = self._auto_scaled_hyperparams(
                 L,
@@ -162,7 +161,9 @@ class SolverTotalVariation(BaseSolver):
             else:
                 ridge_eff = max(float(ridge), 1e-15)
 
-        K_mne = np.linalg.solve(LLT + ridge_eff * np.eye(n_chans), L).T
+        # Pre-compute L.T @ L once (used in CG matvec every iteration)
+        LTL = L.T @ L  # (d, d)
+        K_mne = np.linalg.solve(L @ L.T + ridge_eff * np.eye(n_chans), L).T
         X = K_mne @ Y
 
         edges_i = self._edges_i
@@ -185,8 +186,10 @@ class SolverTotalVariation(BaseSolver):
 
             Lap = build_weighted_laplacian(w)
 
+            # matvec: LTL @ v + lam * Lap @ v + ridge * v
+            # Uses pre-computed LTL instead of L.T @ (L @ v) (one matmul vs two)
             def matvec(v: np.ndarray, Lap_val: np.ndarray = Lap) -> np.ndarray:
-                return L.T @ (L @ v) + lam * (Lap_val @ v) + ridge_eff * v
+                return LTL @ v + lam * (Lap_val @ v) + ridge_eff * v
 
             A = LinearOperator((n_sources, n_sources), matvec=matvec, dtype=np.float64)
 

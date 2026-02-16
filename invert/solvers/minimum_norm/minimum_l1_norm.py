@@ -1,5 +1,4 @@
 import logging
-from copy import deepcopy
 
 import mne
 import numpy as np
@@ -192,7 +191,7 @@ class SolverMinimumL1Norm(BaseSolver):
         if y_mat.ndim == 1:
             y_mat = y_mat[:, np.newaxis]
 
-        A = deepcopy(self.leadfield)
+        A = self.leadfield.copy()
         if not self.prep_leadfield and depth_weighting > 0:
             leadfield_norms = np.linalg.norm(A, axis=0)
             leadfield_norms = np.maximum(leadfield_norms, 1e-12)
@@ -211,23 +210,27 @@ class SolverMinimumL1Norm(BaseSolver):
         L = max(float(L), 1e-12)
         lr = 1.0 / L
 
+        # Pre-compute A.T @ A and A.T @ Y to halve per-iteration matmul cost
+        ATA = A.T @ A  # (d, d)
+        ATY = A.T @ Y  # (d, t)
+
         if scale_l1_by_lmax:
-            lambda_max = float(np.max(np.abs(A.T @ Y)))
+            lambda_max = float(np.max(np.abs(ATY)))
             lambda_eff = float(l1_reg) * lambda_max
         else:
             lambda_eff = float(l1_reg)
         lambda_eff = max(lambda_eff, 0.0)
 
-        # Least-squares warm start keeps early iterations stable.
-        x0 = np.linalg.pinv(A) @ Y
+        # Least-squares warm start: solve A.T A x = A.T Y
+        x0, _, _, _ = np.linalg.lstsq(A, Y, rcond=None)
         x = x0.copy()
         z = x0.copy()
 
         t = 1.0
         for _i in range(max_iter):
             x_prev = x.copy()
-            # Gradient descent step on momentum variable
-            grad = A.T @ (A @ z - Y) + l2_reg * z
+            # grad = A.T @ (A @ z - Y) + l2_reg * z = ATA @ z - ATY + l2_reg * z
+            grad = ATA @ z - ATY + l2_reg * z
             x = z - lr * grad
             # Soft thresholding step (proximal for L1)
             x = soft_threshold(x, lambda_eff * lr)

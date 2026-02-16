@@ -398,29 +398,24 @@ class SolverSSLOFO(BaseSolver):
         """
         n_chans = leadfield.shape[0]
 
-        # Construct weighted inverse operator: K = W @ L.T @ inv(L @ W @ L.T + alpha * I)
-        W_diag = np.diag(weights)
-        LW = leadfield @ W_diag  # L @ W
-        LWLT = LW @ leadfield.T  # L @ W @ L.T (NOT W @ W!)
-        I = np.identity(n_chans)
+        # L @ diag(weights) @ L.T via broadcasting (avoids d×d diag matrix)
+        LW = leadfield * weights  # (m, d) broadcasting
+        LWLT = LW @ leadfield.T  # (m, m)
 
         try:
-            inner_inv = np.linalg.inv(LWLT + alpha * I)
+            inner_inv = np.linalg.inv(LWLT + alpha * np.eye(n_chans))
         except np.linalg.LinAlgError:
-            inner_inv = np.linalg.pinv(LWLT + alpha * I)
+            inner_inv = np.linalg.pinv(LWLT + alpha * np.eye(n_chans))
 
-        # Weighted inverse operator
-        K_eff = W_diag @ leadfield.T @ inner_inv
+        # K_eff = diag(weights) @ L.T @ inv(...) = weights[:, None] * (L.T @ inv)
+        LtInv = leadfield.T @ inner_inv  # (d, m)
+        K_eff = weights[:, None] * LtInv  # (d, m)
 
-        # Compute current density
         j = K_eff @ data
 
-        # Standardize by resolution matrix to reduce depth bias
-        # Rdiag = diag(K @ L) = sum of element-wise product
+        # Standardize: Rdiag = diag(K @ L)
         res_matrix_diag = np.sum(K_eff * leadfield.T, axis=1)
         res_matrix_diag = np.maximum(res_matrix_diag, 1e-12)
-
-        # Standardize
         j_standardized = j / np.sqrt(res_matrix_diag)
 
         return j_standardized
@@ -585,7 +580,7 @@ class SolverSSLOFO(BaseSolver):
         if self.verbose > 0:
             logger.info(f"Common support has {len(support_idx)} sources")
 
-        # Step c: Re-solve at each sample restricted to common support
+        # Step c: Re-solve all timepoints at once on the common support
         source_mat = np.zeros((n_sources, n_times))
         leadfield_support = self.leadfield_full[:, support_idx]
 
@@ -593,17 +588,14 @@ class SolverSSLOFO(BaseSolver):
         weights = J_sum[support_idx] ** self.focuss_power
         weights = np.maximum(weights, 1e-12)
 
-        for t in range(n_times):
-            if self.verbose > 1:
-                logger.debug(
-                    f"  Re-solving timepoint {t + 1}/{n_times} with fixed support"
-                )
-
-            # Weighted minimum norm on the support
-            J_support = self._weighted_minimum_norm(
-                leadfield_support, data[:, t], weights, alpha
-            )
-            source_mat[support_idx, t] = J_support
+        # Since weights and leadfield are fixed, compute inverse operator once
+        # and apply to all timepoints as a single matrix multiply
+        J_all = self._weighted_minimum_norm(
+            leadfield_support, data, weights, alpha
+        )
+        if J_all.ndim == 1:
+            J_all = J_all[:, np.newaxis]
+        source_mat[support_idx, :] = J_all
 
         return source_mat
 
@@ -615,7 +607,7 @@ class SolverSSLOFO(BaseSolver):
         leadfield : numpy.ndarray
             Leadfield matrix (n_channels, n_sources)
         data : numpy.ndarray
-            Data vector (n_channels,)
+            Data vector or matrix (n_channels,) or (n_channels, n_times)
         weights : numpy.ndarray
             Source weights (n_sources,)
         alpha : float
@@ -624,22 +616,21 @@ class SolverSSLOFO(BaseSolver):
         Return
         ------
         J : numpy.ndarray
-            Source estimate (n_sources,)
+            Source estimate (n_sources,) or (n_sources, n_times)
         """
         n_chans = leadfield.shape[0]
-        W_diag = np.diag(weights)
-        LW = leadfield @ W_diag  # L @ W
-        LWLT = LW @ leadfield.T  # L @ W @ L.T (NOT W @ W!)
-        I = np.identity(n_chans)
+        # L @ diag(weights) @ L.T via broadcasting
+        LW = leadfield * weights  # (m, d)
+        LWLT = LW @ leadfield.T  # (m, m)
 
         try:
-            inner_inv = np.linalg.inv(LWLT + alpha * I)
+            inner_inv = np.linalg.inv(LWLT + alpha * np.eye(n_chans))
         except np.linalg.LinAlgError:
-            inner_inv = np.linalg.pinv(LWLT + alpha * I)
+            inner_inv = np.linalg.pinv(LWLT + alpha * np.eye(n_chans))
 
-        # Weighted inverse operator: W @ L.T @ inv(...)
-        J = W_diag @ leadfield.T @ inner_inv @ data
-        return J
+        # diag(weights) @ L.T @ inv(...) @ data
+        J = weights[:, None] * (leadfield.T @ (inner_inv @ data))
+        return J.squeeze()
 
     def _select_regularization_idx(self, data):
         """Select regularization index using the specified method.
