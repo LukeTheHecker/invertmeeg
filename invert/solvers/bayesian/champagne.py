@@ -340,9 +340,11 @@ class SolverChampagne(BaseSolver):
 
             elif self.update_rule.lower() == "lowsnr":
                 upper_term = np.mean(mu_x**2, axis=1)
-                lower_term = np.sum(L**2, axis=0)
-                # gammas = np.sqrt(upper_term / lower_term)
-                gammas = np.sqrt(upper_term) / np.sqrt(lower_term)
+                # Use Fisher info diagonal (same as convexity/mackay) instead
+                # of raw column norms, which are ~1 on normalized L.
+                L_Sigma = Sigma_y_inv @ L  # (n_chans, n_dipoles)
+                z_diag = np.sum(L * L_Sigma, axis=0)  # (n_dipoles,)
+                gammas = np.sqrt(upper_term / z_diag)
 
             elif self.update_rule.lower() == "ar-em":
                 # AR-EM update: Mahalanobis norm with AR(1) covariance (optimized)

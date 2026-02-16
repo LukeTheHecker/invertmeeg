@@ -89,9 +89,8 @@ class SolverGFTMNE(BaseSolver):
         eigenvalues, U = eigsh(lap, k=cutoff_index, which="SM")
         U = np.real(U)
 
-        # Transform leadfield
+        # Transform leadfield into GFT basis
         leadfield_gft = leadfield @ U
-        leadfield_gft /= np.linalg.norm(leadfield_gft, axis=0)
 
         LLT = leadfield_gft @ leadfield_gft.T
         # Regularization should match the transformed system (leadfield_gft).

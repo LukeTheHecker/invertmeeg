@@ -55,7 +55,12 @@ class SolverBCS(BaseSolver):
         super().make_inverse_operator(forward, *args, alpha=alpha, **kwargs)
         wf = self.prepare_whitened_forward(noise_cov)
         self.leadfield = wf.G_white
-        self.leadfield_norm = wf.G_white
+
+        # Column-normalize for numerically stable SBL iteration
+        col_norms = np.linalg.norm(wf.G_white, axis=0)
+        col_norms = np.maximum(col_norms, 1e-15)
+        self.leadfield_norm = wf.G_white / col_norms
+        self._col_norms = col_norms
 
         return self
 
@@ -111,8 +116,9 @@ class SolverBCS(BaseSolver):
         """
 
         alpha_0 = np.clip(alpha_0, a_min=1e-6, a_max=None)
-        n_chans, _ = y.shape
-        n_dipoles = self.leadfield_norm.shape[1]
+        n_chans, n_times = y.shape
+        L = self.leadfield_norm
+        n_dipoles = L.shape[1]
 
         # preprocessing
         y -= y.mean(axis=0)
@@ -120,35 +126,37 @@ class SolverBCS(BaseSolver):
         alphas = np.ones(n_dipoles)
         D = np.diag(alphas)
 
-        LLT = self.leadfield_norm.T @ self.leadfield_norm
+        LLT = L.T @ L
         sigma = np.linalg.inv(alpha_0 * LLT + D)
-        mu = alpha_0 * sigma @ self.leadfield_norm.T @ y
-        proj_norm = self.leadfield_norm.T @ y
-        proj = self.leadfield.T @ y
+        mu = alpha_0 * sigma @ L.T @ y
 
         residual_norms = [1e99]
-        x_hats = []
+        mus = []
         for _i in range(max_iter):
             gammas = np.array(
                 [1 - alphas[ii] * sigma[ii, ii] for ii in range(n_dipoles)]
             )
             gammas[np.isnan(gammas)] = 0
 
-            alphas = gammas / np.linalg.norm(mu**2, axis=1)
-            alpha_0 = 1 / (
-                np.linalg.norm(y - self.leadfield_norm @ mu) / (n_chans - gammas.sum())
-            )
+            mu_sq_norm = np.sum(mu**2, axis=1)
+            alphas = gammas / np.maximum(mu_sq_norm, eps)
+            # Noise precision: (N - sum(gamma)) / ||residual||^2
+            # Use squared Frobenius norm averaged over timepoints (Eq. 11 of [1]).
+            residual = y - L @ mu
+            residual_sq = np.sum(residual**2) / n_times
+            denom = max(residual_sq, eps)
+            alpha_0 = max((n_chans - gammas.sum()), eps) / denom
             D = np.diag(alphas) + eps
             sigma = np.linalg.inv(alpha_0 * LLT + D)
-            mu = alpha_0 * sigma @ proj_norm
+            mu = alpha_0 * sigma @ L.T @ y
 
-            Gamma = np.diag(gammas)
-            x_hat = Gamma @ proj
-            residual_norm = np.linalg.norm(y - self.leadfield @ x_hat)
+            # Convergence check: monitor residual in normalized space
+            residual_norm = np.linalg.norm(y - L @ mu)
             if residual_norm > residual_norms[-1]:
-                x_hat = x_hats[-1]
+                mu = mus[-1]
                 break
             residual_norms.append(residual_norm)
-            x_hats.append(x_hat)
+            mus.append(mu.copy())
 
-        return x_hat
+        # Convert from normalized source space to original amplitudes
+        return mu / self._col_norms[:, np.newaxis]

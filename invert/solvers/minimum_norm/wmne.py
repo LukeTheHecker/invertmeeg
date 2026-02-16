@@ -95,14 +95,15 @@ class SolverWMNE(BaseSolver):
         leadfield = wf.G_white
         sensor_transform = wf.sensor_transform
 
-        # Keep alpha scaling consistent with the transformed leadfield.
-        self.get_alphas(reference=leadfield @ leadfield.T)
-
         col_norms = np.linalg.norm(leadfield, axis=0) ** float(self.depth_weighting)
         col_norms = np.maximum(col_norms, self.eps)
         WTW = np.diag(1.0 / (col_norms**2))
         LWTWL = leadfield @ WTW @ leadfield.T
         n_eff = int(leadfield.shape[0])
+
+        # Alpha must be scaled relative to LWTWL (the matrix being regularized),
+        # not L @ L.T which can have a much larger max eigenvalue.
+        self.get_alphas(reference=LWTWL)
 
         inverse_operators = []
         for alpha in self.alphas:
