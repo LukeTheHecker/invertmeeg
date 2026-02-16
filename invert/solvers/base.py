@@ -359,6 +359,22 @@ class BaseSolver:
             idx = int(self.last_reg_idx)
             return self.inverse_operators[idx].apply(data), idx
 
+        # Beamformer note: residual-based criteria like GCV/L-curve are designed for
+        # regularized linear inverse operators (G @ x ≈ y). For classic covariance
+        # beamformers (LCMV, SMV, SAM, ESMV, ...), those criteria are generally not
+        # meaningful. Default to the first (typically smallest) regularization in
+        # the precomputed grid, or the single provided alpha.
+        is_beamformer = False
+        meta = getattr(self, "meta", None)
+        if meta is not None:
+            is_beamformer = str(getattr(meta, "category", "")).lower() == "beamformers"
+        if not is_beamformer:
+            is_beamformer = ".beamformers." in str(self.__class__.__module__)
+        if is_beamformer and getattr(self, "inverse_operators", None):
+            idx = 0
+            self.last_reg_idx = idx
+            return self.inverse_operators[idx].apply(data), idx
+
         method = self.regularisation_method.lower()
         if method == "l":
             source_mat, idx = self.regularise_lcurve(data, plot=self.plot_reg)
@@ -755,6 +771,63 @@ class BaseSolver:
 
         return data
 
+    def unpack_covariance_samples(
+        self,
+        mne_obj,
+        *,
+        pick_types: list[str] | None = None,
+        require_forward_channel_match: bool = True,
+        context: str = "BaseSolver",
+    ) -> tuple[np.ndarray, list[str]]:
+        """Return a (n_channels, n_samples) matrix for covariance estimation.
+
+        Compared to :meth:`unpack_data_obj`, this method preserves sample count
+        for epochs by concatenating all epoch time samples instead of averaging.
+        Channel handling follows forward-model ordering.
+        """
+        if pick_types is None:
+            pick_types = ["meg", "eeg", "fnirs"]
+
+        mne_obj = self.prep_data(mne_obj)
+        obj = mne_obj.copy().pick(pick_types)
+
+        forward_ch_names = list(self.forward.ch_names)
+        obj_set = set(obj.ch_names)
+        if require_forward_channel_match:
+            missing = [ch for ch in forward_ch_names if ch not in obj_set]
+            if missing:
+                raise ValueError(
+                    f"{context} covariance estimation requires data channels to "
+                    "match the forward model. Missing in data: "
+                    f"{missing[:10]}{'...' if len(missing) > 10 else ''}."
+                )
+            kept = forward_ch_names
+        else:
+            kept = [ch for ch in forward_ch_names if ch in obj_set]
+
+        if len(kept) <= 1:
+            raise ValueError(
+                f"{context} covariance estimation requires at least 2 shared channels."
+            )
+
+        obj.pick(kept)
+        if getattr(obj, "ch_names", None) != kept and hasattr(obj, "reorder_channels"):
+            obj.reorder_channels(kept)
+
+        if isinstance(obj, (mne.Epochs, mne.EpochsArray)):
+            X = obj.get_data()  # (n_epochs, n_ch, n_times)
+            Y = X.transpose(1, 0, 2).reshape(int(X.shape[1]), -1)
+        elif isinstance(obj, (mne.Evoked, mne.EvokedArray)):
+            Y = np.asarray(obj.data, dtype=float)
+        elif isinstance(obj, mne.io.BaseRaw):
+            Y = np.asarray(obj.get_data(), dtype=float)
+        else:
+            Y = np.asarray(self.unpack_data_obj(mne_obj), dtype=float)
+
+        if self.reduce_rank:
+            Y = self.select_signal_subspace(np.asarray(Y, dtype=float), rank=self.rank)
+        return np.asarray(Y, dtype=float), kept
+
     def get_alphas(self, reference=None):
         """Create list of regularization parameters (alphas) based on the
         largest eigenvalue of the leadfield or some reference matrix.
@@ -962,7 +1035,12 @@ class BaseSolver:
         if max_ev <= 0:
             return np.zeros((0, n_chans), dtype=float)
 
-        mask = eigvals > max(rank_tol * max_ev, eps)
+        # Important: eigenvalues can be extremely small in native MEG units
+        # (e.g., ~1e-28..1e-24). Using an *absolute* floor here would incorrectly
+        # discard the full rank and trigger "jitter" fallbacks. Use a relative
+        # threshold instead.
+        rel_tol = max(float(rank_tol), float(eps))
+        mask = eigvals > (rel_tol * max_ev)
         if not np.any(mask):
             return np.zeros((0, n_chans), dtype=float)
 
@@ -2315,9 +2393,9 @@ class BaseSolver:
     def source_to_object_vector(
         self, source_mat: npt.NDArray[np.floating]
     ) -> (
-        "mne.VectorSourceEstimate"
-        | "mne.VolVectorSourceEstimate"
-        | "mne.MixedVectorSourceEstimate"
+        mne.VectorSourceEstimate
+        | mne.VolVectorSourceEstimate
+        | mne.MixedVectorSourceEstimate
     ):
         """Convert a (3*n_sources, n_times) matrix into a VectorSourceEstimate."""
 
