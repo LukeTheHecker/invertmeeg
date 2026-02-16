@@ -1,10 +1,10 @@
 import logging
 import warnings
+from collections import deque
 
 import mne
 import numpy as np
 from scipy.optimize import minimize
-from sklearn.cluster import KMeans
 from tqdm import tqdm
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
@@ -43,7 +43,7 @@ class SolverCMEM(BaseSolver):
             "source activity."
         ),
         references=[
-            "Amblard, C., Lapalme, E., & Bhatt, P. (2004). Biomagnetic source detection by maximum entropy and graphical models. IEEE Transactions on Biomedical Engineering, 51(3), 427–442.",
+            "Amblard, C., Lapalme, E., & Bhatt, P. (2004). Biomagnetic source detection by maximum entropy and graphical models. IEEE Transactions on Biomedical Engineering, 51(3), 427-442.",
         ],
     )
 
@@ -82,8 +82,8 @@ class SolverCMEM(BaseSolver):
             The MNE data object.
         alpha : float
             The regularization parameter.
-        adjacency : numpy.ndarray, optional
-            Source adjacency matrix (n, n).
+        adjacency : scipy.sparse matrix, optional
+            Source adjacency matrix. Computed from forward if not provided.
         positions : numpy.ndarray, optional
             Source positions (n, 3).
 
@@ -96,18 +96,21 @@ class SolverCMEM(BaseSolver):
         data = self.unpack_data_obj(mne_obj)
         data = wf.sensor_transform @ data
 
+        # Compute adjacency from forward model if not provided
+        if adjacency is None:
+            adjacency = mne.spatial_src_adjacency(self.forward["src"], verbose=0)
+        self._adjacency = adjacency
+
         J, parcels = _cmem(
             data,
             self.leadfield,
             A=adjacency,
-            P=positions,
             num_parcels=self.num_parcels,
             max_iter=self.max_iter,
             batch_size=self.batch_size,
         )
 
         self.parcels = parcels
-        # Store source estimate directly; wrap in InverseOperator for API compat
         self.inverse_operators = [
             InverseOperator(J, self.name),
         ]
@@ -131,12 +134,18 @@ class SolverCMEM(BaseSolver):
             The source estimate.
         """
         data = self.unpack_data_obj(mne_obj)
-        self.validate_operator_data_compatibility(data)
+        # Skip validate_operator_data_compatibility: cMEM stores the full
+        # solution in InverseOperator (not an operator matrix), so the
+        # dimension check would fail.  Re-running _cmem below is the
+        # intended application path.
         data = self._sensor_transform @ data
+
+        A = getattr(self, "_adjacency", None)
 
         J, self.parcels = _cmem(
             data,
             self.leadfield,
+            A=A,
             num_parcels=self.num_parcels,
             max_iter=self.max_iter,
             batch_size=self.batch_size,
@@ -151,153 +160,204 @@ class SolverCMEM(BaseSolver):
 # ---------------------------------------------------------------------------
 
 
-def _cmem(Y, L, A=None, P=None, num_parcels=200, max_iter=100, batch_size=100):
+def _cmem(Y, L, A=None, num_parcels=200, max_iter=100, batch_size=100):
     """Coherent Maximum Entropy on the Mean (cMEM) source localization.
+
+    Assumes whitened data (noise cov = identity).
 
     Parameters
     ----------
-    Y : array (m, t) - EEG/MEG data matrix
-    L : array (m, n) - Lead field matrix
-    A : array (n, n) - Source adjacency matrix (optional)
-    P : array (n, 3) - Source positions (optional)
-    num_parcels : int - Number of parcels for DDP
-    max_iter : int - Maximum optimization iterations
-    batch_size : int - Batch size for time processing
+    Y : array (m, t) - whitened EEG/MEG data
+    L : array (m, n) - whitened lead field matrix
+    A : sparse matrix (n, n) - source adjacency matrix (optional)
+    num_parcels : int - number of parcels for DDP
+    max_iter : int - maximum optimization iterations
+    batch_size : int - batch size for time processing
 
     Returns
     -------
-    J : array (n, t) - Source time series
-    parcels : array (n,) - Parcel assignment for each source
+    J : array (n, t) - source time series
+    parcels : array (n,) - parcel assignment for each source
     """
     m, t = Y.shape
     m_l, n = L.shape
-
     assert m == m_l, "Dimension mismatch between Y and L"
 
-    # Step 1: Data Driven Parcellation (DDP)
-    logger.info("Performing Data Driven Parcellation...")
-    parcels = _data_driven_parcellation(Y, L, num_parcels)
+    # Ensure parcels have at least ~10 sources for spatial coherence
+    num_parcels = min(num_parcels, max(20, n // 10))
+    num_parcels = max(num_parcels, 1)
 
-    # Step 2: Initialize parcel parameters
+    # Step 1: Data Driven Parcellation using MSP + region growing
+    logger.info("Performing Data Driven Parcellation...")
+    msp_all = _compute_msp_coefficients(Y, L)
+    parcels = _data_driven_parcellation(Y, L, num_parcels, A=A, msp_scores=msp_all)
+
+    # Step 2: MNE estimate for energy scaling of prior covariance
+    J_mne = np.linalg.lstsq(L, Y, rcond=None)[0]
+    J_mne_power = np.mean(J_mne**2, axis=1)  # per-source RMS power
+    global_power = np.mean(J_mne_power)
+
+    # Activation probability from MNE power (more discriminative than MSP
+    # when number of channels is small relative to source count)
+    log_power = np.log(J_mne_power + 1e-30)
+    lp_median = np.median(log_power)
+    lp_std = np.std(log_power)
+    if lp_std < 1e-10:
+        power_z = np.zeros(n)
+    else:
+        power_z = (log_power - lp_median) / lp_std
+
+    # Step 3: Initialize parcel parameters
     logger.info("Initializing parcel parameters...")
     unique_parcels = np.unique(parcels)
 
-    parcel_params = {}
-    alpha_values = []
-    for k, parcel_id in enumerate(unique_parcels):
-        parcel_vertices = np.where(parcels == parcel_id)[0]
-        parcel_size = len(parcel_vertices)
+    precomputed = {}
+    for parcel_id in unique_parcels:
+        verts = np.where(parcels == parcel_id)[0]
+        n_v = len(verts)
 
-        mu_k = np.zeros(parcel_size)
+        mu_k = np.zeros(n_v)
 
+        # Spatial smoothness prior from graph Laplacian
         if A is not None:
-            Sigma_k = _compute_spatial_covariance(parcel_vertices, A)
+            W_k = _compute_spatial_covariance(verts, A)
         else:
-            Sigma_k = np.eye(parcel_size)
+            W_k = np.eye(n_v)
 
-        L_k = L[:, parcel_vertices]
-        msp_coeffs = _compute_msp_coefficients(Y, L_k)
-        alpha_k = np.median(msp_coeffs)
+        # Energy scaling: eta_k proportional to relative MNE power in parcel
+        # Average parcel gets eta ~ 1, active parcels get eta >> 1
+        parcel_power = np.mean(J_mne_power[verts])
+        eta_k = parcel_power / (global_power + 1e-30)
+        eta_k = max(eta_k, 1e-6)
+        Sigma_k = eta_k * W_k
 
-        if k < 3:
-            logger.debug(
-                f"  Parcel {k}: MSP coeffs range [{np.min(msp_coeffs):.2e}, {np.max(msp_coeffs):.2e}], median={alpha_k:.2e}"
-            )
+        L_k = L[:, verts]
 
-        alpha_k = np.clip(alpha_k, 0.01, 0.99)
-        alpha_values.append(alpha_k)
+        # Activation probability: sigmoid of max z-scored MNE power in parcel
+        z_max = np.max(power_z[verts])
+        alpha_k = np.clip(1.0 / (1.0 + np.exp(-5.0 * z_max)), 0.01, 0.99)
 
-        parcel_params[parcel_id] = {
-            "vertices": parcel_vertices,
-            "mu": mu_k,
-            "Sigma": Sigma_k,
-            "alpha": alpha_k,
-            "L": L_k,
+        precomputed[parcel_id] = {
+            "L_k": L_k,
+            "Sigma_k": Sigma_k,
+            "mu_k": mu_k,
+            "alpha_k": alpha_k,
+            "vertices": verts,
         }
 
-    logger.debug(
-        f"Alpha values range: [{np.min(alpha_values):.4f}, {np.max(alpha_values):.4f}]"
-    )
-
-    # Step 3: Estimate noise covariance (diagonal)
-    logger.info("Estimating noise covariance...")
-    Sigma_e = np.diag(np.var(Y, axis=1))
-    Sigma_e_inv = np.linalg.inv(Sigma_e)
-
-    # Step 4: Precompute matrix operations
-    logger.info("Precomputing matrix operations...")
-    precomputed = _precompute_parcel_matrices(parcel_params, Sigma_e_inv)
-
-    # Step 5: Vectorized MEM optimization with batch processing
-    logger.info("Running vectorized MEM optimization...")
+    # Step 4: MEM optimization (noise cov = identity after whitening)
+    logger.info("Running MEM optimization...")
     J = np.zeros((n, t))
-
     num_batches = (t + batch_size - 1) // batch_size
 
     for batch_idx in tqdm(range(num_batches)):
         batch_start = batch_idx * batch_size
         batch_end = min(batch_start + batch_size, t)
-
         Y_batch = Y[:, batch_start:batch_end]
 
-        lambda_batch = _optimize_lambda_batch(
-            Y_batch, parcel_params, precomputed, Sigma_e_inv, max_iter
-        )
-
-        J_batch = _compute_sources_batch(lambda_batch, parcel_params, precomputed, n)
-
-        if batch_idx == 0:
-            logger.debug(
-                f"Lambda batch stats: min={np.min(lambda_batch):.2e}, max={np.max(lambda_batch):.2e}, mean={np.mean(lambda_batch):.2e}"
-            )
-            logger.debug(
-                f"J_batch stats: min={np.min(J_batch):.2e}, max={np.max(J_batch):.2e}, mean={np.mean(J_batch):.2e}"
-            )
-            logger.debug(
-                f"Non-zero sources in batch: {np.sum(np.abs(J_batch) > 1e-10)}"
-            )
-
+        lambda_batch = _optimize_lambda_batch(Y_batch, precomputed, max_iter)
+        J_batch = _compute_sources_batch(lambda_batch, precomputed, n)
         J[:, batch_start:batch_end] = J_batch
-
-        if (batch_idx + 1) % max(1, num_batches // 10) == 0:
-            logger.info(
-                f"Processed batch {batch_idx + 1}/{num_batches} ({batch_end}/{t} time samples)"
-            )
 
     return J, parcels
 
 
-def _data_driven_parcellation(Y, L, num_parcels):
-    """Perform data-driven parcellation using MSP and clustering."""
-    msp_coeffs = _compute_msp_coefficients(Y, L)
+def _data_driven_parcellation(Y, L, num_parcels, A=None, msp_scores=None):
+    """Data-driven parcellation using MSP scores and region growing on mesh.
 
-    kmeans = KMeans(n_clusters=num_parcels, random_state=42)
-    parcels = kmeans.fit_predict(msp_coeffs.reshape(-1, 1))
+    Seeds parcels from highest-MSP source, grows along mesh edges to form
+    spatially contiguous regions. Falls back to K-Means when no adjacency
+    is available.
+    """
+    if msp_scores is None:
+        msp_scores = _compute_msp_coefficients(Y, L)
+    n = len(msp_scores)
+    num_parcels = min(num_parcels, n)
+
+    if A is None:
+        from sklearn.cluster import KMeans
+
+        kmeans = KMeans(n_clusters=num_parcels, random_state=42, n_init=10)
+        return kmeans.fit_predict(msp_scores.reshape(-1, 1))
+
+    # Region growing on mesh, seeded by descending MSP score
+    if hasattr(A, "tocsr"):
+        A_csr = A.tocsr()
+    else:
+        from scipy.sparse import csr_matrix
+
+        A_csr = csr_matrix(A)
+
+    parcels = np.full(n, -1, dtype=int)
+    target_size = max(1, n // num_parcels)
+    seeds = np.argsort(msp_scores)[::-1]
+
+    parcel_id = 0
+    for seed in seeds:
+        if parcels[seed] >= 0:
+            continue
+
+        queue = deque([seed])
+        parcels[seed] = parcel_id
+        count = 1
+
+        while queue and count < target_size:
+            node = queue.popleft()
+            start, end = A_csr.indptr[node], A_csr.indptr[node + 1]
+            for nb in A_csr.indices[start:end]:
+                if parcels[nb] < 0:
+                    parcels[nb] = parcel_id
+                    queue.append(nb)
+                    count += 1
+                    if count >= target_size:
+                        break
+
+        parcel_id += 1
+
+    # Assign any remaining unassigned vertices to nearest assigned neighbor
+    unassigned = np.where(parcels < 0)[0]
+    for v in unassigned:
+        start, end = A_csr.indptr[v], A_csr.indptr[v + 1]
+        neighbors = A_csr.indices[start:end]
+        assigned = neighbors[parcels[neighbors] >= 0]
+        if len(assigned) > 0:
+            parcels[v] = parcels[assigned[np.argmax(msp_scores[assigned])]]
+        else:
+            parcels[v] = 0
 
     return parcels
 
 
 def _compute_msp_coefficients(Y, L):
-    """Compute Multivariate Source Prelocalization coefficients."""
-    U, s, Vt = np.linalg.svd(L, full_matrices=False)
-    L_pinv = Vt.T @ np.diag(1 / s) @ U.T
+    """Multivariate Source Prelocalization (Mattout et al. 2006).
 
-    J = L_pinv @ Y
+    MSP(i) = ||U_bar^T g_hat_i||^2 where U_bar is the signal subspace
+    from SVD of Y and g_hat_i is the normalized leadfield column i.
+    Returns values in [0, 1].
+    """
+    U, s, _ = np.linalg.svd(Y, full_matrices=False)
+    cumvar = np.cumsum(s**2) / np.sum(s**2)
+    r = max(1, np.searchsorted(cumvar, 0.99) + 1)
+    U_bar = U[:, :r]
 
-    coeffs = np.var(J, axis=1)
+    norms = np.linalg.norm(L, axis=0, keepdims=True)
+    norms = np.maximum(norms, 1e-30)
+    L_bar = L / norms
 
-    return coeffs
+    proj = U_bar.T @ L_bar  # (r, n_sources)
+    return np.sum(proj**2, axis=0)
 
 
 def _compute_spatial_covariance(vertices, A, alpha=0.2):
-    """Compute spatial covariance matrix using adjacency."""
+    """Compute spatial covariance from graph Laplacian: inv(L_graph + alpha*I)."""
     n_v = len(vertices)
 
     A_sub = A[np.ix_(vertices, vertices)]
+    if hasattr(A_sub, "toarray"):
+        A_sub = A_sub.toarray()
 
     D = np.diag(np.sum(A_sub, axis=1))
     L_graph = D - A_sub
-
     L_reg = L_graph + alpha * np.eye(n_v)
 
     try:
@@ -308,157 +368,95 @@ def _compute_spatial_covariance(vertices, A, alpha=0.2):
     return Sigma
 
 
-def _precompute_parcel_matrices(parcel_params, Sigma_e_inv):
-    """Precompute expensive matrix operations for vectorized cMEM."""
-    precomputed = {}
+def _mem_dual_obj_grad(lambda_vec, y_t, precomputed):
+    """MEM dual objective and gradient (minimization form).
 
-    for parcel_id, params in parcel_params.items():
-        L_k = params["L"]
-        Sigma_k = params["Sigma"]
-        mu_k = params["mu"]
+    Minimize: D(lambda) = -lambda^T y + 0.5*||lambda||^2
+              + sum_k log[(1-alpha_k) + alpha_k*exp(E_k)]
+    where E_k = mu_k^T xi_k + 0.5*xi_k^T Sigma_k xi_k
+    and xi_k = L_k^T lambda.
+    """
+    obj = -np.dot(lambda_vec, y_t) + 0.5 * np.dot(lambda_vec, lambda_vec)
+    grad = -y_t + lambda_vec.copy()
 
-        try:
-            Sigma_k_inv = np.linalg.inv(Sigma_k)
-            Sigma_k_logdet = np.log(np.linalg.det(2 * np.pi * Sigma_k))
-        except np.linalg.LinAlgError:
-            Sigma_k_reg = Sigma_k + 1e-6 * np.eye(Sigma_k.shape[0])
-            Sigma_k_inv = np.linalg.inv(Sigma_k_reg)
-            Sigma_k_logdet = np.log(np.linalg.det(2 * np.pi * Sigma_k_reg))
+    for precomp in precomputed.values():
+        L_k = precomp["L_k"]
+        Sigma_k = precomp["Sigma_k"]
+        mu_k = precomp["mu_k"]
+        alpha_k = precomp["alpha_k"]
 
-        LT_Sigma_e_inv = L_k.T @ Sigma_e_inv
-        LT_Sigma_e_inv_L = LT_Sigma_e_inv @ L_k
-        mu_Sigma_inv_mu = mu_k.T @ Sigma_k_inv @ mu_k
+        xi_k = L_k.T @ lambda_vec
+        Sigma_xi = Sigma_k @ xi_k
+        E_k = np.dot(mu_k, xi_k) + 0.5 * np.dot(xi_k, Sigma_xi)
 
-        precomputed[parcel_id] = {
-            "L_k": L_k,
-            "Sigma_k": Sigma_k,
-            "Sigma_k_inv": Sigma_k_inv,
-            "Sigma_k_logdet": Sigma_k_logdet,
-            "mu_k": mu_k,
-            "alpha_k": params["alpha"],
-            "vertices": params["vertices"],
-            "LT_Sigma_e_inv": LT_Sigma_e_inv,
-            "LT_Sigma_e_inv_L": LT_Sigma_e_inv_L,
-            "mu_Sigma_inv_mu": mu_Sigma_inv_mu,
-        }
+        # Numerically stable computation
+        E_k_safe = min(float(E_k), 500.0)
+        exp_E = np.exp(E_k_safe)
+        denom = (1.0 - alpha_k) + alpha_k * exp_E
+        p_k = alpha_k * exp_E / denom
 
-    return precomputed
+        obj += np.log(denom)
+        grad += L_k @ (p_k * (mu_k + Sigma_xi))
+
+    return obj, grad
 
 
-def _optimize_lambda_batch(
-    Y_batch, parcel_params, precomputed, Sigma_e_inv, max_iter=100
-):
-    """Vectorized optimization of Lagrange multipliers for batch of time points."""
+def _optimize_lambda_batch(Y_batch, precomputed, max_iter=100):
+    """Optimize Lagrange multipliers for a batch of time points."""
     m, batch_size = Y_batch.shape
     lambda_batch = np.zeros((m, batch_size))
 
     for i in range(batch_size):
         y_t = Y_batch[:, i]
 
-        def objective(lambda_vec, y_t=y_t):
-            return _mem_dual_function_vectorized(
-                lambda_vec, y_t, precomputed, Sigma_e_inv
-            )
-
-        lambda_init = np.zeros(m)
+        def obj_grad(lam, y_t=y_t):
+            return _mem_dual_obj_grad(lam, y_t, precomputed)
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             result = minimize(
-                objective, lambda_init, method="L-BFGS-B", options={"maxiter": max_iter}
+                obj_grad,
+                np.zeros(m),
+                method="L-BFGS-B",
+                jac=True,
+                options={"maxiter": max_iter},
             )
 
         lambda_batch[:, i] = result.x
 
-        if i < 3:
-            logger.debug(
-                f"  Time {i}: optimization success={result.success}, final objective={result.fun:.2e}"
-            )
-            logger.debug(
-                f"  Lambda stats: min={np.min(result.x):.2e}, max={np.max(result.x):.2e}"
-            )
-
     return lambda_batch
 
 
-def _compute_sources_batch(lambda_batch, parcel_params, precomputed, n):
-    """Vectorized computation of source estimates for batch of time points."""
-    m, batch_size = lambda_batch.shape
+def _compute_sources_batch(lambda_batch, precomputed, n):
+    """Compute source estimates from optimized Lagrange multipliers.
 
+    J_k = p_k * (mu_k + Sigma_k @ xi_k)
+    where p_k = alpha_k*exp(E_k) / [(1-alpha_k) + alpha_k*exp(E_k)]
+    """
+    _, batch_size = lambda_batch.shape
     J_batch = np.zeros((n, batch_size))
 
-    for parcel_id, precomp in precomputed.items():
+    for precomp in precomputed.values():
         vertices = precomp["vertices"]
         L_k = precomp["L_k"]
         Sigma_k = precomp["Sigma_k"]
         mu_k = precomp["mu_k"]
         alpha_k = precomp["alpha_k"]
-        mu_Sigma_inv_mu = precomp["mu_Sigma_inv_mu"]
-        Sigma_k_logdet = precomp["Sigma_k_logdet"]
 
-        xi_k_batch = L_k.T @ lambda_batch  # (parcel_size, batch_size)
+        xi_k = L_k.T @ lambda_batch  # (n_v, batch)
+        Sigma_xi = Sigma_k @ xi_k  # (n_v, batch)
 
-        xi_Sigma_xi_batch = np.sum(xi_k_batch * (Sigma_k @ xi_k_batch), axis=0)
-        F_nu_k_batch = 0.5 * (mu_Sigma_inv_mu + xi_Sigma_xi_batch + Sigma_k_logdet)
+        # E_k per time point
+        E_k = mu_k @ xi_k + 0.5 * np.sum(xi_k * Sigma_xi, axis=0)
+        E_k = np.clip(E_k, -500, 500)
 
-        exp_neg_F = np.exp(-F_nu_k_batch)
-        alpha_k_updated_batch = alpha_k / (alpha_k + (1 - alpha_k) * exp_neg_F)
+        # Posterior activation probability
+        exp_E = np.exp(E_k)
+        p_k = alpha_k * exp_E / ((1.0 - alpha_k) + alpha_k * exp_E)
 
-        Sigma_xi_batch = Sigma_k @ xi_k_batch
-        mu_expanded = mu_k.reshape(-1, 1)
-
-        j_k_batch = alpha_k_updated_batch.reshape(1, -1) * (
-            mu_expanded + Sigma_xi_batch
+        # Source estimate
+        J_batch[vertices, :] = p_k[np.newaxis, :] * (
+            mu_k[:, np.newaxis] + Sigma_xi
         )
 
-        J_batch[vertices, :] = j_k_batch
-
-        if parcel_id == list(precomputed.keys())[0]:
-            logger.debug(
-                f"  Parcel {parcel_id}: alpha={alpha_k:.4f}, vertices={len(vertices)}"
-            )
-            logger.debug(
-                f"  xi_k range: [{np.min(xi_k_batch):.2e}, {np.max(xi_k_batch):.2e}]"
-            )
-            logger.debug(
-                f"  F_nu_k range: [{np.min(F_nu_k_batch):.2e}, {np.max(F_nu_k_batch):.2e}]"
-            )
-            logger.debug(
-                f"  alpha_updated range: [{np.min(alpha_k_updated_batch):.4f}, {np.max(alpha_k_updated_batch):.4f}]"
-            )
-            logger.debug(
-                f"  j_k range: [{np.min(j_k_batch):.2e}, {np.max(j_k_batch):.2e}]"
-            )
-
     return J_batch
-
-
-def _mem_dual_function_vectorized(lambda_vec, y_t, precomputed, Sigma_e_inv):
-    """Vectorized MEM dual function computation using precomputed matrices."""
-    data_term = np.dot(lambda_vec, y_t) + 0.5 * np.dot(
-        lambda_vec, Sigma_e_inv @ lambda_vec
-    )
-
-    free_energy = 0.0
-
-    for _parcel_id, precomp in precomputed.items():
-        L_k = precomp["L_k"]
-        Sigma_k = precomp["Sigma_k"]
-        mu_Sigma_inv_mu = precomp["mu_Sigma_inv_mu"]
-        alpha_k = precomp["alpha_k"]
-        Sigma_k_logdet = precomp["Sigma_k_logdet"]
-
-        xi_k = L_k.T @ lambda_vec
-
-        xi_Sigma_xi = np.dot(xi_k, Sigma_k @ xi_k)
-        F_nu_k = 0.5 * (mu_Sigma_inv_mu + xi_Sigma_xi + Sigma_k_logdet)
-
-        exp_neg_F = np.exp(-F_nu_k)
-        if exp_neg_F > 1e-300:
-            parcel_free_energy = -np.log(alpha_k * exp_neg_F + (1 - alpha_k))
-        else:
-            parcel_free_energy = F_nu_k - np.log(alpha_k)
-
-        free_energy += parcel_free_energy
-
-    return -(data_term - free_energy)
