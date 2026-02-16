@@ -102,25 +102,25 @@ def pos_from_forward(forward, verbose=0):
     src = forward["src"]
     subject_his_id = src[0].get("subject_his_id")
 
+    parts = []
     try:
+        if subject_his_id is None:
+            raise TypeError("no subject_his_id")
         # Preferred: MNI coordinates via FreeSurfer surfaces
-        pos_left = mne.vertex_to_mni(
-            src[0]["vertno"], 0, subject_his_id, verbose=verbose
-        )
-        pos_right = mne.vertex_to_mni(
-            src[1]["vertno"], 1, subject_his_id, verbose=verbose
-        )
-    except (FileNotFoundError, OSError):
+        for hemi_idx, s in enumerate(src):
+            parts.append(
+                mne.vertex_to_mni(s["vertno"], hemi_idx, subject_his_id, verbose=verbose)
+            )
+    except (FileNotFoundError, OSError, TypeError):
         # Fallback: use source-space positions directly (head coordinates)
         logger.info(
             "FreeSurfer surfaces not found for %s, using source-space "
             "positions instead of MNI coordinates.",
             subject_his_id,
         )
-        pos_left = src[0]["rr"][src[0]["vertno"]]
-        pos_right = src[1]["rr"][src[1]["vertno"]]
+        parts = [s["rr"][s["vertno"]] for s in src]
 
-    pos = np.concatenate([pos_left, pos_right], axis=0)
+    pos = np.concatenate(parts, axis=0)
     return pos
 
 

@@ -5,24 +5,98 @@ import logging
 import mne
 import numpy as np
 from scipy.sparse import csr_matrix
+from scipy.spatial import cKDTree
 
 logger = logging.getLogger(__name__)
 
 
-def _adjacency_from_discrete_src(src) -> csr_matrix:
-    """Build adjacency from ``neighbor_vert`` for discrete source spaces."""
+def _adjacency_from_points(
+    points: np.ndarray,
+    *,
+    adjacency_distance: float = 3e-3,
+    min_k_neighbors: int = 6,
+) -> csr_matrix:
+    """Build adjacency from point coordinates using robust radius/kNN fallback."""
+    points = np.asarray(points, dtype=float)
+    if points.ndim != 2 or points.shape[1] != 3:
+        raise ValueError(f"points must have shape (n_vertices, 3), got {points.shape}")
+
+    n_vertices = int(points.shape[0])
+    if n_vertices == 0:
+        return csr_matrix((0, 0), dtype=float)
+    if n_vertices == 1:
+        return csr_matrix((1, 1), dtype=float)
+
+    tree = cKDTree(points)
+
+    rows: list[int] = []
+    cols: list[int] = []
+
+    radius = float(adjacency_distance)
+    if radius > 0:
+        pairs = tree.query_pairs(radius, output_type="ndarray")
+        if pairs.size > 0:
+            rows.extend(pairs[:, 0].tolist())
+            cols.extend(pairs[:, 1].tolist())
+
+    if not rows:
+        # If the configured radius is too small (e.g., 3 mm on an 8 mm grid),
+        # adapt to the nearest-neighbor spacing to keep adjacency connected.
+        nn_dists, _ = tree.query(points, k=2)
+        nearest = nn_dists[:, 1]
+        nearest = nearest[np.isfinite(nearest) & (nearest > 0)]
+        if nearest.size > 0:
+            auto_radius = 1.05 * float(np.median(nearest))
+            pairs = tree.query_pairs(auto_radius, output_type="ndarray")
+            if pairs.size > 0:
+                rows.extend(pairs[:, 0].tolist())
+                cols.extend(pairs[:, 1].tolist())
+
+    if not rows:
+        # Final fallback: connect each vertex to a few nearest neighbors.
+        k = max(1, min(int(min_k_neighbors), n_vertices - 1))
+        dists, idxs = tree.query(points, k=k + 1)
+        for i in range(n_vertices):
+            for j in np.asarray(idxs[i, 1:], dtype=int):
+                if j != i:
+                    a, b = (i, int(j)) if i < int(j) else (int(j), i)
+                    rows.append(a)
+                    cols.append(b)
+
+    if not rows:
+        return csr_matrix((n_vertices, n_vertices), dtype=float)
+
+    data = np.ones(len(rows), dtype=float)
+    adjacency = csr_matrix((data, (rows, cols)), shape=(n_vertices, n_vertices))
+    adjacency = adjacency.maximum(adjacency.T)
+    adjacency.setdiag(0)
+    adjacency.eliminate_zeros()
+    return adjacency
+
+
+def _adjacency_from_discrete_src(
+    src,
+    *,
+    adjacency_distance: float = 3e-3,
+) -> csr_matrix:
+    """Build adjacency for discrete source spaces.
+
+    Prefers ``neighbor_vert`` when available and falls back to coordinate-based
+    adjacency when it is missing.
+    """
     if len(src) != 1 or src[0].get("type") != "discrete":
         msg = "Discrete fallback only supports single discrete source spaces."
         raise RuntimeError(msg)
 
     space = src[0]
-    neighbor_vert = space.get("neighbor_vert")
-    if neighbor_vert is None:
-        msg = "Discrete source space is missing 'neighbor_vert'."
-        raise RuntimeError(msg)
-
     vertno = np.asarray(space["vertno"], dtype=int)
     n_vertices = int(vertno.size)
+
+    neighbor_vert = space.get("neighbor_vert")
+    if neighbor_vert is None:
+        rr = np.asarray(space["rr"], dtype=float)[vertno]
+        return _adjacency_from_points(rr, adjacency_distance=adjacency_distance)
+
     global_to_local = {int(v): idx for idx, v in enumerate(vertno)}
 
     rows: list[int] = []
@@ -36,7 +110,8 @@ def _adjacency_from_discrete_src(src) -> csr_matrix:
                 cols.append(local_j)
 
     if not rows:
-        return csr_matrix((n_vertices, n_vertices), dtype=float)
+        rr = np.asarray(space["rr"], dtype=float)[vertno]
+        return _adjacency_from_points(rr, adjacency_distance=adjacency_distance)
 
     data = np.ones(len(rows), dtype=float)
     adjacency = csr_matrix((data, (rows, cols)), shape=(n_vertices, n_vertices))
@@ -66,8 +141,15 @@ def build_source_adjacency(
         raise ValueError(msg)
 
     if mode == "distance":
-        adjacency = mne.spatial_dist_adjacency(src, adjacency_distance, verbose=verbose)
-        return csr_matrix(adjacency)
+        try:
+            adjacency = mne.spatial_dist_adjacency(src, adjacency_distance, verbose=verbose)
+            return csr_matrix(adjacency)
+        except Exception as distance_exc:
+            logger.warning(
+                "distance adjacency failed (%s). Trying discrete source fallback.",
+                distance_exc,
+            )
+            return _adjacency_from_discrete_src(src, adjacency_distance=adjacency_distance)
 
     try:
         adjacency = mne.spatial_src_adjacency(src, verbose=verbose)
@@ -85,9 +167,9 @@ def build_source_adjacency(
         return csr_matrix(adjacency)
     except Exception as distance_exc:
         logger.warning(
-            "spatial_dist_adjacency also failed (%s). Trying discrete neighbor_vert "
+            "spatial_dist_adjacency also failed (%s). Trying discrete source "
             "fallback.",
             distance_exc,
         )
 
-    return _adjacency_from_discrete_src(src)
+    return _adjacency_from_discrete_src(src, adjacency_distance=adjacency_distance)
