@@ -43,9 +43,11 @@ def evaluate_all(
     pos_pred : np.ndarray
         Positions of predicted sources (typically same as pos_true)
     mode : str
-        MLE calculation mode
+        MLE aggregation mode (default ``"dle"``).  See
+        :func:`eval_mean_localization_error` for details.
     threshold : float
-        Threshold for maxima detection
+        Relative threshold for MLE maxima detection (default 0.1).
+        Values below ``threshold * max`` are ignored.
 
     Returns
     -------
@@ -133,22 +135,35 @@ def eval_sparsity(y):
 
 
 def eval_emd(M, values_1, values_2, threshold=0.25, p=1):
-    """
-    Compute Earth Mover's Distance between two distributions.
+    """Compute Earth Mover's Distance between two distributions.
+
+    Before computing EMD, values below ``threshold * max`` in each
+    distribution are zeroed out.  This acts as a noise-floor removal step:
+    inverse solutions typically have low-level activity spread across many
+    sources, and without thresholding these small values dominate the
+    transport cost (moving tiny mass long distances).  The default of 0.25
+    retains only the top 75% of the peak amplitude, focusing the metric on
+    the main reconstructed patches.
 
     Parameters
     ----------
     M : np.ndarray, shape (n1, n2)
-        Distance/cost matrix between positions
+        Distance/cost matrix between positions.
     values_1 : np.ndarray, shape (n1,)
-        First distribution (will be normalized to sum to 1)
+        First distribution (will be thresholded then normalized to sum to 1).
     values_2 : np.ndarray, shape (n2,)
-        Second distribution (will be normalized to sum to 1)
+        Second distribution (will be thresholded then normalized to sum to 1).
+    threshold : float
+        Relative threshold: values below ``threshold * max(values)`` are set
+        to zero before normalization.  Default 0.25.
+    p : int
+        Exponent applied to the cost matrix (``M**p``).  Default 1 (linear
+        distance).
 
     Returns
     -------
     float
-        EMD value, or np.nan if calculation fails
+        EMD value, or np.nan if calculation fails.
     """
     # Validate inputs
     if np.any(np.isnan(values_1)) or np.any(np.isnan(values_2)):
@@ -273,6 +288,25 @@ def nmse(y_true, y_pred):
 
 
 def corr(y_true, y_pred):
+    """Per-timepoint Pearson correlation between true and predicted sources.
+
+    Returns an array of correlation values, one per timepoint (column).
+    The caller (``evaluate_all``) aggregates via ``np.nanmedian`` — the
+    median is robust to outlier timepoints (e.g. near-zero activity) at the
+    cost of discarding temporal structure.  This is intentional: we want a
+    single scalar that reflects typical spatial reconstruction quality
+    without being dominated by a few bad frames.
+
+    Parameters
+    ----------
+    y_true, y_pred : np.ndarray, shape (n_sources, n_times)
+        True and predicted source matrices.
+
+    Returns
+    -------
+    np.ndarray, shape (n_times,)
+        Per-timepoint Pearson correlation, or ``np.nan`` if inputs contain NaN.
+    """
     if np.any(np.isnan(y_true)) or np.any(np.isnan(y_pred)):
         return np.nan
     error = np.zeros(y_true.shape[1])
@@ -382,6 +416,11 @@ def eval_mean_localization_error(
     max_iter: int = 100,
 ) -> float:
     """Calculate the Mean Localization Error (MLE) between a true and predicted source.
+
+    Local maxima are detected in both true and estimated source distributions
+    (after thresholding), and pairwise distances between maxima are computed.
+    The final scalar depends on ``mode``.
+
     Parameters
     ----------
     y_true : np.ndarray
@@ -392,11 +431,43 @@ def eval_mean_localization_error(
         The adjacency matrix for the true graph.
     adjacency_est : scipy.sparse.csr_matrix
         The adjacency matrix for the estimated graph.
+    pos_true : np.ndarray
+        Positions of true source dipoles.
+    pos_pred : np.ndarray
+        Positions of estimated source dipoles.
     distance_matrix : np.ndarray
         The euclidean distance between each dipole in y_true and each dipole in y_est.
     mode : str
-        The mode to use for the MLE calculation. Options are "dle" (default), "truth" and "est" and "match".
+        Aggregation mode for pairwise maxima distances:
 
+        - ``"dle"`` (default) — Bidirectional Distance to the Localization
+          Error: average of (mean min-distance true→est) and (mean
+          min-distance est→true).  Standard in M/EEG literature.  Symmetric
+          and handles different numbers of true vs estimated sources
+          gracefully (unlike Hungarian matching).
+        - ``"truth"`` — Mean min-distance from each true maximum to the
+          nearest estimated maximum.
+        - ``"est"`` — Mean min-distance from each estimated maximum to the
+          nearest true maximum.
+        - ``"match"`` — Hungarian (optimal assignment) matching.  O(n³) and
+          not standard for variable-count source sets.
+        - ``"amir"`` — Greedy nearest-neighbor matching.
+    threshold : float
+        Relative threshold for maxima detection: values below
+        ``threshold * max(values)`` are ignored.  Default 0.1.
+    smooth_solution : bool
+        Whether to adaptively smooth the estimated solution before maxima
+        detection (reduces spurious peaks).
+    max_maxima : int
+        Maximum number of maxima to retain.
+    max_iter : int
+        Maximum smoothing iterations (if ``smooth_solution=True``).
+
+    Returns
+    -------
+    float
+        Mean localization error in the same units as ``distance_matrix``
+        (typically meters).
     """
     if len(y_true.shape) == 2:
         y_true_collapsed = abs(y_true).mean(axis=-1)

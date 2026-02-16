@@ -4,8 +4,18 @@ These tests verify that the solvers satisfy known mathematical properties,
 independent of MNE infrastructure where possible.
 """
 
+import importlib.util
+import pathlib
+
 import numpy as np
 import pytest
+
+# Import evaluate.py directly (bypassing invert.evaluate.__init__ which has
+# a broken import of invert.models.priors via evaluation.py).
+_eval_path = pathlib.Path(__file__).resolve().parent.parent / "invert" / "evaluate" / "evaluate.py"
+_eval_spec = importlib.util.spec_from_file_location("_evaluate_standalone", _eval_path)
+_eval_mod = importlib.util.module_from_spec(_eval_spec)
+_eval_spec.loader.exec_module(_eval_mod)
 
 # ---------------------------------------------------------------------------
 # Helpers – small synthetic forward problems (no MNE dependency)
@@ -936,3 +946,162 @@ class TestInverseOperatorValidation:
 
         op2 = InverseOperator(np.zeros(10), "test")
         assert op2.data[0].shape == (10,)
+
+
+# ---------------------------------------------------------------------------
+# Evaluation metric properties
+# ---------------------------------------------------------------------------
+
+
+class TestEMDThreshold:
+    """Test that EMD threshold parameter works as documented."""
+
+    def test_threshold_zeros_small_values(self):
+        """Values below threshold * max should be zeroed before EMD."""
+        eval_emd = _eval_mod.eval_emd
+
+        n = 20
+        rng = np.random.RandomState(42)
+        pos = rng.randn(n, 3)
+        M = np.linalg.norm(pos[:, None] - pos[None, :], axis=-1)
+
+        # Distribution with one large peak and small background
+        v1 = np.zeros(n)
+        v1[0] = 1.0
+        v1[1:5] = 0.1  # below 0.25 threshold → should be zeroed
+
+        v2 = np.zeros(n)
+        v2[0] = 1.0
+
+        # With threshold=0.25, v1's small values are zeroed → v1 ≈ v2 → EMD ≈ 0
+        emd_with_thresh = eval_emd(M, v1.copy(), v2.copy(), threshold=0.25)
+        # Without threshold, the small mass at indices 1-4 must be transported
+        emd_no_thresh = eval_emd(M, v1.copy(), v2.copy(), threshold=0.0)
+
+        assert emd_with_thresh < emd_no_thresh
+
+    def test_threshold_zero_preserves_all(self):
+        """threshold=0 should keep all non-zero values."""
+        eval_emd = _eval_mod.eval_emd
+
+        n = 10
+        M = np.ones((n, n)) - np.eye(n)  # uniform distance
+        v1 = np.ones(n) / n
+        v2 = np.ones(n) / n
+
+        emd_val = eval_emd(M, v1, v2, threshold=0.0)
+        assert np.isfinite(emd_val)
+        assert emd_val == pytest.approx(0.0, abs=1e-10)
+
+    def test_identical_distributions_zero_emd(self):
+        """EMD between identical distributions should be 0."""
+        eval_emd = _eval_mod.eval_emd
+
+        n = 15
+        rng = np.random.RandomState(7)
+        pos = rng.randn(n, 3)
+        M = np.linalg.norm(pos[:, None] - pos[None, :], axis=-1)
+        v = np.abs(rng.randn(n))
+        v[v < 0.3 * v.max()] = 0  # ensure some zeros
+
+        emd_val = eval_emd(M, v.copy(), v.copy())
+        assert emd_val == pytest.approx(0.0, abs=1e-8)
+
+
+class TestMLEProperties:
+    """Basic mathematical properties of MLE (Mean Localization Error)."""
+
+    @staticmethod
+    def _make_simple_problem(n=50, seed=0):
+        """Create a simple source space with adjacency."""
+        from scipy.sparse import eye as speye
+
+        rng = np.random.RandomState(seed)
+        pos = rng.randn(n, 3)
+        # Simple adjacency: connect nearest neighbors within threshold
+        from scipy.spatial.distance import cdist
+
+        D = cdist(pos, pos)
+        adj = (D < np.percentile(D[D > 0], 20)).astype(float)
+        np.fill_diagonal(adj, 0)
+        from scipy.sparse import csr_matrix
+
+        return pos, csr_matrix(adj), D
+
+    def test_perfect_reconstruction_zero_error(self):
+        """MLE(y, y) should be 0."""
+        eval_mean_localization_error = _eval_mod.eval_mean_localization_error
+
+        pos, adj, D = self._make_simple_problem()
+        y = np.zeros(len(pos))
+        y[10] = 1.0  # single source
+
+        mle = eval_mean_localization_error(
+            y, y, adj, adj, pos, pos, D, mode="dle"
+        )
+        assert mle == pytest.approx(0.0, abs=1e-10)
+
+    def test_mle_nonnegative(self):
+        """MLE should always be >= 0."""
+        eval_mean_localization_error = _eval_mod.eval_mean_localization_error
+
+        pos, adj, D = self._make_simple_problem()
+        y_true = np.zeros(len(pos))
+        y_true[5] = 1.0
+        y_pred = np.zeros(len(pos))
+        y_pred[20] = 1.0
+
+        mle = eval_mean_localization_error(
+            y_true, y_pred, adj, adj, pos, pos, D, mode="dle"
+        )
+        assert np.isfinite(mle)
+        assert mle >= 0
+
+    def test_dle_is_symmetric(self):
+        """DLE mode should give the same error regardless of argument order."""
+        eval_mean_localization_error = _eval_mod.eval_mean_localization_error
+
+        pos, adj, D = self._make_simple_problem()
+        y1 = np.zeros(len(pos))
+        y1[5] = 1.0
+        y2 = np.zeros(len(pos))
+        y2[20] = 1.0
+
+        mle_fwd = eval_mean_localization_error(
+            y1, y2, adj, adj, pos, pos, D, mode="dle"
+        )
+        mle_rev = eval_mean_localization_error(
+            y2, y1, adj, adj, pos, pos, D, mode="dle"
+        )
+        assert mle_fwd == pytest.approx(mle_rev, abs=1e-10)
+
+
+class TestCorrProperties:
+    """Basic properties of per-timepoint correlation."""
+
+    def test_perfect_correlation(self):
+        """corr(y, y) should be 1 for all timepoints."""
+        corr = _eval_mod.corr
+
+        rng = np.random.RandomState(42)
+        y = rng.randn(50, 10)
+        r = corr(y, y)
+        np.testing.assert_allclose(r, 1.0, atol=1e-10)
+
+    def test_scaled_correlation(self):
+        """corr(y, 2*y) should be 1 (Pearson is scale-invariant)."""
+        corr = _eval_mod.corr
+
+        rng = np.random.RandomState(42)
+        y = rng.randn(50, 10)
+        r = corr(y, 2 * y)
+        np.testing.assert_allclose(r, 1.0, atol=1e-10)
+
+    def test_nan_input_returns_nan(self):
+        """NaN in input should return NaN."""
+        corr = _eval_mod.corr
+
+        y = np.ones((10, 5))
+        y_nan = y.copy()
+        y_nan[0, 0] = np.nan
+        assert np.isnan(corr(y, y_nan))
