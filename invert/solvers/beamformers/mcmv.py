@@ -231,13 +231,18 @@ class SolverMCMV(BaseBeamformer):
             if k <= 1:
                 return [np.array([i]) for i in range(n_dipoles)]
             pos = pos_from_forward(forward, verbose=0)
+            n_sources = len(pos)
+            n_orient = n_dipoles // n_sources
             dists = cdist(pos, pos)
             result = []
             for i in range(n_dipoles):
-                row = dists[i, :].copy()
-                row[i] = np.inf
-                neighbors = np.argsort(row)[: k - 1]
-                result.append(np.concatenate([[i], neighbors]))
+                src_i = i // n_orient
+                row = dists[src_i, :].copy()
+                row[src_i] = np.inf
+                # Find nearest sources, then map back to column indices
+                src_neighbors = np.argsort(row)[: k - 1]
+                col_neighbors = src_neighbors * n_orient + (i % n_orient)
+                result.append(np.concatenate([[i], col_neighbors]))
             return result
 
         elif constraint_mode == "lcmv_preloc":
