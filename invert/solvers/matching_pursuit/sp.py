@@ -89,8 +89,11 @@ class SolverSP(BaseSolver):
         return self
 
     def apply_inverse_operator(
-        self, mne_obj, K="auto",
-        include_singletons=True, include_patches=False,
+        self,
+        mne_obj,
+        K="auto",
+        include_singletons=True,
+        include_patches=False,
     ) -> mne.SourceEstimate:
         """Apply the SP inverse solution.
 
@@ -114,7 +117,8 @@ class SolverSP(BaseSolver):
         self.validate_operator_data_compatibility(data)
         data = self._sensor_transform @ data
         source_mat = self.calc_sp_solution(
-            data, K=K,
+            data,
+            K=K,
             include_singletons=include_singletons,
             include_patches=include_patches,
         )
@@ -137,7 +141,11 @@ class SolverSP(BaseSolver):
                     patch = np.where(self.adjacency[idx] != 0)[0]
                     patch = np.append(patch, idx)
                     patches.append(patch)
-                return np.unique(np.concatenate(patches)) if patches else np.array([], dtype=int)
+                return (
+                    np.unique(np.concatenate(patches))
+                    if patches
+                    else np.array([], dtype=int)
+                )
         elif include_patches:
             b_smooth = np.linalg.norm(self.leadfield_smooth_normed.T @ R, axis=1)
             b_thresh = thresholding(b_smooth, K)
@@ -147,14 +155,19 @@ class SolverSP(BaseSolver):
                 patch = np.where(self.adjacency[idx] != 0)[0]
                 patch = np.append(patch, idx)
                 patches.append(patch)
-            return np.unique(np.concatenate(patches)) if patches else np.array([], dtype=int)
+            return (
+                np.unique(np.concatenate(patches))
+                if patches
+                else np.array([], dtype=int)
+            )
         else:  # include_singletons only
             b_sparse = np.linalg.norm(self.leadfield_normed.T @ R, axis=1)
             b_thresh = thresholding(b_sparse, K)
             return np.where(b_thresh != 0)[0]
 
-    def calc_sp_solution(self, y, K="auto",
-                         include_singletons=True, include_patches=False):
+    def calc_sp_solution(
+        self, y, K="auto", include_singletons=True, include_patches=False
+    ):
         """Calculates the Subspace Pursuit (SP) inverse solution (MMV, patch-aware).
 
         Parameters
@@ -174,7 +187,9 @@ class SolverSP(BaseSolver):
             The inverse solution.
         """
         if not include_singletons and not include_patches:
-            raise ValueError("At least one of include_patches/include_singletons must be True")
+            raise ValueError(
+                "At least one of include_patches/include_singletons must be True"
+            )
 
         squeeze = False
         if y.ndim == 1:
@@ -206,7 +221,9 @@ class SolverSP(BaseSolver):
 
         for i in range(1, n_chans + 1):
             # Select K new candidates from residual
-            new_T = self._select_atoms(R_list[-1], K, include_singletons, include_patches)
+            new_T = self._select_atoms(
+                R_list[-1], K, include_singletons, include_patches
+            )
             T_tilde = np.unique(np.concatenate([T_list[i - 1], new_T]))
 
             # Solve on expanded support and prune by coefficient norms

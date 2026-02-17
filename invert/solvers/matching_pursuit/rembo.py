@@ -89,8 +89,13 @@ class SolverREMBO(BaseSolver):
         return self
 
     def apply_inverse_operator(
-        self, mne_obj, K="auto", max_boost_iter=None, fit_tol="auto",
-        include_singletons=True, include_patches=False,
+        self,
+        mne_obj,
+        K="auto",
+        max_boost_iter=None,
+        fit_tol="auto",
+        include_singletons=True,
+        include_patches=False,
     ) -> mne.SourceEstimate:
         """Apply the REMBO inverse solution.
 
@@ -118,15 +123,25 @@ class SolverREMBO(BaseSolver):
         self.validate_operator_data_compatibility(data)
         data = self._sensor_transform @ data
         source_mat = self.calc_rembo_solution(
-            data, K=K, max_boost_iter=max_boost_iter, fit_tol=fit_tol,
+            data,
+            K=K,
+            max_boost_iter=max_boost_iter,
+            fit_tol=fit_tol,
             include_singletons=include_singletons,
             include_patches=include_patches,
         )
         stc = self.source_to_object(source_mat)
         return stc
 
-    def calc_rembo_solution(self, y, K="auto", max_boost_iter=None, fit_tol="auto",
-                            include_singletons=True, include_patches=False):
+    def calc_rembo_solution(
+        self,
+        y,
+        K="auto",
+        max_boost_iter=None,
+        fit_tol="auto",
+        include_singletons=True,
+        include_patches=False,
+    ):
         """Calculate the REMBO inverse solution.
 
         Parameters
@@ -150,7 +165,9 @@ class SolverREMBO(BaseSolver):
             The source matrix (dipoles, time).
         """
         if not include_singletons and not include_patches:
-            raise ValueError("At least one of include_patches/include_singletons must be True")
+            raise ValueError(
+                "At least one of include_patches/include_singletons must be True"
+            )
 
         n_chans, n_time = y.shape
         if K == "auto":
@@ -180,7 +197,8 @@ class SolverREMBO(BaseSolver):
             a = np.random.standard_normal(n_time)
             y_vec = y @ a
             x_vec = self.calc_omp_solution(
-                y_vec, K=K,
+                y_vec,
+                K=K,
                 include_singletons=include_singletons,
                 include_patches=include_patches,
             )
@@ -208,8 +226,9 @@ class SolverREMBO(BaseSolver):
 
         return x_hat
 
-    def calc_omp_solution(self, y, K="auto",
-                          include_singletons=True, include_patches=False):
+    def calc_omp_solution(
+        self, y, K="auto", include_singletons=True, include_patches=False
+    ):
         """Inner OMP for a single-measurement vector (used by ReMBo).
 
         Parameters
@@ -260,7 +279,11 @@ class SolverREMBO(BaseSolver):
                         patch = np.where(self.adjacency[idx] != 0)[0]
                         patch = np.append(patch, idx)
                         new_atoms.append(patch)
-                    new_atoms = np.unique(np.concatenate(new_atoms)) if new_atoms else np.array([], dtype=int)
+                    new_atoms = (
+                        np.unique(np.concatenate(new_atoms))
+                        if new_atoms
+                        else np.array([], dtype=int)
+                    )
             elif include_patches:
                 b_smooth = np.abs(self.leadfield_smooth_normed.T @ r)
                 b_thresh = thresholding(b_smooth, 1)
@@ -270,7 +293,11 @@ class SolverREMBO(BaseSolver):
                     patch = np.where(self.adjacency[idx] != 0)[0]
                     patch = np.append(patch, idx)
                     new_atoms.append(patch)
-                new_atoms = np.unique(np.concatenate(new_atoms)) if new_atoms else np.array([], dtype=int)
+                new_atoms = (
+                    np.unique(np.concatenate(new_atoms))
+                    if new_atoms
+                    else np.array([], dtype=int)
+                )
             else:  # include_singletons only
                 b_sparse = self.leadfield_normed.T @ r
                 b_thresh = thresholding(b_sparse, 1)

@@ -93,7 +93,9 @@ def leadfield_free_surface(forward_model_free_surface):
 
 
 @pytest.fixture(scope="session")
-def simulated_evoked_free_surface(sensor_info, forward_model_free_surface, leadfield_free_surface):
+def simulated_evoked_free_surface(
+    sensor_info, forward_model_free_surface, leadfield_free_surface
+):
     """Simulated evoked response using a free-orientation surface leadfield."""
     info = sensor_info
     n_chans, n_cols = leadfield_free_surface.shape

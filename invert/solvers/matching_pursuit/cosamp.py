@@ -92,8 +92,12 @@ class SolverCOSAMP(BaseSolver):
         return self
 
     def apply_inverse_operator(
-        self, mne_obj, K="auto", rv_thresh=1,
-        include_singletons=True, include_patches=False,
+        self,
+        mne_obj,
+        K="auto",
+        rv_thresh=1,
+        include_singletons=True,
+        include_patches=False,
     ) -> mne.SourceEstimate:
         """Apply the inverse operator.
 
@@ -119,7 +123,9 @@ class SolverCOSAMP(BaseSolver):
         self.validate_operator_data_compatibility(data)
         data = self._sensor_transform @ data
         source_mat = self.calc_cosamp_solution(
-            data, K=K, rv_thresh=rv_thresh,
+            data,
+            K=K,
+            rv_thresh=rv_thresh,
             include_singletons=include_singletons,
             include_patches=include_patches,
         )
@@ -142,7 +148,11 @@ class SolverCOSAMP(BaseSolver):
                     patch = np.where(self.adjacency[idx] != 0)[0]
                     patch = np.append(patch, idx)
                     patches.append(patch)
-                return np.unique(np.concatenate(patches)) if patches else np.array([], dtype=int)
+                return (
+                    np.unique(np.concatenate(patches))
+                    if patches
+                    else np.array([], dtype=int)
+                )
         elif include_patches:
             b_smooth = np.linalg.norm(self.leadfield_smooth_normed.T @ R, axis=1)
             b_thresh = thresholding(b_smooth, K)
@@ -152,14 +162,19 @@ class SolverCOSAMP(BaseSolver):
                 patch = np.where(self.adjacency[idx] != 0)[0]
                 patch = np.append(patch, idx)
                 patches.append(patch)
-            return np.unique(np.concatenate(patches)) if patches else np.array([], dtype=int)
+            return (
+                np.unique(np.concatenate(patches))
+                if patches
+                else np.array([], dtype=int)
+            )
         else:  # include_singletons only
             b_sparse = np.linalg.norm(self.leadfield_normed.T @ R, axis=1)
             b_thresh = thresholding(b_sparse, K)
             return np.where(b_thresh != 0)[0]
 
-    def calc_cosamp_solution(self, y, K="auto", rv_thresh=1,
-                             include_singletons=True, include_patches=False):
+    def calc_cosamp_solution(
+        self, y, K="auto", rv_thresh=1, include_singletons=True, include_patches=False
+    ):
         """Calculates the CoSaMP inverse solution (MMV, patch-aware).
 
         Parameters
@@ -181,7 +196,9 @@ class SolverCOSAMP(BaseSolver):
             The inverse solution.
         """
         if not include_singletons and not include_patches:
-            raise ValueError("At least one of include_patches/include_singletons must be True")
+            raise ValueError(
+                "At least one of include_patches/include_singletons must be True"
+            )
 
         squeeze = False
         if y.ndim == 1:
@@ -201,18 +218,18 @@ class SolverCOSAMP(BaseSolver):
         x_hats = [deepcopy(x_hat)]
         r = y.copy()
         residuals = np.array([np.linalg.norm(y - self.leadfield_original @ x_hat)])
-        unexplained_variance = np.array([
-            calc_residual_variance(self.leadfield_original @ x_hat, y),
-        ])
+        unexplained_variance = np.array(
+            [
+                calc_residual_variance(self.leadfield_original @ x_hat, y),
+            ]
+        )
 
         for i in range(1, n_chans + 1):
             # Identify 2K candidate atoms
             omega = self._select_atoms(r, 2 * K, include_singletons, include_patches)
 
             # Merge with previous active set
-            old_activations = np.where(
-                np.linalg.norm(x_hats[i - 1], axis=1) != 0
-            )[0]
+            old_activations = np.where(np.linalg.norm(x_hats[i - 1], axis=1) != 0)[0]
             T = np.unique(np.concatenate([omega, old_activations]))
 
             # Solve least-squares on merged support

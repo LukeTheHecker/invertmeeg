@@ -142,14 +142,18 @@ def build_source_adjacency(
 
     if mode == "distance":
         try:
-            adjacency = mne.spatial_dist_adjacency(src, adjacency_distance, verbose=verbose)
+            adjacency = mne.spatial_dist_adjacency(
+                src, adjacency_distance, verbose=verbose
+            )
             return csr_matrix(adjacency)
         except Exception as distance_exc:
             logger.warning(
                 "distance adjacency failed (%s). Trying discrete source fallback.",
                 distance_exc,
             )
-            return _adjacency_from_discrete_src(src, adjacency_distance=adjacency_distance)
+            return _adjacency_from_discrete_src(
+                src, adjacency_distance=adjacency_distance
+            )
 
     try:
         adjacency = mne.spatial_src_adjacency(src, verbose=verbose)
@@ -167,8 +171,7 @@ def build_source_adjacency(
         return csr_matrix(adjacency)
     except Exception as distance_exc:
         logger.warning(
-            "spatial_dist_adjacency also failed (%s). Trying discrete source "
-            "fallback.",
+            "spatial_dist_adjacency also failed (%s). Trying discrete source fallback.",
             distance_exc,
         )
 

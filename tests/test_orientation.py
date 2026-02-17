@@ -38,7 +38,9 @@ def test_pca_orientation_recovers_known_q_on_discrete(forward_model_discrete_fre
     active = int(min(7, max(0, n_locs - 1)))
     x[active] = rng.randn(n_time)
 
-    J_true = (q_true[:, :, np.newaxis] * x[:, np.newaxis, :]).reshape(n_locs * 3, n_time)
+    J_true = (q_true[:, :, np.newaxis] * x[:, np.newaxis, :]).reshape(
+        n_locs * 3, n_time
+    )
     Y = G_free @ J_true
 
     q_est = estimate_orientation_pca(

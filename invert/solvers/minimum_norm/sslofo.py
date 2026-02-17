@@ -590,9 +590,7 @@ class SolverSSLOFO(BaseSolver):
 
         # Since weights and leadfield are fixed, compute inverse operator once
         # and apply to all timepoints as a single matrix multiply
-        J_all = self._weighted_minimum_norm(
-            leadfield_support, data, weights, alpha
-        )
+        J_all = self._weighted_minimum_norm(leadfield_support, data, weights, alpha)
         if J_all.ndim == 1:
             J_all = J_all[:, np.newaxis]
         source_mat[support_idx, :] = J_all

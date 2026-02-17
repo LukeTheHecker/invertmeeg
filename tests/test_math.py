@@ -12,8 +12,14 @@ import pytest
 
 # Import evaluate.py directly (bypassing invert.evaluate.__init__ which has
 # a broken import of invert.models.priors via evaluation.py).
-_eval_path = pathlib.Path(__file__).resolve().parent.parent / "invert" / "evaluate" / "evaluate.py"
+_eval_path = (
+    pathlib.Path(__file__).resolve().parent.parent
+    / "invert"
+    / "evaluate"
+    / "evaluate.py"
+)
 _eval_spec = importlib.util.spec_from_file_location("_evaluate_standalone", _eval_path)
+assert _eval_spec is not None and _eval_spec.loader is not None
 _eval_mod = importlib.util.module_from_spec(_eval_spec)
 _eval_spec.loader.exec_module(_eval_mod)
 
@@ -865,7 +871,6 @@ class TestGCVEdgeCases:
 
 
 class TestLCurveEdgeCases:
-
     def test_two_points_returns_last(self):
         """With fewer than 3 points, find_corner should return last index."""
         from invert.util import find_corner
@@ -898,9 +903,7 @@ class TestLCurveEdgeCases:
 
         # L-shaped curve: flat residual then steep rise
         residual = np.concatenate([np.linspace(1, 1.01, 10), np.linspace(1.1, 10, 10)])
-        source_power = np.concatenate(
-            [np.linspace(100, 10, 10), np.linspace(9, 1, 10)]
-        )
+        source_power = np.concatenate([np.linspace(100, 10, 10), np.linspace(9, 1, 10)])
         idx = find_corner(source_power, residual)
         # Corner should be near the transition (around index 9-11)
         assert 5 <= idx <= 15, f"Corner at {idx}, expected near 10"
@@ -912,7 +915,6 @@ class TestLCurveEdgeCases:
 
 
 class TestInverseOperatorValidation:
-
     def test_valid_shape_accepted(self):
         """Correct shape should not raise."""
         from invert.solvers.base import InverseOperator
@@ -1014,7 +1016,6 @@ class TestMLEProperties:
     @staticmethod
     def _make_simple_problem(n=50, seed=0):
         """Create a simple source space with adjacency."""
-        from scipy.sparse import eye as speye
 
         rng = np.random.RandomState(seed)
         pos = rng.randn(n, 3)
@@ -1036,9 +1037,7 @@ class TestMLEProperties:
         y = np.zeros(len(pos))
         y[10] = 1.0  # single source
 
-        mle = eval_mean_localization_error(
-            y, y, adj, adj, pos, pos, D, mode="dle"
-        )
+        mle = eval_mean_localization_error(y, y, adj, adj, pos, pos, D, mode="dle")
         assert mle == pytest.approx(0.0, abs=1e-10)
 
     def test_mle_nonnegative(self):

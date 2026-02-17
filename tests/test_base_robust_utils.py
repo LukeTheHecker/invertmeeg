@@ -159,9 +159,7 @@ class TestRelativeEpsilonRegression:
         C = 0.5 * (C + C.T)
 
         cond_target = 1e4
-        C_reg, lam = condition_number_loaded_covariance(
-            C, cond_target=cond_target
-        )
+        C_reg, lam = condition_number_loaded_covariance(C, cond_target=cond_target)
 
         # With the fix: lambda should be small relative to max eigenvalue
         # With the bug: lambda ≈ 1e-18 >> 1e-23, producing matched filter

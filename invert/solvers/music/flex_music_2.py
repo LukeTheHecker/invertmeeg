@@ -271,7 +271,9 @@ class SolverFLEXMUSIC_2(BaseSolver):
         """
         n_dipoles = self.leadfield.shape[1]
         self.identity = np.identity(n_dipoles)
-        self.adjacency = build_source_adjacency(self.forward["src"], verbose=0).toarray()
+        self.adjacency = build_source_adjacency(
+            self.forward["src"], verbose=0
+        ).toarray()
         self.adjacency_ex = deepcopy(self.adjacency)
         np.fill_diagonal(self.adjacency_ex, 0)
         self.members_ex = [np.where(row)[0] for row in self.adjacency_ex]

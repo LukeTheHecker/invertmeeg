@@ -270,8 +270,10 @@ class SolverChampagne(BaseSolver):
 
         # Fast path: delegate to shared SBL engine for standard rules
         rule_lower = self.update_rule.lower()
-        if (rule_lower in {"mackay", "convexity", "mm", "em", "lowsnr"}
-                and self.noise_learning != "learn"):
+        if (
+            rule_lower in {"mackay", "convexity", "mm", "em", "lowsnr"}
+            and self.noise_learning != "learn"
+        ):
             sbl_rule = "convexity" if rule_lower == "lowsnr" else rule_lower
             result = sbl_iterate(
                 L=L_full_scaled,

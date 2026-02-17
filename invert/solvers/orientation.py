@@ -202,4 +202,3 @@ def ensure_surface_free_surf_ori(forward: mne.Forward) -> mne.Forward:
         use_cps=True,
         verbose=0,
     )
-

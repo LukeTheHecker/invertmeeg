@@ -154,9 +154,7 @@ class SolverGammaMAP(BaseSolver):
             # term_1: gamma-scaled RMS of projected data
             # L.T @ sigma_b_inv @ B = SiL.T @ B (reuse SiL transposed)
             LtSiB = SiL.T @ B  # (d, t)
-            term_1 = (gammas / np.sqrt(n)) * np.sqrt(
-                np.sum(LtSiB ** 2, axis=1)
-            )
+            term_1 = (gammas / np.sqrt(n)) * np.sqrt(np.sum(LtSiB**2, axis=1))
             # diag(L.T @ sigma_b_inv @ L) = column-wise dot product
             denom = np.sum(L * SiL, axis=0)  # (d,)
             denom = np.maximum(denom, 1e-15)
@@ -176,7 +174,9 @@ class SolverGammaMAP(BaseSolver):
         # Final inverse: diag(gammas_final) @ sigma_s @ L.T @ inv(...)
         if sigma_s_is_identity:
             sigma_b_final = sigma_e + (L * gammas_final) @ L.T
-            inverse_operator = (gammas_final[:, None] * L.T) @ np.linalg.inv(sigma_b_final)
+            inverse_operator = (gammas_final[:, None] * L.T) @ np.linalg.inv(
+                sigma_b_final
+            )
         else:
             sigma_s_hat = gammas_final[:, None] * self.sigma_s
             inverse_operator = (

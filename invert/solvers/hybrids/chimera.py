@@ -120,7 +120,8 @@ class SolverChimera(BaseSolver):
         is_single_focal = self._is_single_focal(Y)
         if is_single_focal:
             solver = SolverFlexESMV(
-                verbose=self.verbose, orientation=self.orientation,
+                verbose=self.verbose,
+                orientation=self.orientation,
             )
             solver.make_inverse_operator(
                 self.forward, mne_obj, alpha="auto", noise_cov=self._noise_cov
@@ -128,7 +129,8 @@ class SolverChimera(BaseSolver):
             return solver.apply_inverse_operator(mne_obj)
 
         solver = SolverSignalSubspaceMatching(
-            verbose=self.verbose, orientation=self.orientation,
+            verbose=self.verbose,
+            orientation=self.orientation,
         )
         solver.make_inverse_operator(
             self.forward,

@@ -27,7 +27,9 @@ def test_discrete_fallback_without_neighbor_vert(forward_model_discrete_free):
     _assert_valid_undirected_adjacency(adjacency, n_vertices)
 
 
-def test_distance_mode_discrete_fallback_without_neighbor_vert(forward_model_discrete_free):
+def test_distance_mode_discrete_fallback_without_neighbor_vert(
+    forward_model_discrete_free,
+):
     src = deepcopy(forward_model_discrete_free["src"])
     src[0].pop("neighbor_vert", None)
 

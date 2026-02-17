@@ -212,7 +212,10 @@ class SolverLCMV(BaseBeamformer):
         for cov_mat in cov_mats:
             C_inv = self.robust_inverse(cov_mat)
 
-            if getattr(self, "_free_orientation", False) and int(getattr(self, "_n_orient", 1)) == 3:
+            if (
+                getattr(self, "_free_orientation", False)
+                and int(getattr(self, "_n_orient", 1)) == 3
+            ):
                 # Vector LCMV: per-location 3x3 solve
                 # W_i^T = C_inv L_i (L_i^T C_inv L_i)^-1
                 L = np.asarray(leadfield_eff, dtype=float)
@@ -265,9 +268,9 @@ class SolverLCMV(BaseBeamformer):
                         except np.linalg.LinAlgError:
                             G_inv[i] = np.linalg.pinv(Gi, rcond=1e-12)
 
-                    W_eff = np.einsum("mni,nij->mnj", CiL, G_inv, optimize=True).reshape(
-                        m, n_cols
-                    )
+                    W_eff = np.einsum(
+                        "mni,nij->mnj", CiL, G_inv, optimize=True
+                    ).reshape(m, n_cols)
             else:
                 # Scalar LCMV: classic unit-gain per source
                 # W = (C_inv @ leadfield) / diag(leadfield^T C_inv leadfield)

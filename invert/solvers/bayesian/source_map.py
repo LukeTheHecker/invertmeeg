@@ -155,9 +155,7 @@ class SolverSourceMAP(BaseSolver):
             SiL = sigma_b_inv @ L  # (m, d)
             LtSiB = SiL.T @ B  # (d, t)
 
-            term_1 = (gammas / np.sqrt(n)) * np.sqrt(
-                np.sum(LtSiB ** 2, axis=1)
-            )
+            term_1 = (gammas / np.sqrt(n)) * np.sqrt(np.sum(LtSiB**2, axis=1))
             # diag(L.T @ sigma_b_inv @ L) via column-wise dot product
             denom = np.sum(L * SiL, axis=0)
             denom = np.maximum(denom, 1e-15)
@@ -176,7 +174,9 @@ class SolverSourceMAP(BaseSolver):
 
         if sigma_s_is_identity:
             sigma_b_final = sigma_e + (L * gammas_final) @ L.T
-            inverse_operator = (gammas_final[:, None] * L.T) @ np.linalg.inv(sigma_b_final)
+            inverse_operator = (gammas_final[:, None] * L.T) @ np.linalg.inv(
+                sigma_b_final
+            )
         else:
             sigma_s_hat = gammas_final[:, None] * self.sigma_s
             inverse_operator = (

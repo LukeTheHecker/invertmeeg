@@ -121,7 +121,10 @@ class SolverSubSMP(BaseSolver):
         return self
 
     def apply_inverse_operator(
-        self, mne_obj, include_singletons=True, include_patches=False,
+        self,
+        mne_obj,
+        include_singletons=True,
+        include_patches=False,
     ) -> mne.SourceEstimate:
         """Apply the inverse operator.
         Parameters

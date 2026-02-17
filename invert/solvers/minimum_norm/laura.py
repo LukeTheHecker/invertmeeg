@@ -142,7 +142,9 @@ class SolverLAURA(BaseSolver):
         # Determine neighborhood structure
         if self.use_mesh_adjacency:
             # Use mesh connectivity (extension)
-            adjacency = build_source_adjacency(forward["src"], verbose=verbose).toarray()
+            adjacency = build_source_adjacency(
+                forward["src"], verbose=verbose
+            ).toarray()
             d_adj = d * adjacency
         else:
             # Pure LAURA: use all sources (full distance matrix, exclude diagonal)

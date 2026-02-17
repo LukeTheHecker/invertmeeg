@@ -52,11 +52,7 @@ EXCLUDED = {"random-noise", "cmem"}  # random-noise: by design random; cmem: too
 
 
 def _solver_ids():
-    return [
-        sid
-        for sid in _ALL_SPECS
-        if sid not in NN_SOLVERS and sid not in EXCLUDED
-    ]
+    return [sid for sid in _ALL_SPECS if sid not in NN_SOLVERS and sid not in EXCLUDED]
 
 
 # ---------------------------------------------------------------------------
@@ -78,7 +74,11 @@ def _eval_emd(M, values_1, values_2, threshold=0.25):
         val = ot.emd2(v1, v2, M)
     except Exception:
         return float("nan")
-    return float(np.asarray(val).item()) if isinstance(val, (list, np.ndarray)) else float(val)
+    return (
+        float(np.asarray(val).item())
+        if isinstance(val, (list, np.ndarray))
+        else float(val)
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -124,8 +124,8 @@ def _simulate_focal_source(leadfield, n_dipoles, info, seed):
 def _compute_r2(evoked_data, leadfield, stc_data):
     """Compute % variance explained: 1 - ||Y - L @ S||² / ||Y||²."""
     residual = evoked_data - leadfield @ stc_data
-    ss_res = np.sum(residual ** 2)
-    ss_tot = np.sum(evoked_data ** 2)
+    ss_res = np.sum(residual**2)
+    ss_tot = np.sum(evoked_data**2)
     if ss_tot == 0:
         return 0.0
     return 1.0 - ss_res / ss_tot
@@ -164,14 +164,19 @@ def accuracy_setup():
     leadfield = np.asarray(fwd["sol"]["data"], dtype=float)
     n_dipoles = leadfield.shape[1]
     src = fwd["src"]
-    coords_mm = np.vstack([
-        src[0]["rr"][src[0]["vertno"]] * 1000.0,
-        src[1]["rr"][src[1]["vertno"]] * 1000.0,
-    ])
+    coords_mm = np.vstack(
+        [
+            src[0]["rr"][src[0]["vertno"]] * 1000.0,
+            src[1]["rr"][src[1]["vertno"]] * 1000.0,
+        ]
+    )
     dist_matrix = cdist(coords_mm, coords_mm)
     return dict(
-        fwd=fwd, info=info, leadfield=leadfield,
-        n_dipoles=n_dipoles, dist_matrix=dist_matrix,
+        fwd=fwd,
+        info=info,
+        leadfield=leadfield,
+        n_dipoles=n_dipoles,
+        dist_matrix=dist_matrix,
     )
 
 
@@ -207,7 +212,7 @@ def test_solver_localization(solver_name, accuracy_setup, update_baselines):
             continue
 
         # EMD: power-based source distribution
-        source_power = np.sum(stc.data ** 2, axis=1)
+        source_power = np.sum(stc.data**2, axis=1)
         emd_val = _eval_emd(dist_matrix, y_true, source_power)
         emds.append(emd_val)
 
@@ -221,7 +226,10 @@ def test_solver_localization(solver_name, accuracy_setup, update_baselines):
     # --- Update mode: save baselines and skip assertions ---
     if update_baselines:
         baselines = _load_baselines()
-        baselines[solver_name] = {"emd": round(median_emd, 4), "r2": round(median_r2, 6)}
+        baselines[solver_name] = {
+            "emd": round(median_emd, 4),
+            "r2": round(median_r2, 6),
+        }
         _save_baselines(baselines)
         pytest.skip(f"Baseline saved: EMD={median_emd:.2f}, R²={median_r2:.4f}")
 

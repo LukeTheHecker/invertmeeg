@@ -76,7 +76,13 @@ def _build_registry() -> dict[str, Any]:
         partial(solvers.SolverChampagne, update_rule="EM"),
     )
     _add(
-        ["champagne-convexity", "convexitychampagne", "convexity-champagne", "coc", "mm-champagne"],
+        [
+            "champagne-convexity",
+            "convexitychampagne",
+            "convexity-champagne",
+            "coc",
+            "mm-champagne",
+        ],
         partial(solvers.SolverChampagne, update_rule="Convexity"),
     )
     _add(
@@ -88,11 +94,23 @@ def _build_registry() -> dict[str, Any]:
         partial(solvers.SolverChampagne, update_rule="TEM"),
     )
     _add(
-        ["champagne-ar-em", "aremchampagne", "arem-champagne", "aremc", "ar-em-champagne"],
+        [
+            "champagne-ar-em",
+            "aremchampagne",
+            "arem-champagne",
+            "aremc",
+            "ar-em-champagne",
+        ],
         partial(solvers.SolverChampagne, update_rule="AR-EM"),
     )
     _add(
-        ["champagne-low-snr", "lowsnrchampagne", "low-snr-champagne", "lowsnr-champagne", "lsc"],
+        [
+            "champagne-low-snr",
+            "lowsnrchampagne",
+            "low-snr-champagne",
+            "lowsnr-champagne",
+            "lsc",
+        ],
         partial(solvers.SolverChampagne, update_rule="LowSNR"),
     )
     _add(

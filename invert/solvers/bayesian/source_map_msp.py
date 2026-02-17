@@ -159,9 +159,7 @@ class SolverSourceMAPMSP(BaseSolver):
             SiL = sigma_b_inv @ L_smooth  # (m, d)
             LtSiB = SiL.T @ B  # (d, t)
 
-            term_1 = (gammas / np.sqrt(n)) * np.sqrt(
-                np.sum(LtSiB ** 2, axis=1)
-            )
+            term_1 = (gammas / np.sqrt(n)) * np.sqrt(np.sum(LtSiB**2, axis=1))
             # diag(L.T @ sigma_b_inv @ L) via column-wise dot product
             denom = np.sum(L_smooth * SiL, axis=0)
             denom = np.maximum(denom, 1e-15)

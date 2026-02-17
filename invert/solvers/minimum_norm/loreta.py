@@ -113,7 +113,9 @@ class SolverLORETA(BaseSolver):
         sensor_transform = wf.sensor_transform
 
         LTL = leadfield.T @ leadfield
-        adjacency = build_source_adjacency(forward["src"], verbose=self.verbose).toarray()
+        adjacency = build_source_adjacency(
+            forward["src"], verbose=self.verbose
+        ).toarray()
         Lap = laplacian(adjacency)
 
         # Fractional Laplacian power: L^p = U diag(λ_i^p) U^T
@@ -123,7 +125,7 @@ class SolverLORETA(BaseSolver):
         if p == 1.0:
             penalty = Lap
         else:
-            penalty = eigvecs * (eigvals ** p) @ eigvecs.T
+            penalty = eigvecs * (eigvals**p) @ eigvecs.T
 
         # Free orientation: expand penalty from (n_pos, n_pos) to (n_dipoles, n_dipoles)
         n_orient = getattr(self, "_n_orient", 1)

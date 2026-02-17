@@ -210,7 +210,7 @@ def _cmem(Y, L, A=None, num_parcels=200, max_iter=100, batch_size=100):
     power_vals = np.array([parcel_powers[p] for p in unique_parcels])
     power_ranks = np.argsort(np.argsort(power_vals)).astype(float)
     power_quantiles = power_ranks / max(len(power_ranks) - 1, 1)
-    parcel_quantile = dict(zip(unique_parcels, power_quantiles))
+    parcel_quantile = dict(zip(unique_parcels, power_quantiles, strict=True))
 
     precomputed = {}
     max_E_k = 0.0  # track for calibration
@@ -502,8 +502,6 @@ def _compute_sources_batch(lambda_batch, precomputed, n):
         p_k = alpha_k * exp_E / ((1.0 - alpha_k) + alpha_k * exp_E)
 
         # Source estimate
-        J_batch[vertices, :] = p_k[np.newaxis, :] * (
-            mu_k[:, np.newaxis] + Sigma_xi
-        )
+        J_batch[vertices, :] = p_k[np.newaxis, :] * (mu_k[:, np.newaxis] + Sigma_xi)
 
     return J_batch

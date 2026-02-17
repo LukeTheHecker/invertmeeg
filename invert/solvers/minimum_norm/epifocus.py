@@ -79,9 +79,7 @@ class SolverEPIFOCUS(BaseSolver):
 
         inverse_operators = []
         for alpha in self.alphas:
-            K = np.linalg.solve(
-                LLT + float(alpha) * np.identity(n_chans), L_norm
-            ).T
+            K = np.linalg.solve(LLT + float(alpha) * np.identity(n_chans), L_norm).T
             # Denormalize: divide by col_norms to weight toward focal sources
             K = (1.0 / col_norms[:, np.newaxis]) * K
             inverse_operators.append(K @ wf.sensor_transform)

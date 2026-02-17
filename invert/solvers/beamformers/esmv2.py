@@ -101,7 +101,6 @@ class SolverESMV2(BaseBeamformer):
 
         inverse_operators = []
         for C_reg in cov_mats:
-
             # 2. Eigendecomposition
             eigvals, eigvecs = np.linalg.eigh(C_reg)
             idx = np.argsort(eigvals)[::-1]

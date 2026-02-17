@@ -134,7 +134,9 @@ def pos_from_forward(forward, verbose=0):
         # Preferred: MNI coordinates via FreeSurfer surfaces
         for hemi_idx, s in enumerate(src):
             parts.append(
-                mne.vertex_to_mni(s["vertno"], hemi_idx, subject_his_id, verbose=verbose)
+                mne.vertex_to_mni(
+                    s["vertno"], hemi_idx, subject_his_id, verbose=verbose
+                )
             )
     except (FileNotFoundError, OSError, TypeError):
         # Fallback: use source-space positions directly (head coordinates)

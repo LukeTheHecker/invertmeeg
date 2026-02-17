@@ -32,8 +32,10 @@ ALPHA = 0.1
 # ---------------------------------------------------------------------------
 # Solver sets (derived from solver registry)
 # ---------------------------------------------------------------------------
-_ALL_SPECS = {spec.solver_id: spec
-              for spec in iter_solver_specs(include_internal=False, include_unavailable=True)}
+_ALL_SPECS = {
+    spec.solver_id: spec
+    for spec in iter_solver_specs(include_internal=False, include_unavailable=True)
+}
 
 # NN solvers require training — too slow for parametrized orientation tests
 NN_SOLVERS = {sid for sid, spec in _ALL_SPECS.items() if "torch" in spec.requires}
@@ -48,14 +50,18 @@ _VECTOR_MIN_NORM = {"mne", "eloreta", "epifocus", "wmne", "backus-gilbert"}
 
 # Solvers that support orientation="free" (mirrors base.py logic at line ~2070)
 FREE_ORIENTATION_SOLVERS = {
-    sid for sid, spec in _ALL_SPECS.items()
+    sid
+    for sid, spec in _ALL_SPECS.items()
     if sid in _VECTOR_MIN_NORM or ".beamformers." in spec.module_path
 }
 
 
 def _solver_ids():
-    return [sid for sid in _ALL_SPECS
-            if sid not in NN_SOLVERS and sid not in RANDOM_BASELINE]
+    return [
+        sid
+        for sid in _ALL_SPECS
+        if sid not in NN_SOLVERS and sid not in RANDOM_BASELINE
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -77,7 +83,11 @@ def _eval_emd(M, values_1, values_2, threshold=0.25):
         val = ot.emd2(v1, v2, M)
     except Exception:
         return float("nan")
-    return float(np.asarray(val).item()) if isinstance(val, (list, np.ndarray)) else float(val)
+    return (
+        float(np.asarray(val).item())
+        if isinstance(val, (list, np.ndarray))
+        else float(val)
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -128,10 +138,12 @@ def tangential_setup():
     G = np.asarray(fwd["sol"]["data"], dtype=float)
     n_src = G.shape[1] // 3
     src = fwd["src"]
-    coords_mm = np.vstack([
-        src[0]["rr"][src[0]["vertno"]] * 1000.0,
-        src[1]["rr"][src[1]["vertno"]] * 1000.0,
-    ])
+    coords_mm = np.vstack(
+        [
+            src[0]["rr"][src[0]["vertno"]] * 1000.0,
+            src[1]["rr"][src[1]["vertno"]] * 1000.0,
+        ]
+    )
     dist_matrix = cdist(coords_mm, coords_mm)
     return dict(fwd=fwd, info=info, G=G, n_src=n_src, dist_matrix=dist_matrix)
 
@@ -173,7 +185,7 @@ def test_orientation_emd_on_tangential(solver_name, tangential_setup):
             solver = Solver(solver_name, orientation=ori)
             solver.make_inverse_operator(fwd, evoked_train, **extra_kwargs)
             stc = solver.apply_inverse_operator(evoked_test)
-            source_pred = np.sum(stc.data ** 2, axis=1)
+            source_pred = np.sum(stc.data**2, axis=1)
             emd_val = _eval_emd(dist_matrix, x_true, source_pred)
             emds[ori].append(emd_val)
 

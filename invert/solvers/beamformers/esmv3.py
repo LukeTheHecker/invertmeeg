@@ -111,7 +111,6 @@ class SolverESMV3(BaseBeamformer):
 
         inverse_operators = []
         for C_reg in cov_mats:
-
             # Robust inverse
             C_inv = self.robust_inverse(C_reg)
 

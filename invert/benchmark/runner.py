@@ -540,7 +540,9 @@ def _make_inverse_operator_with_covariance(
             forward, evoked, alpha=alpha, noise_cov=noise_cov, **kwargs
         )
     else:
-        solver.make_inverse_operator(forward, alpha=alpha, noise_cov=noise_cov, **kwargs)
+        solver.make_inverse_operator(
+            forward, alpha=alpha, noise_cov=noise_cov, **kwargs
+        )
 
 
 class TimingInfo(BaseModel):
@@ -769,10 +771,12 @@ class BenchmarkRunner:
                                     # Aggregate GCV scores across multiple samples
                                     # for more robust regularization selection.
                                     n_gcv = min(5, len(x_batch))
-                                    all_scores = np.stack([
-                                        solver.compute_gcv_scores(x_batch[k])
-                                        for k in range(n_gcv)
-                                    ])
+                                    all_scores = np.stack(
+                                        [
+                                            solver.compute_gcv_scores(x_batch[k])
+                                            for k in range(n_gcv)
+                                        ]
+                                    )
                                     median_scores = np.median(all_scores, axis=0)
                                     valid = np.isfinite(median_scores)
                                     if np.any(valid):

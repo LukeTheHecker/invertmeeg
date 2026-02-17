@@ -2,8 +2,8 @@
 Beamformer solvers for M/EEG source reconstruction.
 """
 
-from .base_beamformer import BaseBeamformer
 from .adapt_flex_esmv import SolverAdaptFlexESMV
+from .base_beamformer import BaseBeamformer
 from .deblur_flex_esmv import SolverDeblurFlexESMV
 from .dics import SolverDICS
 from .ebb import SolverEBB

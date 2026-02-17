@@ -151,7 +151,7 @@ class SolverMSP(BaseSolver):
 
         # Vectorized LQL computation: LQL[i] = (L * Q_src[i]) @ L.T
         # Using einsum: LQL[i,j,k] = sum_d L[j,d] * Q_src[i,d] * L[k,d]
-        LQL = np.einsum('jd,id,kd->ijk', leadfield, Q_src, leadfield)  # (n_pats, m, m)
+        LQL = np.einsum("jd,id,kd->ijk", leadfield, Q_src, leadfield)  # (n_pats, m, m)
         tr = np.trace(LQL, axis1=1, axis2=2)  # (n_pats,)
         valid = tr > 1e-20
         # Normalize valid components by their trace
@@ -211,7 +211,7 @@ class SolverMSP(BaseSolver):
             W = np.eye(m) - P @ C
 
             # PQ[i] = P @ LQL_all[i] * scales[i]
-            PQ = np.einsum('jk,ikl->ijl', P, LQL_all) * scales[:, None, None]
+            PQ = np.einsum("jk,ikl->ijl", P, LQL_all) * scales[:, None, None]
 
             # Vectorized gradient: g_i = -v/2 * trace(PQ[i] @ W)
             PQ_flat = PQ.reshape(n_comp, m * m)
@@ -266,9 +266,7 @@ class SolverMSP(BaseSolver):
             # Convergence
             if abs(dF) < self.tol:
                 if self.verbose:
-                    logger.info(
-                        f"MSP converged after {it} iterations (dF={dF:.3e})"
-                    )
+                    logger.info(f"MSP converged after {it} iterations (dF={dF:.3e})")
                 break
 
         # Final reconstruction

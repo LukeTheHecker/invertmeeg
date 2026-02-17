@@ -976,15 +976,12 @@ class TestChampagneConvergence:
         L_scaled = L / L_norms
 
         gammas = np.ones(n_dipoles)
-        I = np.identity(n_chans)
 
         losses = []
         for _ in range(50):
             Gamma = np.diag(gammas)
             Sigma_y = noise_cov_used + L_scaled @ Gamma @ L_scaled.T
-            Sigma_y_inv = np.linalg.inv(
-                Sigma_y + 1e-12 * np.eye(n_chans)
-            )
+            Sigma_y_inv = np.linalg.inv(Sigma_y + 1e-12 * np.eye(n_chans))
             mu_x = Gamma @ L_scaled.T @ Sigma_y_inv @ Y
 
             # MacKay update
@@ -1014,8 +1011,7 @@ class TestChampagneConvergence:
         # EM should decrease loss; allow small numerical noise
         violations = np.where(diffs > 1e-6)[0]
         assert len(violations) == 0, (
-            f"Loss increased at iterations {violations}: "
-            f"diffs = {diffs[violations]}"
+            f"Loss increased at iterations {violations}: diffs = {diffs[violations]}"
         )
 
 
@@ -1065,9 +1061,7 @@ class TestMUSICPseudospectrum:
         # Get positions to check spatial proximity
         src = forward_model["src"]
         positions = np.vstack([s["rr"][s["vertno"]] for s in src])
-        distance = np.linalg.norm(
-            positions[estimated_peak] - positions[true_idx]
-        )
+        distance = np.linalg.norm(positions[estimated_peak] - positions[true_idx])
         # Peak should be within ~20mm (generous for coarse ico1 mesh)
         assert distance < 0.025, (
             f"MUSIC peak at dipole {estimated_peak} is {distance * 1000:.1f}mm "
@@ -1114,12 +1108,10 @@ class TestMUSICPseudospectrum:
         positions = np.vstack([s["rr"][s["vertno"]] for s in src])
 
         near_1 = any(
-            np.linalg.norm(positions[j] - positions[idx1]) < 0.025
-            for j in top_k
+            np.linalg.norm(positions[j] - positions[idx1]) < 0.025 for j in top_k
         )
         near_2 = any(
-            np.linalg.norm(positions[j] - positions[idx2]) < 0.025
-            for j in top_k
+            np.linalg.norm(positions[j] - positions[idx2]) < 0.025 for j in top_k
         )
         assert near_1 or near_2, (
             "MUSIC top-10 dipoles don't include either true source location"
@@ -1197,7 +1189,9 @@ class TestSBLEngineEquivalence:
 
         # Run engine
         result = sbl_iterate(
-            L, Y, noise_cov,
+            L,
+            Y,
+            noise_cov,
             update_rule="mackay",
             max_iter=200,
             pruning_thresh=1e-3,
@@ -1218,10 +1212,18 @@ class TestSBLEngineEquivalence:
         L, Y, noise_cov, _ = self._make_sbl_problem(rng)
 
         result_mackay = sbl_iterate(
-            L, Y, noise_cov, update_rule="mackay", max_iter=300,
+            L,
+            Y,
+            noise_cov,
+            update_rule="mackay",
+            max_iter=300,
         )
         result_conv = sbl_iterate(
-            L, Y, noise_cov, update_rule="convexity", max_iter=300,
+            L,
+            Y,
+            noise_cov,
+            update_rule="convexity",
+            max_iter=300,
         )
         # Both should converge to finite loss
         assert np.isfinite(result_mackay.loss)
@@ -1238,7 +1240,11 @@ class TestSBLEngineEquivalence:
         L, Y, noise_cov, _ = self._make_sbl_problem(rng)
 
         result = sbl_iterate(
-            L, Y, noise_cov, update_rule="em", max_iter=200,
+            L,
+            Y,
+            noise_cov,
+            update_rule="em",
+            max_iter=200,
         )
         assert np.isfinite(result.loss)
         assert len(result.active_set) >= 1
@@ -1256,13 +1262,23 @@ class TestSBLEngineEquivalence:
         L, Y, noise_cov, _ = self._make_sbl_problem(rng)
 
         result_builtin = sbl_iterate(
-            L, Y, noise_cov, update_rule="mackay", max_iter=100,
+            L,
+            Y,
+            noise_cov,
+            update_rule="mackay",
+            max_iter=100,
         )
         result_custom = sbl_iterate(
-            L, Y, noise_cov, update_rule=my_mackay, max_iter=100,
+            L,
+            Y,
+            noise_cov,
+            update_rule=my_mackay,
+            max_iter=100,
         )
         # Custom MacKay should produce identical result to built-in
-        np.testing.assert_array_equal(result_builtin.active_set, result_custom.active_set)
+        np.testing.assert_array_equal(
+            result_builtin.active_set, result_custom.active_set
+        )
         np.testing.assert_allclose(result_builtin.gammas, result_custom.gammas)
 
     def test_no_pruning_keeps_all_atoms(self):
@@ -1273,6 +1289,11 @@ class TestSBLEngineEquivalence:
         L, Y, noise_cov, _ = self._make_sbl_problem(rng, n_dipoles=20)
 
         result = sbl_iterate(
-            L, Y, noise_cov, update_rule="mackay", max_iter=50, prune=False,
+            L,
+            Y,
+            noise_cov,
+            update_rule="mackay",
+            max_iter=50,
+            prune=False,
         )
         assert len(result.active_set) == 20

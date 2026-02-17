@@ -90,8 +90,12 @@ class SolverOMP(BaseSolver):
         return self
 
     def apply_inverse_operator(
-        self, mne_obj, K="auto", max_iter=None,
-        include_singletons=True, include_patches=False,
+        self,
+        mne_obj,
+        K="auto",
+        max_iter=None,
+        include_singletons=True,
+        include_patches=False,
     ) -> mne.SourceEstimate:
         """Apply the inverse operator.
 
@@ -117,15 +121,18 @@ class SolverOMP(BaseSolver):
         self.validate_operator_data_compatibility(data)
         data = self._sensor_transform @ data
         source_mat = self.calc_omp_solution(
-            data, K=K, max_iter=max_iter,
+            data,
+            K=K,
+            max_iter=max_iter,
             include_singletons=include_singletons,
             include_patches=include_patches,
         )
         stc = self.source_to_object(source_mat)
         return stc
 
-    def calc_omp_solution(self, y, K="auto", max_iter=None,
-                          include_singletons=True, include_patches=False):
+    def calc_omp_solution(
+        self, y, K="auto", max_iter=None, include_singletons=True, include_patches=False
+    ):
         """Calculates the OMP inverse solution (MMV, patch-aware).
 
         Parameters
@@ -147,7 +154,9 @@ class SolverOMP(BaseSolver):
             The inverse solution, shape ``(n_dipoles,)`` or ``(n_dipoles, n_time)``.
         """
         if not include_singletons and not include_patches:
-            raise ValueError("At least one of include_patches/include_singletons must be True")
+            raise ValueError(
+                "At least one of include_patches/include_singletons must be True"
+            )
 
         # Handle both SMV and MMV input
         squeeze = False
@@ -178,7 +187,9 @@ class SolverOMP(BaseSolver):
         for _ in range(max_iter):
             # Aggregated correlation across time (L2 norm over time dimension)
             if include_patches and include_singletons:
-                b_smooth = np.linalg.norm(self.leadfield_smooth_normed.T @ R, axis=1, ord=2)
+                b_smooth = np.linalg.norm(
+                    self.leadfield_smooth_normed.T @ R, axis=1, ord=2
+                )
                 b_sparse = np.linalg.norm(self.leadfield_normed.T @ R, axis=1, ord=2)
                 if b_sparse.max() > b_smooth.max():
                     b_thresh = thresholding(b_sparse, K)
@@ -191,9 +202,15 @@ class SolverOMP(BaseSolver):
                         patch = np.where(self.adjacency[idx] != 0)[0]
                         patch = np.append(patch, idx)
                         new_atoms.append(patch)
-                    new_atoms = np.unique(np.concatenate(new_atoms)) if new_atoms else np.array([], dtype=int)
+                    new_atoms = (
+                        np.unique(np.concatenate(new_atoms))
+                        if new_atoms
+                        else np.array([], dtype=int)
+                    )
             elif include_patches:
-                b_smooth = np.linalg.norm(self.leadfield_smooth_normed.T @ R, axis=1, ord=2)
+                b_smooth = np.linalg.norm(
+                    self.leadfield_smooth_normed.T @ R, axis=1, ord=2
+                )
                 b_thresh = thresholding(b_smooth, K)
                 best_idx = np.where(b_thresh != 0)[0]
                 new_atoms = []
@@ -201,7 +218,11 @@ class SolverOMP(BaseSolver):
                     patch = np.where(self.adjacency[idx] != 0)[0]
                     patch = np.append(patch, idx)
                     new_atoms.append(patch)
-                new_atoms = np.unique(np.concatenate(new_atoms)) if new_atoms else np.array([], dtype=int)
+                new_atoms = (
+                    np.unique(np.concatenate(new_atoms))
+                    if new_atoms
+                    else np.array([], dtype=int)
+                )
             else:  # include_singletons only
                 b_sparse = np.linalg.norm(self.leadfield_normed.T @ R, axis=1, ord=2)
                 b_thresh = thresholding(b_sparse, K)

@@ -284,6 +284,7 @@ def _find_local_maxima(values, adjacency, n_peaks):
         adj_csr = adjacency.tocsr()
     else:
         from scipy.sparse import csr_array
+
         adj_csr = csr_array(adjacency)
     is_max = np.ones(n, dtype=bool)
     for i in range(n):

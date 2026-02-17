@@ -218,7 +218,12 @@ class SolverAdaptiveAlternatingProjections(BaseSolver):
         # Initialization:  search the 1st source location over the entire
         # dipoles topographies space
         np.zeros((n_orders, n_dipoles))
-        adjacency = build_source_adjacency(self.forward["src"], adjacency_type="spatial", adjacency_distance=self.adjacency_distance, verbose=0).toarray()
+        adjacency = build_source_adjacency(
+            self.forward["src"],
+            adjacency_type="spatial",
+            adjacency_distance=self.adjacency_distance,
+            verbose=0,
+        ).toarray()
         L = leadfields[0]
         cluster_indices = []
         # initial_candidate
@@ -411,7 +416,12 @@ class SolverAdaptiveAlternatingProjections(BaseSolver):
         n_dipoles = self.leadfield.shape[1]
         I = np.identity(n_dipoles)
         if self.adjacency_type == "spatial":
-            adjacency = build_source_adjacency(self.forward["src"], adjacency_type="spatial", adjacency_distance=self.adjacency_distance, verbose=0)
+            adjacency = build_source_adjacency(
+                self.forward["src"],
+                adjacency_type="spatial",
+                adjacency_distance=self.adjacency_distance,
+                verbose=0,
+            )
         else:
             adjacency = mne.spatial_dist_adjacency(
                 self.forward["src"], self.adjacency_distance, verbose=None

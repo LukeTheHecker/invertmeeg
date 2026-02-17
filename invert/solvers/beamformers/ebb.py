@@ -116,10 +116,10 @@ class SolverEBB(BaseBeamformer):
                 # Posterior variance (diagonal only):
                 # diag(Sigma_s) = gamma - gamma^2 * diag(L^T Sigma_y^{-1} L)
                 z_diag = np.sum(L * (Sigma_y_inv @ L), axis=0)
-                diag_Sigma_s = gamma - gamma ** 2 * z_diag
+                diag_Sigma_s = gamma - gamma**2 * z_diag
 
                 # EM update: gamma_new = diag(Sigma_s) + mean(mu^2, axis=1)
-                gamma_new = diag_Sigma_s + np.mean(mu ** 2, axis=1)
+                gamma_new = diag_Sigma_s + np.mean(mu**2, axis=1)
                 gamma_new = np.maximum(gamma_new, 1e-12)
 
                 # Convergence check
@@ -131,13 +131,15 @@ class SolverEBB(BaseBeamformer):
                 if max_change < tol:
                     logger.info(
                         "EBB converged after %d iterations (max change: %.2e)",
-                        n_iter + 1, max_change,
+                        n_iter + 1,
+                        max_change,
                     )
                     break
             else:
                 logger.warning(
                     "EBB reached max iterations (%d), max change: %.2e",
-                    max_iter, max_change,
+                    max_iter,
+                    max_change,
                 )
 
             # Final beamformer weights with converged hyperparameters
@@ -148,7 +150,7 @@ class SolverEBB(BaseBeamformer):
             # Unit-noise-gain normalization
             if weight_norm:
                 # noise_gain_i = W_i @ Cn @ W_i^T = alpha * ||W_i||^2
-                noise_gain = alpha * np.sum(W ** 2, axis=1)
+                noise_gain = alpha * np.sum(W**2, axis=1)
                 W /= np.sqrt(np.maximum(noise_gain, 1e-30))[:, None]
 
             W_raw = W @ sensor_transform

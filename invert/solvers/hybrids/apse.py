@@ -211,12 +211,12 @@ class SolverAPSE(BaseSolver):
 
         # Vectorized beamformer spatial filter for all dipoles at once
         # CiL[:,i] = C_inv @ l_i, denom[i] = l_i.T @ C_inv @ l_i
-        CiL = C_inv @ leadfield                      # (m, d)
-        denom = np.sum(leadfield * CiL, axis=0)      # (d,) = diag(L.T @ C_inv @ L)
+        CiL = C_inv @ leadfield  # (m, d)
+        denom = np.sum(leadfield * CiL, axis=0)  # (d,) = diag(L.T @ C_inv @ L)
         denom = np.maximum(denom, 1e-15)
-        W = CiL / denom                              # (m, d) all filter weights
+        W = CiL / denom  # (m, d) all filter weights
         # power[i] = w_i.T @ C @ w_i
-        source_power = np.sum(W * (C @ W), axis=0)   # (d,)
+        source_power = np.sum(W * (C @ W), axis=0)  # (d,)
 
         # Step 2: Find peaks using adaptive thresholding
         # Normalize source power
@@ -419,15 +419,15 @@ class SolverAPSE(BaseSolver):
             # Posterior mean: Gamma @ L_patch.T @ Sigma_y_inv @ data
             # = diag(gamma) @ L_patch.T @ Sigma_y_inv @ data
             SiL = Sigma_y_inv @ L_patch  # (m, d_patch)
-            mu_post = (gamma[:, None] * (SiL.T @ data))  # (d_patch, t)
+            mu_post = gamma[:, None] * (SiL.T @ data)  # (d_patch, t)
 
             # Posterior variance diagonal: gamma - gamma^2 * diag(L.T @ Sinv @ L)
             z_diag = np.sum(L_patch * SiL, axis=0)  # (d_patch,)
-            sigma_post_diag = gamma - gamma ** 2 * z_diag
+            sigma_post_diag = gamma - gamma**2 * z_diag
 
             # M-step: vectorized hyperparameter update
             # data_term[j] = ||mu_post[j,:]||^2 / n_time + Sigma_post[j,j]
-            data_term = np.sum(mu_post ** 2, axis=1) / n_time + sigma_post_diag
+            data_term = np.sum(mu_post**2, axis=1) / n_time + sigma_post_diag
             data_term = np.real(data_term)
             gamma = (1 - self.sparsity_param) * data_term + self.sparsity_param * gamma
 
@@ -541,10 +541,9 @@ class SolverAPSE(BaseSolver):
 
             # Vectorized blend for all outside dipoles at once
             blend_factors = spatial_weights[outside_mask] * 0.3  # (n_outside,)
-            W_smooth[outside_mask, :] = (
-                (1 - blend_factors[:, None]) * W_smooth[outside_mask, :]
-                + blend_factors[:, None] * representative_activity
-            )
+            W_smooth[outside_mask, :] = (1 - blend_factors[:, None]) * W_smooth[
+                outside_mask, :
+            ] + blend_factors[:, None] * representative_activity
 
         return W_smooth
 
@@ -650,10 +649,9 @@ class SolverAPSE(BaseSolver):
             # Vectorized: apply to all outside dipoles where kernel > 0.1
             eligible = outside_mask & (spatial_kernel > 0.1)
             blend_factors = spatial_kernel[eligible] * 0.4  # (n_eligible,)
-            data[eligible, :] = (
-                (1 - blend_factors[:, None]) * data[eligible, :]
-                + blend_factors[:, None] * representative_signal
-            )
+            data[eligible, :] = (1 - blend_factors[:, None]) * data[
+                eligible, :
+            ] + blend_factors[:, None] * representative_signal
 
         stc_continuous = mne.SourceEstimate(
             data=data,

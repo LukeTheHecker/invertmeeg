@@ -53,13 +53,35 @@ MUSIC_SOLVERS = {"MUSIC", "RAP-MUSIC", "TRAP-MUSIC", "FLEX-MUSIC"}
 # These are: solvers with SUPPORTS_VECTOR_ORIENTATION = True + all beamformers
 FREE_ORIENTATION_SOLVERS = {
     # SUPPORTS_VECTOR_ORIENTATION = True (Backus-Gilbert excluded: free-ori bug)
-    "MNE", "eLORETA", "EPIFOCUS", "LCMV",
+    "MNE",
+    "eLORETA",
+    "EPIFOCUS",
+    "LCMV",
     # All beamformers (auto-detected via module path)
-    "Adapt-Flex-ESMV", "DICS", "Deblur-Flex-ESMV", "ESMV", "ESMV-MVPURE",
-    "Flex-ESMV", "Flex-ESMV-MVPURE", "Flex-ESMV2", "HOCMCMV", "HOCMV",
-    "IR-ESMV", "LCMV-MVPURE", "MCMV", "MVAB", "ReciPSIICOS", "SAM",
-    "SMV", "SSP-ESMV", "SSP-IR-ESMV", "Safe-Flex-ESMV", "Sharp-Flex-ESMV",
-    "Sharp-Flex-ESMV2", "Unit-Noise-Gain", "WNMV",
+    "Adapt-Flex-ESMV",
+    "DICS",
+    "Deblur-Flex-ESMV",
+    "ESMV",
+    "ESMV-MVPURE",
+    "Flex-ESMV",
+    "Flex-ESMV-MVPURE",
+    "Flex-ESMV2",
+    "HOCMCMV",
+    "HOCMV",
+    "IR-ESMV",
+    "LCMV-MVPURE",
+    "MCMV",
+    "MVAB",
+    "ReciPSIICOS",
+    "SAM",
+    "SMV",
+    "SSP-ESMV",
+    "SSP-IR-ESMV",
+    "Safe-Flex-ESMV",
+    "Sharp-Flex-ESMV",
+    "Sharp-Flex-ESMV2",
+    "Unit-Noise-Gain",
+    "WNMV",
 }
 
 
