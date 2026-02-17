@@ -85,9 +85,7 @@ class SolverSourceMAPMSP(BaseSolver):
         leadfield = self.leadfield
         data_cov = self.data_covariance(data, center=True, ddof=1)
         L_smooth, _gradient = self.get_smooth_prior_cov(leadfield, smoothness_order)
-        # Scale alphas against the raw leadfield (not the column-normalised
-        # L_smooth) because alpha enters the *final* inverse via raw L.
-        reg_reference = leadfield @ leadfield.T
+        reg_reference = L_smooth @ L_smooth.T
         reg_reference = 0.5 * (reg_reference + reg_reference.T)
         if not np.all(np.isfinite(reg_reference)) or np.linalg.norm(reg_reference) == 0:
             reg_reference = data_cov
