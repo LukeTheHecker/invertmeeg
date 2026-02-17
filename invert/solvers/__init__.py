@@ -115,13 +115,8 @@ __all__ = [
     # ANN (optional)
     "SolverCNN",
     "SolverCovCNN",
-    "SolverCovCNNCenters",
-    "SolverCovCNNMask",
     "SolverCovCNNKL",
-    "SolverCovCNNKLDiff",
-    "SolverCovCNNKLAdapt",
-    "SolverCovCNNStructKLDiff",
-    "SolverCovCNNBasisDiagKLDiff",
+    "SolverCovCNNKLFlexOMP",
     "SolverFC",
     "SolverLSTM",
     # Baseline

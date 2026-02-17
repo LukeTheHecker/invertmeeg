@@ -178,6 +178,8 @@ def _build_registry() -> dict[str, Any]:
         _add(["covcnn", "cov-cnn", "covnet"], solvers.SolverCovCNN)  # type: ignore[attr-defined]
         _add("lstm", solvers.SolverLSTM)  # type: ignore[attr-defined]
         _add("cnn", solvers.SolverCNN)  # type: ignore[attr-defined]
+        _add(["covcnn-kl", "cov-cnn-kl"], solvers.SolverCovCNNKL)  # type: ignore[attr-defined]
+        _add(["covcnn-kl-flexomp", "cov-cnn-kl-flexomp"], solvers.SolverCovCNNKLFlexOMP)  # type: ignore[attr-defined]
     except AttributeError:
         logger.debug("ANN solvers not available (torch not installed)")
 
@@ -227,6 +229,7 @@ def _build_registry() -> dict[str, Any]:
         ["generalized-iterative", "gi"],
         solvers.SolverGeneralizedIterative,
     )
+    _add(["exso-music", "exsomusic"], solvers.SolverExSoMUSIC)
 
     # -- Basis Functions ----------------------------------------------------
     _add("gbf", solvers.SolverBasisFunctions)

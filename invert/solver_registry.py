@@ -635,6 +635,27 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         class_name="SolverChimera",
     ),
     SolverSpec(
+        solver_id="exso-music",
+        module_path="invert.solvers.music.exso_music",
+        class_name="SolverExSoMUSIC",
+        aliases=("exsomusic",),
+    ),
+    # -- Artificial Neural Networks (optional torch) ------------------------
+    SolverSpec(
+        solver_id="covcnn-kl",
+        module_path="invert.solvers.neural_networks.covcnn_kl",
+        class_name="SolverCovCNNKL",
+        aliases=("cov-cnn-kl",),
+        requires=("torch",),
+    ),
+    SolverSpec(
+        solver_id="covcnn-kl-flexomp",
+        module_path="invert.solvers.neural_networks.covcnn_kl_flexomp",
+        class_name="SolverCovCNNKLFlexOMP",
+        aliases=("cov-cnn-kl-flexomp",),
+        requires=("torch",),
+    ),
+    SolverSpec(
         solver_id="random-noise",
         module_path="invert.solvers.random_noise",
         class_name="SolverRandomNoise",
