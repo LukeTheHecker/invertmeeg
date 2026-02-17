@@ -193,9 +193,15 @@ def _cmem(Y, L, A=None, num_parcels=200, max_iter=100, batch_size=100):
     parcels = _data_driven_parcellation(Y, L, num_parcels, A=A, msp_scores=msp_all)
 
     # Step 2: Regularized MNE estimate for energy scaling and alpha init
-    LtL = L.T @ L
-    reg = 0.1 * np.trace(LtL) / n
-    J_mne = np.linalg.solve(LtL + reg * np.eye(n), L.T @ Y)
+    # Avoid forming (n, n) matrices (LtL) which is prohibitive when n_sources >> n_sensors.
+    # Use the ridge/MNE identity:
+    #   (L^T L + reg I)^{-1} L^T Y = L^T (L L^T + reg I)^{-1} Y
+    # This preserves the estimate (up to numerical precision) while reducing the solve to (m, m).
+    fro2 = float(np.sum(L * L))  # trace(L^T L)
+    reg = 0.1 * fro2 / n
+    LLt = L @ L.T
+    LLt.flat[:: m + 1] += reg
+    J_mne = L.T @ np.linalg.solve(LLt, Y)
     J_mne_power = np.mean(J_mne**2, axis=1)  # per-source RMS power
 
     # Step 3: Initialize parcel parameters
@@ -212,7 +218,9 @@ def _cmem(Y, L, A=None, num_parcels=200, max_iter=100, batch_size=100):
     power_quantiles = power_ranks / max(len(power_ranks) - 1, 1)
     parcel_quantile = dict(zip(unique_parcels, power_quantiles, strict=True))
 
-    precomputed = {}
+    xi_ref_full = L.T @ Y[:, 0]
+
+    precomputed = []
     max_E_k = 0.0  # track for calibration
     for parcel_id in unique_parcels:
         verts = np.where(parcels == parcel_id)[0]
@@ -232,11 +240,9 @@ def _cmem(Y, L, A=None, num_parcels=200, max_iter=100, batch_size=100):
         parcel_power = parcel_powers[parcel_id]
         Sigma_k = parcel_power * W_k
 
-        L_k = L[:, verts]
-
         # Estimate E_k scale: E_k = 0.5 * xi^T Sigma xi for reference lambda
         # Use y as reference lambda direction (near-optimal for small Sigma)
-        xi_ref = L_k.T @ Y[:, 0]
+        xi_ref = xi_ref_full[verts]
         E_ref = 0.5 * np.dot(xi_ref, Sigma_k @ xi_ref)
         max_E_k = max(max_E_k, E_ref)
 
@@ -244,26 +250,31 @@ def _cmem(Y, L, A=None, num_parcels=200, max_iter=100, batch_size=100):
         q = parcel_quantile[parcel_id]
         alpha_k = np.clip(0.01 + 0.98 * q**2, 0.01, 0.99)
 
-        precomputed[parcel_id] = {
-            "L_k": L_k,
-            "Sigma_k": Sigma_k,
-            "mu_k": mu_k,
-            "alpha_k": alpha_k,
-            "vertices": verts,
-        }
+        precomputed.append(
+            {
+                "parcel_id": int(parcel_id),
+                "Sigma_k": Sigma_k,
+                "mu_k": mu_k,
+                "alpha_k": alpha_k,
+                "vertices": verts,
+            }
+        )
 
     # Calibrate Sigma scale so max E_k ≈ target at the optimum.
     # Without this, E_k >> 1 saturates exp(E_k) and disables alpha.
     target_E = 10.0
     if max_E_k > 1e-30:
         sigma_scale = target_E / max_E_k
-        for precomp in precomputed.values():
+        for precomp in precomputed:
             precomp["Sigma_k"] *= sigma_scale
 
     # Step 4: Iterative MEM optimization with alpha/eta updates
     # Outer EM loop: optimize lambda (E-step), update alpha/eta (M-step)
     n_outer = 5
     logger.info("Running MEM optimization (%d outer iterations)...", n_outer)
+
+    # Warm-start across time points and outer iterations.
+    lambda_prev = np.zeros((m, t))
 
     for outer in range(n_outer):
         J = np.zeros((n, t))
@@ -276,12 +287,16 @@ def _cmem(Y, L, A=None, num_parcels=200, max_iter=100, batch_size=100):
             batch_end = min(batch_start + batch_size, t)
             Y_batch = Y[:, batch_start:batch_end]
 
-            lambda_batch = _optimize_lambda_batch(Y_batch, precomputed, max_iter)
-            J_batch = _compute_sources_batch(lambda_batch, precomputed, n)
+            lambda_init = lambda_prev[:, batch_start:batch_end]
+            lambda_batch = _optimize_lambda_batch(
+                Y_batch, L, precomputed, max_iter=max_iter, lambda_init=lambda_init
+            )
+            lambda_prev[:, batch_start:batch_end] = lambda_batch
+            J_batch = _compute_sources_batch(lambda_batch, L, precomputed, n)
             J[:, batch_start:batch_end] = J_batch
 
         if outer < n_outer - 1:
-            _update_parcel_params(J, precomputed, L)
+            _update_parcel_params(J, precomputed)
 
     return J, parcels
 
@@ -304,7 +319,13 @@ def _data_driven_parcellation(Y, L, num_parcels, A=None, msp_scores=None):
         kmeans = KMeans(n_clusters=num_parcels, random_state=42, n_init=10)
         return kmeans.fit_predict(msp_scores.reshape(-1, 1))
 
-    # Region growing on mesh, seeded by descending MSP score
+    # Region growing on mesh, seeded by descending MSP score.
+    #
+    # Important: grow *exactly* `num_parcels` spatially contiguous parcels.
+    # A previous greedy "fill target_size then start a new parcel" approach can
+    # fragment the mesh when seeds are scattered, producing far more parcels
+    # than requested (many tiny parcels), which slows MEM optimization and
+    # hurts spatial coherence.
     if hasattr(A, "tocsr"):
         A_csr = A.tocsr()
     else:
@@ -313,30 +334,22 @@ def _data_driven_parcellation(Y, L, num_parcels, A=None, msp_scores=None):
         A_csr = csr_matrix(A)
 
     parcels = np.full(n, -1, dtype=int)
-    target_size = max(1, n // num_parcels)
-    seeds = np.argsort(msp_scores)[::-1]
+    seeds = np.argsort(msp_scores)[::-1][:num_parcels]
 
-    parcel_id = 0
-    for seed in seeds:
-        if parcels[seed] >= 0:
-            continue
-
-        queue = deque([seed])
+    # Multi-source BFS: simultaneous growth from all seeds.
+    queue = deque()
+    for parcel_id, seed in enumerate(seeds):
         parcels[seed] = parcel_id
-        count = 1
+        queue.append(seed)
 
-        while queue and count < target_size:
-            node = queue.popleft()
-            start, end = A_csr.indptr[node], A_csr.indptr[node + 1]
-            for nb in A_csr.indices[start:end]:
-                if parcels[nb] < 0:
-                    parcels[nb] = parcel_id
-                    queue.append(nb)
-                    count += 1
-                    if count >= target_size:
-                        break
-
-        parcel_id += 1
+    while queue:
+        node = queue.popleft()
+        parcel_id = parcels[node]
+        start, end = A_csr.indptr[node], A_csr.indptr[node + 1]
+        for nb in A_csr.indices[start:end]:
+            if parcels[nb] < 0:
+                parcels[nb] = parcel_id
+                queue.append(nb)
 
     # Assign any remaining unassigned vertices to nearest assigned neighbor
     unassigned = np.where(parcels < 0)[0]
@@ -392,7 +405,7 @@ def _compute_spatial_covariance(vertices, A, alpha=0.2):
     return Sigma
 
 
-def _update_parcel_params(J, precomputed, L):
+def _update_parcel_params(J, precomputed):
     """Update alpha from posterior source estimates (M-step).
 
     After solving MEM with current parameters, use the estimated source
@@ -403,36 +416,42 @@ def _update_parcel_params(J, precomputed, L):
 
     # Rank parcels by posterior power
     parcel_powers = []
-    for precomp in precomputed.values():
+    for precomp in precomputed:
         verts = precomp["vertices"]
         parcel_powers.append(np.mean(J_power[verts]))
     power_arr = np.array(parcel_powers)
     ranks = np.argsort(np.argsort(power_arr)).astype(float)
     quantiles = ranks / max(len(ranks) - 1, 1)
 
-    for i, precomp in enumerate(precomputed.values()):
+    for i, precomp in enumerate(precomputed):
         q = quantiles[i]
         precomp["alpha_k"] = np.clip(0.01 + 0.98 * q**2, 0.01, 0.99)
 
 
-def _mem_dual_obj_grad(lambda_vec, y_t, precomputed):
+def _mem_dual_obj_grad(lambda_vec, y_t, L, precomputed, w_full):
     """MEM dual objective and gradient (minimization form).
 
     Minimize: D(lambda) = -lambda^T y + 0.5*||lambda||^2
               + sum_k log[(1-alpha_k) + alpha_k*exp(E_k)]
     where E_k = mu_k^T xi_k + 0.5*xi_k^T Sigma_k xi_k
-    and xi_k = L_k^T lambda.
+    and xi_k = (L[:, vertices_k]^T) lambda.
     """
     obj = -np.dot(lambda_vec, y_t) + 0.5 * np.dot(lambda_vec, lambda_vec)
     grad = -y_t + lambda_vec.copy()
 
-    for precomp in precomputed.values():
-        L_k = precomp["L_k"]
+    # Parcels form a partition of the source space, so summing L_k @ v_k over parcels
+    # is equivalent to a single L @ v_full. Computing xi_full = L.T @ lambda once and
+    # accumulating v_full avoids many small BLAS calls inside the optimizer.
+    xi_full = L.T @ lambda_vec
+    w_full.fill(0.0)
+
+    for precomp in precomputed:
         Sigma_k = precomp["Sigma_k"]
         mu_k = precomp["mu_k"]
         alpha_k = precomp["alpha_k"]
+        vertices = precomp["vertices"]
 
-        xi_k = L_k.T @ lambda_vec
+        xi_k = xi_full[vertices]
         Sigma_xi = Sigma_k @ xi_k
         E_k = np.dot(mu_k, xi_k) + 0.5 * np.dot(xi_k, Sigma_xi)
 
@@ -443,27 +462,38 @@ def _mem_dual_obj_grad(lambda_vec, y_t, precomputed):
         p_k = alpha_k * exp_E / denom
 
         obj += np.log(denom)
-        grad += L_k @ (p_k * (mu_k + Sigma_xi))
+        w_full[vertices] = p_k * (mu_k + Sigma_xi)
+
+    grad += L @ w_full
 
     return obj, grad
 
 
-def _optimize_lambda_batch(Y_batch, precomputed, max_iter=100):
+def _optimize_lambda_batch(Y_batch, L, precomputed, max_iter=100, lambda_init=None):
     """Optimize Lagrange multipliers for a batch of time points."""
     m, batch_size = Y_batch.shape
     lambda_batch = np.zeros((m, batch_size))
+    n = L.shape[1]
 
     for i in range(batch_size):
         y_t = Y_batch[:, i]
+        if lambda_init is not None:
+            x0 = lambda_init[:, i]
+        elif i > 0:
+            x0 = lambda_batch[:, i - 1]
+        else:
+            x0 = np.zeros(m)
 
-        def obj_grad(lam, y_t=y_t):
-            return _mem_dual_obj_grad(lam, y_t, precomputed)
+        w_full = np.empty(n)
+
+        def obj_grad(lam, y_t=y_t, w_full=w_full):
+            return _mem_dual_obj_grad(lam, y_t, L, precomputed, w_full)
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             result = minimize(
                 obj_grad,
-                np.zeros(m),
+                x0,
                 method="L-BFGS-B",
                 jac=True,
                 options={"maxiter": max_iter},
@@ -474,7 +504,7 @@ def _optimize_lambda_batch(Y_batch, precomputed, max_iter=100):
     return lambda_batch
 
 
-def _compute_sources_batch(lambda_batch, precomputed, n):
+def _compute_sources_batch(lambda_batch, L, precomputed, n):
     """Compute source estimates from optimized Lagrange multipliers.
 
     J_k = p_k * (mu_k + Sigma_k @ xi_k)
@@ -483,14 +513,15 @@ def _compute_sources_batch(lambda_batch, precomputed, n):
     _, batch_size = lambda_batch.shape
     J_batch = np.zeros((n, batch_size))
 
-    for precomp in precomputed.values():
+    xi_full = L.T @ lambda_batch  # (n, batch)
+
+    for precomp in precomputed:
         vertices = precomp["vertices"]
-        L_k = precomp["L_k"]
         Sigma_k = precomp["Sigma_k"]
         mu_k = precomp["mu_k"]
         alpha_k = precomp["alpha_k"]
 
-        xi_k = L_k.T @ lambda_batch  # (n_v, batch)
+        xi_k = xi_full[vertices, :]  # (n_v, batch)
         Sigma_xi = Sigma_k @ xi_k  # (n_v, batch)
 
         # E_k per time point
