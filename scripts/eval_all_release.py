@@ -31,7 +31,6 @@ if __name__ == "__main__":
             "EBB",
             "ReciPSIICOS-Plain",
             "ReciPSIICOS-Whitened",
-            "CMEM",
         ],
         # solvers=[
         #     "CovCNN",

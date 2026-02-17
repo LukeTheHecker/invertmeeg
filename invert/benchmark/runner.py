@@ -26,183 +26,17 @@ _eval_mod = _ilu.module_from_spec(_spec)
 _spec.loader.exec_module(_eval_mod)
 evaluate_all = _eval_mod.evaluate_all
 from invert.simulate import SimulationConfig, SimulationGenerator  # noqa: E402
+from invert.solver_registry import (  # noqa: E402
+    get_solver_class,
+    get_solver_spec,
+    iter_solver_specs,
+)
 from invert.solvers.base import BaseSolver  # noqa: E402
 from invert.util.util import pos_from_forward  # noqa: E402
 
 from .datasets import BENCHMARK_DATASETS, DatasetConfig  # noqa: E402
 
 logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Solver registry: maps short name -> (module_path, class_name)
-# Lazy-imported to avoid loading all solvers at module level.
-# ---------------------------------------------------------------------------
-
-_SOLVER_REGISTRY: dict[str, tuple[str, str]] = {
-    # Minimum-norm family
-    "MNE": ("invert.solvers.minimum_norm.mne", "SolverMNE"),
-    "GFTMNE": ("invert.solvers.minimum_norm.gft_mne", "SolverGFTMNE"),
-    "WMNE": ("invert.solvers.minimum_norm.wmne", "SolverWMNE"),
-    "dSPM": ("invert.solvers.minimum_norm.dspm", "SolverDSPM"),
-    "dSPM-MNE": ("invert.solvers.minimum_norm.dspm_mne", "SolverDSPMMNE"),
-    "MCE": ("invert.solvers.minimum_norm.minimum_l1_norm", "SolverMinimumL1Norm"),
-    "GFTMCE": (
-        "invert.solvers.minimum_norm.gft_minimum_l1_norm",
-        "SolverGFTMinimumL1Norm",
-    ),
-    "MCE-GPT": (
-        "invert.solvers.minimum_norm.minimum_l1_norm_gpt",
-        "SolverMinimumL1NormGPT",
-    ),
-    "MCE-L1L2": (
-        "invert.solvers.minimum_norm.minimum_l1_l2_norm",
-        "SolverMinimumL1L2Norm",
-    ),
-    "SSLOFO": ("invert.solvers.minimum_norm.sslofo", "SolverSSLOFO"),
-    "SMAP": ("invert.solvers.minimum_norm.smap", "SolverSMAP"),
-    "EPIFOCUS": ("invert.solvers.minimum_norm.epifocus", "SolverEPIFOCUS"),
-    "BasisFunctions": (
-        "invert.solvers.minimum_norm.basis_functions",
-        "SolverBasisFunctions",
-    ),
-    # "BackusGilbert": ("invert.solvers.minimum_norm.backus_gilbert", "SolverBackusGilbert"),
-    "LAURA": ("invert.solvers.minimum_norm.laura", "SolverLAURA"),
-    "TV": ("invert.solvers.minimum_norm.total_variation", "SolverTotalVariation"),
-    # LORETA family
-    "LORETA": ("invert.solvers.minimum_norm.loreta", "SolverLORETA"),
-    "sLORETA": ("invert.solvers.minimum_norm.sloreta", "SolverSLORETA"),
-    "eLORETA": ("invert.solvers.minimum_norm.eloreta", "SolverELORETA"),
-    "SelfRegELORETA": (
-        "invert.solvers.minimum_norm.self_regularized",
-        "SolverSelfRegularizedELORETA",
-    ),
-    # Beamformers
-    "MVAB": ("invert.solvers.beamformers.mvab", "SolverMVAB"),
-    "LCMV": ("invert.solvers.beamformers.lcmv", "SolverLCMV"),
-    "LCMV-MVPURE": ("invert.solvers.beamformers.lcmv_mvpure", "SolverLCMVMVPURE"),
-    "SMV": ("invert.solvers.beamformers.smv", "SolverSMV"),
-    "WNMV": ("invert.solvers.beamformers.wnmv", "SolverWNMV"),
-    "HOCMV": ("invert.solvers.beamformers.hocmv", "SolverHOCMV"),
-    "MCMV": ("invert.solvers.beamformers.mcmv", "SolverMCMV"),
-    "UNIG": ("invert.solvers.beamformers.unit_noise_gain", "SolverUnitNoiseGain"),
-    "HOCMCMV": ("invert.solvers.beamformers.hocmcmv", "SolverHOCMCMV"),
-    "SAM": ("invert.solvers.beamformers.sam", "SolverSAM"),
-    # "EBB": ("invert.solvers.beamformers.ebb", "SolverEBB"),
-    "ESMV": ("invert.solvers.beamformers.esmv", "SolverESMV"),
-    "ESMV-MVPURE": ("invert.solvers.beamformers.esmv_mvpure", "SolverESMVMVPURE"),
-    "ESMV2": ("invert.solvers.beamformers.esmv2", "SolverESMV2"),
-    "ESMV3": ("invert.solvers.beamformers.esmv3", "SolverESMV3"),
-    "DeblurFlexESMV": (
-        "invert.solvers.beamformers.deblur_flex_esmv",
-        "SolverDeblurFlexESMV",
-    ),
-    "FlexESMV": ("invert.solvers.beamformers.flex_esmv", "SolverFlexESMV"),
-    "FlexESMV-MVPURE": (
-        "invert.solvers.beamformers.flex_esmv_mvpure",
-        "SolverFlexESMVMVPURE",
-    ),
-    "SafeFlexESMV": ("invert.solvers.beamformers.safe_flex_esmv", "SolverSafeFlexESMV"),
-    "SharpFlexESMV": (
-        "invert.solvers.beamformers.sharp_flex_esmv",
-        "SolverSharpFlexESMV",
-    ),
-    "SharpFlexESMV2": (
-        "invert.solvers.beamformers.sharp_flex_esmv2",
-        "SolverSharpFlexESMV2",
-    ),
-    "AdaptFlexESMV": (
-        "invert.solvers.beamformers.adapt_flex_esmv",
-        "SolverAdaptFlexESMV",
-    ),
-    "SSP-ESMV": ("invert.solvers.beamformers.ssp_esmv", "SolverSSPESMV"),
-    "IR-ESMV": ("invert.solvers.beamformers.iresmv", "SolverIRESMV"),
-    "SSP-IR-ESMV": ("invert.solvers.beamformers.ssp_iresmv", "SolverSSPIRESMV"),
-    "ReciPSIICOS-Plain": (
-        "invert.solvers.beamformers.recipsiicos_plain",
-        "SolverReciPSIICOSPlain",
-    ),
-    "ReciPSIICOS-Whitened": (
-        "invert.solvers.beamformers.recipsiicos_whitened",
-        "SolverReciPSIICOSWhitened",
-    ),
-    # Empirical Bayes
-    "Champagne": ("invert.solvers.bayesian.champagne", "SolverChampagne"),
-    "NLChampagne": ("invert.solvers.bayesian.nl_champagne", "SolverNLChampagne"),
-    "FlexChampagne": ("invert.solvers.bayesian.flex_champagne", "SolverFlexChampagne"),
-    "FlexNLChampagne": (
-        "invert.solvers.bayesian.flex_nl_champagne",
-        "SolverFlexNLChampagne",
-    ),
-    "OmniChampagne": ("invert.solvers.bayesian.omni_champagne", "SolverOmniChampagne"),
-    # Sparse Bayesian
-    "MSP": ("invert.solvers.bayesian.msp", "SolverMSP"),
-    "BCS": ("invert.solvers.bayesian.bcs", "SolverBCS"),
-    "GammaMAP": ("invert.solvers.bayesian.gamma_map", "SolverGammaMAP"),
-    "SourceMAP": ("invert.solvers.bayesian.source_map", "SolverSourceMAP"),
-    "GammaMAPMSP": ("invert.solvers.bayesian.gamma_map_msp", "SolverGammaMAPMSP"),
-    "SourceMAPMSP": ("invert.solvers.bayesian.source_map_msp", "SolverSourceMAPMSP"),
-    "CMEM": ("invert.solvers.bayesian.cmem", "SolverCMEM"),
-    "SubspaceSBL": ("invert.solvers.bayesian.subspace_sbl", "SolverSubspaceSBL"),
-    "SubspaceSBLPlus": (
-        "invert.solvers.bayesian.subspace_sbl",
-        "SolverSubspaceSBLPlus",
-    ),
-    "VBSBL": ("invert.solvers.bayesian.vb_sbl", "SolverVBSBL"),
-    # MUSIC / subspace
-    "MUSIC": ("invert.solvers.music", "SolverMUSIC"),
-    # "ExSoMUSIC": ("invert.solvers.music", "SolverExSoMUSIC"),
-    "FLEX-MUSIC": ("invert.solvers.music", "SolverFLEXMUSIC"),
-    "FLEX-MUSIC-2": ("invert.solvers.music", "SolverFLEXMUSIC_2"),
-    "AltProj": ("invert.solvers.music", "SolverAlternatingProjections"),
-    "AdaptiveAltProj": ("invert.solvers.music", "SolverAdaptiveAlternatingProjections"),
-    "SSM": ("invert.solvers.music", "SolverSignalSubspaceMatching"),
-    "GenIterative": ("invert.solvers.music", "SolverGeneralizedIterative"),
-    # Matching pursuit
-    "OMP": ("invert.solvers.matching_pursuit", "SolverOMP"),
-    "COSAMP": ("invert.solvers.matching_pursuit", "SolverCOSAMP"),
-    "REMBO": ("invert.solvers.matching_pursuit", "SolverREMBO"),
-    "SP": ("invert.solvers.matching_pursuit", "SolverSP"),
-    "SubSMP": ("invert.solvers.matching_pursuit", "SolverSubSMP"),
-    "ISubSMP": ("invert.solvers.matching_pursuit", "SolverISubSMP"),
-    # Other
-    "APSE": ("invert.solvers.hybrids.apse", "SolverAPSE"),
-    "Chimera": ("invert.solvers.hybrids.chimera", "SolverChimera"),
-    "ECD": ("invert.solvers.dipoles", "SolverECD"),
-    "SESAME": ("invert.solvers.dipoles", "SolverSESAME"),
-    # Baseline
-    "RandomNoise": ("invert.solvers.random_noise", "SolverRandomNoise"),
-    # Neural Networks (optional torch)
-    "FC": ("invert.solvers.neural_networks.fc", "SolverFC"),
-    "CovCNN": ("invert.solvers.neural_networks.covcnn", "SolverCovCNN"),
-    "CovCNN-Centers": (
-        "invert.solvers.neural_networks.covcnn_centers",
-        "SolverCovCNNCenters",
-    ),
-    "CovCNN-Mask": ("invert.solvers.neural_networks.covcnn_mask", "SolverCovCNNMask"),
-    "CovCNN-KL": ("invert.solvers.neural_networks.covcnn_kl", "SolverCovCNNKL"),
-    "CovCNN-KL-FLEXOMP": (
-        "invert.solvers.neural_networks.covcnn_kl_flexomp",
-        "SolverCovCNNKLFlexOMP",
-    ),
-    "CovCNN-KL-Diff": (
-        "invert.solvers.neural_networks.covcnn_kl_diff",
-        "SolverCovCNNKLDiff",
-    ),
-    "CovCNN-KL-Adapt": (
-        "invert.solvers.neural_networks.covcnn_kl_adapt",
-        "SolverCovCNNKLAdapt",
-    ),
-    "CovCNN-StructKL-Diff": (
-        "invert.solvers.neural_networks.covcnn_structkl_diff",
-        "SolverCovCNNStructKLDiff",
-    ),
-    "CovCNN-BasisDiagKL-Diff": (
-        "invert.solvers.neural_networks.covcnn_basisdiag_kl_diff",
-        "SolverCovCNNBasisDiagKLDiff",
-    ),
-    "LSTM": ("invert.solvers.neural_networks.lstm", "SolverLSTM"),
-    "CNN": ("invert.solvers.neural_networks.cnn", "SolverCNN"),
-}
 
 
 def _expects_simulation_config(solver_cls: type[BaseSolver]) -> bool:
@@ -241,57 +75,40 @@ def _default_nn_batch_size(forward: mne.Forward) -> int:
 
 
 def _generate_solver_categories() -> dict[str, list[str]]:
-    """Automatically generate solver categories based on directory structure.
+    """Automatically generate solver categories from solver_registry.
 
     Categories are determined by the solver's module path:
     - beamformers/ -> beamformer
     - bayesian/ -> bayesian
-    - minimum_norm/ -> loreta (if name contains "LORETA") or minimum_norm
+    - minimum_norm/ -> loreta (if solver_id contains "loreta") or minimum_norm
     - music/ -> music
     - matching_pursuit/ -> matching_pursuit
     - hybrids/ -> other
     - neural_networks/ -> neural_networks
+    - dipoles/ -> other
     - random_noise -> other
-    - _old/ -> excluded
-
-    Special cases:
-    - RandomNoise -> other (not baseline)
     """
     categories: dict[str, list[str]] = {}
 
-    # Solver names that should be categorized as "other" regardless of directory
-    other_solvers = {
-        "RandomNoise",  # Should be other, not baseline
-    }
-
-    for solver_name, (module_path, _) in _SOLVER_REGISTRY.items():
-        # Skip solvers from _old directory
-        if "_old" in module_path:
-            continue
-
-        # Handle special cases
-        if solver_name in other_solvers:
-            categories.setdefault("other", []).append(solver_name)
-            continue
+    for spec in iter_solver_specs(include_internal=False, include_unavailable=True):
+        module_path = spec.module_path
+        solver_id = spec.solver_id
 
         # Extract directory from module path
         # e.g., "invert.solvers.beamformers.esmv" -> "beamformers"
         parts = module_path.split(".")
         if len(parts) < 3 or parts[0] != "invert" or parts[1] != "solvers":
-            # Fallback: put in other
-            categories.setdefault("other", []).append(solver_name)
+            categories.setdefault("other", []).append(solver_id)
             continue
 
         directory = parts[2]
 
-        # Map directory to category
         if directory == "beamformers":
             category = "beamformer"
         elif directory == "bayesian":
             category = "bayesian"
         elif directory == "minimum_norm":
-            # Split based on solver name
-            if "LORETA" in solver_name:
+            if "loreta" in solver_id:
                 category = "loreta"
             else:
                 category = "minimum_norm"
@@ -299,21 +116,13 @@ def _generate_solver_categories() -> dict[str, list[str]]:
             category = "music"
         elif directory == "matching_pursuit":
             category = "matching_pursuit"
-        elif directory == "hybrids":
-            category = "other"
         elif directory == "neural_networks":
             category = "neural_networks"
-        elif (
-            directory == "random_noise" or module_path == "invert.solvers.random_noise"
-        ):
-            category = "other"
         else:
-            # Unknown directory, put in other
             category = "other"
 
-        categories.setdefault(category, []).append(solver_name)
+        categories.setdefault(category, []).append(solver_id)
 
-    # Sort solver lists within each category for consistency
     for category in categories:
         categories[category].sort()
 
@@ -323,34 +132,25 @@ def _generate_solver_categories() -> dict[str, list[str]]:
 SOLVER_CATEGORIES = _generate_solver_categories()
 
 
-def get_solver_class(name: str) -> type[BaseSolver]:
-    """Lazy-import and return a solver class by its short name."""
-    if name not in _SOLVER_REGISTRY:
-        raise ValueError(
-            f"Unknown solver {name!r}. Available: {sorted(_SOLVER_REGISTRY)}"
-        )
-    module_path, class_name = _SOLVER_REGISTRY[name]
-    import importlib
-
-    mod = importlib.import_module(module_path)
-    return getattr(mod, class_name)
-
-
 def get_solver_category(solver_name: str) -> str:
-    """Get the category for a solver name.
+    """Get the category for a solver (accepts any alias).
 
     Parameters
     ----------
     solver_name : str
-        The solver's short name.
+        The solver's canonical id or any known alias.
 
     Returns
     -------
     str
         The category name, or "other" if not found in any category.
     """
+    try:
+        sid = get_solver_spec(solver_name).solver_id
+    except ValueError:
+        return "other"
     for category, solvers in SOLVER_CATEGORIES.items():
-        if solver_name in solvers:
+        if sid in solvers:
             return category
     return "other"
 
@@ -365,26 +165,35 @@ def resolve_solvers(
     Parameters
     ----------
     solvers : list of str, optional
-        Explicit solver short names (e.g. ``["MNE", "LCMV"]``).
+        Explicit solver names or aliases (e.g. ``["MNE", "Champagne"]``).
     categories : list of str, optional
         Category names to include (e.g. ``["beamformer", "loreta"]``).
-        Use ``"all"`` to include every registered (non-neural-net) solver.
+        Use ``"all"`` to include every registered (non-internal) solver.
     exclude : list of str, optional
-        Solver names to exclude from the result.
+        Solver names or aliases to exclude from the result.
 
     Returns
     -------
     list of str
-        Deduplicated, order-preserved list of solver names.
+        Deduplicated, order-preserved list of canonical solver_ids.
     """
     result: list[str] = []
     seen: set[str] = set()
-    exclude_set = set(exclude) if exclude else set()
+
+    exclude_ids: set[str] = set()
+    if exclude:
+        for name in exclude:
+            exclude_ids.add(get_solver_spec(name).solver_id)
 
     if categories:
         for cat in categories:
             if cat == "all":
-                names = list(_SOLVER_REGISTRY.keys())
+                names = [
+                    spec.solver_id
+                    for spec in iter_solver_specs(
+                        include_internal=False, include_unavailable=True
+                    )
+                ]
             elif cat in SOLVER_CATEGORIES:
                 names = SOLVER_CATEGORIES[cat]
             else:
@@ -393,25 +202,22 @@ def resolve_solvers(
                     f"Available: {sorted(SOLVER_CATEGORIES)} or 'all'"
                 )
             for n in names:
-                if n not in seen and n not in exclude_set:
+                if n not in seen and n not in exclude_ids:
                     seen.add(n)
                     result.append(n)
 
     if solvers:
-        for n in solvers:
-            if n not in _SOLVER_REGISTRY:
-                raise ValueError(
-                    f"Unknown solver {n!r}. Available: {sorted(_SOLVER_REGISTRY)}"
-                )
-            if n not in seen and n not in exclude_set:
-                seen.add(n)
-                result.append(n)
+        for name in solvers:
+            sid = get_solver_spec(name).solver_id
+            if sid not in seen and sid not in exclude_ids:
+                seen.add(sid)
+                result.append(sid)
 
     return result
 
 
 # Default solvers when nothing is specified
-_DEFAULT_SOLVERS = ["MNE", "eLORETA", "LCMV", "Champagne", "RandomNoise"]
+_DEFAULT_SOLVERS = ["mne", "eloreta", "lcmv", "champagne-mackay", "random-noise"]
 
 
 # ---------------------------------------------------------------------------
@@ -593,9 +399,11 @@ class BenchmarkRunner:
         self.forward = forward
         self.info = info
         if solvers is None and categories is None:
-            self.solvers = [
-                s for s in _DEFAULT_SOLVERS if s not in set(exclude_solvers or [])
-            ]
+            exclude_ids: set[str] = set()
+            if exclude_solvers:
+                for name in exclude_solvers:
+                    exclude_ids.add(get_solver_spec(name).solver_id)
+            self.solvers = [s for s in _DEFAULT_SOLVERS if s not in exclude_ids]
         else:
             self.solvers = resolve_solvers(
                 solvers=solvers, categories=categories, exclude=exclude_solvers
@@ -603,7 +411,10 @@ class BenchmarkRunner:
         self.datasets = datasets or dict(BENCHMARK_DATASETS)
         self.n_samples = n_samples
         self.random_seed = random_seed
-        self.solver_params = solver_params or {}
+        # Normalize solver_params keys to canonical solver_ids
+        self.solver_params = {
+            get_solver_spec(k).solver_id: v for k, v in (solver_params or {}).items()
+        }
 
         # Auto-detect n_jobs if not specified
         if n_jobs is None:
@@ -653,11 +464,13 @@ class BenchmarkRunner:
 
                 for solver_name in self.solvers:
                     logger.info("  Solver: %s", solver_name)
+                    spec = get_solver_spec(solver_name)
                     solver_cls = get_solver_class(solver_name)
                     init_params, make_params, apply_params = _split_solver_params(
                         self.solver_params.get(solver_name, {})
                     )
-                    solver = solver_cls(**init_params)
+                    merged_init = {**spec.default_kwargs, **init_params}
+                    solver = solver_cls(**merged_init)
 
                     # Best-effort determinism for fair comparisons when a seed is provided.
                     if self.random_seed is not None:
@@ -833,11 +646,18 @@ class BenchmarkRunner:
                         )
                     else:
                         # Parallelize full computation (require_recompute=True)
-                        module_path, class_name = _SOLVER_REGISTRY[solver_name]
+                        # Merge default_kwargs as init__ prefixed keys so the
+                        # worker receives them through _split_solver_params.
+                        merged_params = {
+                            f"init__{k}": v for k, v in spec.default_kwargs.items()
+                        }
+                        merged_params.update(
+                            self.solver_params.get(solver_name, {})
+                        )
 
                         sample_metrics = self._run_parallel_compute(
-                            module_path,
-                            class_name,
+                            spec.module_path,
+                            spec.class_name,
                             self.forward,
                             self.info,
                             x_batch,
@@ -848,7 +668,7 @@ class BenchmarkRunner:
                             ds_name,
                             solver_name,
                             noise_cov,
-                            self.solver_params.get(solver_name, {}),
+                            merged_params,
                         )
                         total_seconds = time.perf_counter() - t_solver_start
                         timing_info = TimingInfo(total_seconds=total_seconds)

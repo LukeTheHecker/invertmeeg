@@ -1,12 +1,10 @@
 import logging
-from copy import deepcopy
 
 import mne
 import numpy as np
-from scipy.sparse import diags
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
-from .sbl_core import sbl_iterate
+from .sbl_core import _cholesky_inv, sbl_iterate
 
 logger = logging.getLogger(__name__)
 EPSILON = 1e-10
@@ -191,7 +189,16 @@ class SolverChampagne(BaseSolver):
         self.noise_cov = noise_cov_projected / noise_scale
 
         data_cov = self.data_covariance(data_projected, center=True, ddof=1)
-        self.get_alphas(reference=data_cov)
+        # Noise-learning variants with Convexity-style updates converge to
+        # the same fixed point regardless of the initial noise level (alpha),
+        # because the update rule doesn't depend on the previous gammas and
+        # the noise is re-estimated every iteration.  Searching over a grid
+        # of alphas just wastes compute and triggers spurious edge-of-grid
+        # warnings from GCV.  Use a single well-scaled initial noise level.
+        if self.noise_learning == "learn" and self.alpha == "auto":
+            self.alphas = [float(noise_scale)]
+        else:
+            self.get_alphas(reference=data_cov)
         inverse_operators = []
         original_leadfield = self.leadfield
         self.leadfield = wf.G_white
@@ -235,46 +242,69 @@ class SolverChampagne(BaseSolver):
         L_orig = np.asarray(self.leadfield, dtype=float)
         L_norms = np.maximum(np.linalg.norm(L_orig, axis=0), self.eps)
         L_full_scaled = L_orig / L_norms
-        L = deepcopy(L_full_scaled)
+        L = L_full_scaled.copy()
 
         # re-reference data for noise learning modes (FUN/HSChampagne requirement)
         if self.noise_learning == "learn":
             Y = Y - Y.mean(axis=0)
 
-        # Scaling of the data (necessary for convergence criterion and pruning threshold)
-        Y_scaled = deepcopy(Y)
+        Y_scaled = Y.copy()
 
         scaler = 1.0  # Keep track of scaler even if not used
-        # scaler = abs(Y_scaled).mean()
-        # Y_scaled /= scaler
 
-        I = np.identity(n_chans)
         gammas = np.ones(n_dipoles)
-        Gamma = diags(gammas, 0)
 
         # Initialize noise covariance based on learning mode
+        I_chans = np.eye(n_chans)
         base_noise_cov = getattr(self, "noise_cov", None)
         if base_noise_cov is None:
-            base_noise_cov = I
+            base_noise_cov = I_chans
         base_noise_cov = np.asarray(base_noise_cov, dtype=float)
         if base_noise_cov.shape != (n_chans, n_chans):
-            base_noise_cov = I
+            base_noise_cov = I_chans
         base_noise_cov = 0.5 * (base_noise_cov + base_noise_cov.T)
 
         if self.noise_learning == "learn":
             if self.noise_learning_mode in {"diagonal", "precision"}:
                 base_noise_cov = np.diag(np.diag(base_noise_cov))
             elif self.noise_learning_mode == "homoscedastic":
-                base_noise_cov = I
+                base_noise_cov = I_chans
         noise_cov = float(alpha) * base_noise_cov
 
         # Fast path: delegate to shared SBL engine for standard rules
         rule_lower = self.update_rule.lower()
-        if (
-            rule_lower in {"mackay", "convexity", "mm", "em", "lowsnr"}
-            and self.noise_learning != "learn"
-        ):
-            sbl_rule = "convexity" if rule_lower == "lowsnr" else rule_lower
+        _fast_rules = {"mackay", "convexity", "mm", "em", "lowsnr",
+                       "adaptive", "dynamic_adaptive"}
+        if rule_lower in _fast_rules and self.noise_learning != "learn":
+            if rule_lower == "lowsnr":
+                sbl_rule = "convexity"
+            elif rule_lower == "adaptive":
+                noise_diag_mean = float(np.mean(np.diag(noise_cov)))
+
+                def sbl_rule(mu_x, gammas, z_diag, n_times,
+                             _ndm=noise_diag_mean):
+                    upper = np.mean(mu_x**2, axis=1)
+                    snr = upper / _ndm
+                    exp = 0.5 + 0.5 / (1 + np.exp(-snr + 5))
+                    return (upper / (z_diag + 1e-20)) ** exp
+            elif rule_lower == "dynamic_adaptive":
+                noise_diag_mean = float(np.mean(np.diag(noise_cov)))
+                _iter_count = [0]
+
+                def sbl_rule(mu_x, gammas, z_diag, n_times,
+                             _ndm=noise_diag_mean, _it=_iter_count):
+                    upper = np.mean(mu_x**2, axis=1)
+                    snr = upper / _ndm
+                    i = _it[0]; _it[0] += 1
+                    ifact = 1 - np.exp(-i / 10)
+                    sfact = 1 / (1 + np.exp(-snr + 5))
+                    mackay = upper / (gammas * z_diag + 1e-20)
+                    convex = np.sqrt(upper / (z_diag + 1e-20))
+                    weighted = (sfact * mackay + (1 - sfact) * convex) ** ifact
+                    smooth = 0.1 * (1 - ifact)
+                    return (1 - smooth) * weighted + smooth * gammas
+            else:
+                sbl_rule = rule_lower
             result = sbl_iterate(
                 L=L_full_scaled,
                 Y=Y_scaled,
@@ -284,30 +314,30 @@ class SolverChampagne(BaseSolver):
                 prune=self.prune,
                 pruning_thresh=pruning_thresh,
                 conv_crit=self.convergence_criterion,
-                inverse_fn=self.robust_inverse,
             )
             gammas_scaled = np.zeros(n_dipoles)
             gammas_scaled[result.active_set] = result.gammas
             gammas_final = gammas_scaled / (L_norms**2)
-            Gamma_final = diags(gammas_final, 0)
-            Sigma_y_final = noise_cov + L_orig @ Gamma_final @ L_orig.T
-            Sigma_y_final_inv = self.robust_inverse(Sigma_y_final)
-            return Gamma_final @ L_orig.T @ Sigma_y_final_inv
+            Sigma_y_final = noise_cov + (L_orig * gammas_final) @ L_orig.T
+            Sigma_y_final = 0.5 * (Sigma_y_final + Sigma_y_final.T)
+            Sigma_y_final_inv = _cholesky_inv(Sigma_y_final)
+            return (Sigma_y_final_inv @ L_orig).T * gammas_final[:, None]
 
-        # Legacy path: complex update rules (AR-EM, TEM, adaptive) or noise learning
-        Sigma_y = noise_cov + L @ Gamma @ L.T
-        Sigma_y_inv = self.robust_inverse(Sigma_y)
-        mu_x = Gamma @ L.T @ Sigma_y_inv @ Y_scaled
+        # Legacy path: complex update rules (AR-EM, TEM) or noise learning
+        # Vectorized initial posterior
+        Sigma_y = noise_cov + (L * gammas) @ L.T
+        Sigma_y = 0.5 * (Sigma_y + Sigma_y.T)
+        Sigma_y_inv = _cholesky_inv(Sigma_y)
+        SiL = Sigma_y_inv @ L
+        mu_x = (SiL.T @ Y_scaled) * gammas[:, None]
 
-        # Initialize loss list with None to compute first loss properly
         loss_list = []
         active_set = np.arange(n_dipoles)
 
         # Initialize AR-EM specific variables if needed
-        if self.update_rule.lower() == "ar-em":
+        if rule_lower == "ar-em":
             beta = np.clip(self.beta_init, 0, 0.99)
 
-            # Helper function for AR(1) covariance
             def make_ar1_covariance(beta, n_times):
                 if beta == 0:
                     return np.identity(n_times)
@@ -319,66 +349,31 @@ class SolverChampagne(BaseSolver):
             B = make_ar1_covariance(beta, n_times)
 
         # Initialize TEM specific variables if needed
-        if self.update_rule.lower() == "tem":
+        if rule_lower == "tem":
             It = np.identity(n_times)
-            # Initialize B matrix as identity
-            B_hat = (
-                np.stack(
-                    [
-                        (mu_x[nn, np.newaxis].T * mu_x[nn, np.newaxis]) / gammas[nn]
-                        for nn in range(n_dipoles)
-                    ],
-                    axis=0,
-                ).sum(axis=0)
-                + self.theta * It
-            )
-            B = B_hat / self._frob(B_hat)
+            mu_x_scaled_init = mu_x / (gammas[:, np.newaxis] + 1e-10)
+            B_hat = mu_x_scaled_init.T @ mu_x + self.theta * It
+            B = B_hat * (n_times / np.trace(B_hat))
 
         for i_iter in range(self.max_iter):
-            old_gammas = deepcopy(gammas)
+            old_gammas = gammas.copy()
 
-            if self.update_rule.lower() == "em":
-                # EM update: variance + mean-square (optimized)
-                # Compute diagonal of Sigma_x efficiently (avoid full matrix)
-                L_Sigma = Sigma_y_inv @ L  # (n_chans, n_dipoles)
-                z_diag = np.sum(L * L_Sigma, axis=0)  # (n_dipoles,)
+            # SiL cached from posterior recompute (or initial)
+            z_diag = np.sum(L * SiL, axis=0)
+
+            if rule_lower == "em":
                 diag_Sigma_x = gammas - gammas**2 * z_diag
                 gammas = diag_Sigma_x + np.mean(mu_x**2, axis=1)
 
-            elif self.update_rule.lower() == "mackay":
-                # MacKay update (optimized with vectorized z_diag computation)
+            elif rule_lower == "mackay":
                 upper_term = np.mean(mu_x**2, axis=1)
-                # Vectorized: z_diag = diag(L.T @ Sigma_y_inv @ L)
-                L_Sigma = Sigma_y_inv @ L  # (n_chans, n_dipoles)
-                z_diag = np.sum(L * L_Sigma, axis=0)  # (n_dipoles,)
-                lower_term = gammas * z_diag
-                gammas = upper_term / lower_term
+                gammas = upper_term / (gammas * z_diag + 1e-20)
 
-            elif (
-                self.update_rule.lower() == "convexity"
-                or self.update_rule.lower() == "mm"
-            ):
-                # Convexity/MM update: sqrt(mean(mu_x²) / z_n) (optimized)
-                # Note: MM-Champagne is mathematically equivalent to Convexity bound
+            elif rule_lower in {"convexity", "mm", "lowsnr"}:
                 upper_term = np.mean(mu_x**2, axis=1)
-                # Vectorized: z_diag = diag(L.T @ Sigma_y_inv @ L)
-                L_Sigma = Sigma_y_inv @ L  # (n_chans, n_dipoles)
-                z_diag = np.sum(L * L_Sigma, axis=0)  # (n_dipoles,)
-                gammas = np.sqrt(upper_term / z_diag)
+                gammas = np.sqrt(upper_term / (z_diag + 1e-20))
 
-            elif self.update_rule.lower() == "lowsnr":
-                upper_term = np.mean(mu_x**2, axis=1)
-                # Use Fisher info diagonal (same as convexity/mackay) instead
-                # of raw column norms, which are ~1 on normalized L.
-                L_Sigma = Sigma_y_inv @ L  # (n_chans, n_dipoles)
-                z_diag = np.sum(L * L_Sigma, axis=0)  # (n_dipoles,)
-                gammas = np.sqrt(upper_term / z_diag)
-
-            elif self.update_rule.lower() == "ar-em":
-                # AR-EM update: Mahalanobis norm with AR(1) covariance (optimized)
-                # Compute diagonal of Sigma_x efficiently (avoid full matrix)
-                L_Sigma = Sigma_y_inv @ L  # (n_chans, n_dipoles)
-                z_diag = np.sum(L * L_Sigma, axis=0)  # (n_dipoles,)
+            elif rule_lower == "ar-em":
                 diag_Sigma_x = gammas - gammas**2 * z_diag
 
                 try:
@@ -386,18 +381,13 @@ class SolverChampagne(BaseSolver):
                 except np.linalg.LinAlgError:
                     B_inv = np.linalg.pinv(B)
 
-                # Vectorized gamma update: compute mu_x @ B_inv @ mu_x.T efficiently
-                # Result is (n_dipoles,) array where each element is mu_x[n] @ B_inv @ mu_x[n].T
-                mu_x_B_inv = mu_x @ B_inv  # (n_dipoles, n_times)
-                mahalanobis_terms = np.sum(mu_x * mu_x_B_inv, axis=1)  # (n_dipoles,)
+                mu_x_B_inv = mu_x @ B_inv
+                mahalanobis_terms = np.sum(mu_x * mu_x_B_inv, axis=1)
                 gammas = diag_Sigma_x + mahalanobis_terms
 
-                # Update beta based on autocorrelation (vectorized)
-                # Only consider active dipoles (above pruning threshold)
                 active_mask = gammas > self.pruning_thresh
                 if np.any(active_mask):
-                    mu_x_active = mu_x[active_mask]  # (n_active, n_times)
-                    # Autocorrelation: sum over active sources of x(t) * x(t+1)
+                    mu_x_active = mu_x[active_mask]
                     autocorr_sum = np.sum(mu_x_active[:, :-1] * mu_x_active[:, 1:])
                     norm_sum = np.sum(mu_x_active[:, :-1] ** 2)
 
@@ -407,11 +397,7 @@ class SolverChampagne(BaseSolver):
                         beta = np.clip(beta, 0, 0.99)
                         B = make_ar1_covariance(beta, n_times)
 
-            elif self.update_rule.lower() == "tem":
-                # TEM update: learns full temporal covariance matrix B (optimized)
-                # Compute diagonal of Sigma_x efficiently (avoid full matrix)
-                L_Sigma = Sigma_y_inv @ L  # (n_chans, n_dipoles)
-                z_diag = np.sum(L * L_Sigma, axis=0)  # (n_dipoles,)
+            elif rule_lower == "tem":
                 diag_Sigma_x = gammas - gammas**2 * z_diag
 
                 try:
@@ -419,118 +405,70 @@ class SolverChampagne(BaseSolver):
                 except np.linalg.LinAlgError:
                     B_inv = np.linalg.pinv(B)
 
-                # Vectorized gamma update: compute mu_x @ B_inv @ mu_x.T efficiently
-                mu_x_B_inv = mu_x @ B_inv  # (n_dipoles, n_times)
-                mahalanobis_terms = np.sum(mu_x * mu_x_B_inv, axis=1)  # (n_dipoles,)
-                gammas = diag_Sigma_x + mahalanobis_terms
+                mu_x_B_inv = mu_x @ B_inv
+                mahalanobis_terms = np.sum(mu_x * mu_x_B_inv, axis=1)
+                gammas = diag_Sigma_x + mahalanobis_terms / n_times
 
-                # Update B matrix based on source estimates (vectorized)
-                # B_hat = sum_n [mu_x[n].T @ mu_x[n] / gamma[n]] + theta * I
-                # Vectorized: (mu_x.T / gammas) @ mu_x
-                mu_x_scaled = mu_x / (
-                    gammas[:, np.newaxis] + 1e-10
-                )  # (n_dipoles, n_times)
-                B_hat = mu_x_scaled.T @ mu_x + self.theta * It  # (n_times, n_times)
-                B = B_hat / self._frob(B_hat)
+                mu_x_scaled_t = mu_x / (gammas[:, np.newaxis] + 1e-10)
+                B_hat = mu_x_scaled_t.T @ mu_x + self.theta * It
+                B = B_hat * (n_times / np.trace(B_hat))
 
-            elif self.update_rule.lower() == "adaptive":
-                # ai-composed update rule (optimized)
+            elif rule_lower == "adaptive":
                 upper_term = np.mean(mu_x**2, axis=1)
-                L_Sigma = Sigma_y_inv @ L  # (n_chans, n_dipoles)
-                lower_term = np.sum(L * L_Sigma, axis=0)  # (n_dipoles,)
                 snr_estimate = upper_term / np.mean(np.diag(noise_cov))
-
-                # Adaptive exponent based on estimated SNR
                 adaptive_exponent = 0.5 + 0.5 / (1 + np.exp(-snr_estimate + 5))
+                gammas = (upper_term / z_diag) ** adaptive_exponent
 
-                # Combine aspects of MacKay, Convexity, and LowSNR rules
-                gammas = (upper_term / lower_term) ** adaptive_exponent
-            elif self.update_rule.lower() == "dynamic_adaptive":
-                # Dynamic adaptive update rule (optimized)
+            elif rule_lower == "dynamic_adaptive":
                 upper_term = np.mean(mu_x**2, axis=1)
-                L_Sigma = Sigma_y_inv @ L  # (n_chans, n_dipoles)
-                lower_term = np.sum(L * L_Sigma, axis=0)  # (n_dipoles,)
                 snr_estimate = upper_term / np.mean(np.diag(noise_cov))
-
-                # Dynamic scaling factor based on iteration number and SNR
-                iteration_factor = 1 - np.exp(
-                    -i_iter / 10
-                )  # Assumes 'i' is the current iteration number
+                iteration_factor = 1 - np.exp(-i_iter / 10)
                 snr_factor = 1 / (1 + np.exp(-snr_estimate + 5))
-
-                # Combine MacKay and Convexity rules with dynamic weighting
-                mackay_update = upper_term / (gammas * lower_term)
-                convexity_update = np.sqrt(upper_term / lower_term)
-
-                # Apply dynamic weighting
+                mackay_update = upper_term / (gammas * z_diag + 1e-20)
+                convexity_update = np.sqrt(upper_term / (z_diag + 1e-20))
                 weighted_update = (
                     snr_factor * mackay_update + (1 - snr_factor) * convexity_update
                 ) ** iteration_factor
-
-                # Apply adaptive smoothing
                 smoothing_factor = 0.1 * (1 - iteration_factor)
-                gammas = (
-                    1 - smoothing_factor
-                ) * weighted_update + smoothing_factor * gammas
-
-                # Apply soft thresholding for sparsity
-                # threshold = np.percentile(gammas, 10)  # Adjust percentile as needed
-                # gammas = np.maximum(gammas - threshold, 0)
+                gammas = (1 - smoothing_factor) * weighted_update + smoothing_factor * gammas
 
             # Remove nans
             gammas[np.isnan(gammas)] = 0
 
             # Stop if gammas went to zero
             if np.linalg.norm(gammas) == 0:
-                # print("breaking")
                 gammas = old_gammas
                 break
 
             if self.prune:
-                # # Use relative threshold
                 active_set_idc = np.where(gammas > (pruning_thresh * gammas.max()))[0]
-                # print(f"Gammas: Max {gammas.max()}, Min {gammas.min()}, Mean {gammas.mean()}")
-                # gammas_minmax_scaled = (gammas - gammas.min()) / (gammas.max() - gammas.min())
-                # print(f"Gammas: Max {gammas_minmax_scaled.max()}, Min {gammas_minmax_scaled.min()}, Mean {gammas_minmax_scaled.mean()}")
-                # active_set_idc = np.where(gammas_minmax_scaled>(pruning_thresh))[0]
 
                 if len(active_set_idc) == 0:
-                    # print("pruned too much")
                     gammas = old_gammas
                     break
                 active_set = active_set[active_set_idc]
-                # print(f"New set: {len(active_set)}")
                 gammas = gammas[active_set_idc]
                 L = L[:, active_set_idc]
 
             # Update noise covariance if learning is enabled
             if self.noise_learning == "learn":
-                # Reconstruct full gamma vector for noise update
-                gammas_full = np.zeros(n_dipoles)
-                gammas_full[active_set] = gammas
-                Gamma_full = diags(gammas_full, 0)
-                mu_x_full = Gamma_full @ L_full_scaled.T @ Sigma_y_inv @ Y_scaled
-                noise_cov = self._update_noise_covariance(
-                    Y_scaled,
-                    L_full_scaled,
-                    mu_x_full,
-                    gammas_full,
-                    noise_cov,
-                    n_times,
-                    scaler,
+                # Compute pruned posterior mean using only active columns
+                L_act_full = L_full_scaled[:, active_set]
+                SiL_act = Sigma_y_inv @ L_act_full
+                mu_x_noise = (SiL_act.T @ Y_scaled) * gammas[:, None]
+                residuals = Y_scaled - L_act_full @ mu_x_noise
+                noise_cov = self._update_noise_covariance_pruned(
+                    residuals, L_act_full, gammas, Sigma_y_inv, noise_cov, n_times,
                 )
 
-            # update rest
-            Gamma = diags(gammas, 0)
-            Sigma_y = noise_cov + L @ Gamma @ L.T
-            Sigma_y_inv = self.robust_inverse(Sigma_y)
-            # Sigma_x = Gamma - Gamma @ L.T @ Sigma_y_inv @ L @ Gamma
-            mu_x = Gamma @ L.T @ Sigma_y_inv @ Y_scaled
+            # Recompute posterior with Cholesky
+            Sigma_y = noise_cov + (L * gammas) @ L.T
+            Sigma_y = 0.5 * (Sigma_y + Sigma_y.T)
+            Sigma_y_inv = _cholesky_inv(Sigma_y)
+            SiL = Sigma_y_inv @ L
+            mu_x = (SiL.T @ Y_scaled) * gammas[:, None]
 
-            # Correct Champagne loss function: negative log-likelihood
-            # loss = data_fit_term + log_det_term
-            # Data fit: tr(Sigma_y_inv @ Y @ Y.T) / n_times
-            # Model complexity: log(det(Sigma_y))
+            # Negative log-marginal-likelihood
             data_fit = np.trace(Sigma_y_inv @ Y_scaled @ Y_scaled.T) / n_times
             with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
                 sign, log_det = np.linalg.slogdet(Sigma_y)
@@ -538,10 +476,8 @@ class SolverChampagne(BaseSolver):
                 log_det = np.finfo(float).max / 2
             loss = data_fit + log_det
 
-            # Compute the residuals
             loss_list.append(loss)
 
-            # Check convergence only after first iteration
             if len(loss_list) > 1:
                 relative_change = (loss_list[-2] - loss) / abs(loss_list[-2])
 
@@ -550,7 +486,6 @@ class SolverChampagne(BaseSolver):
                         f"Iteration {i_iter}: loss = {loss:.6f}, relative change = {relative_change:.6f}, Active set size = {len(active_set)}"
                     )
 
-                # Only converge if loss is decreasing (positive relative change) and change is small
                 if relative_change > 0 and relative_change < self.convergence_criterion:
                     if self.verbose > 0:
                         logger.info(
@@ -558,7 +493,6 @@ class SolverChampagne(BaseSolver):
                         )
                     break
             else:
-                # First iteration - just print the loss if verbose
                 if self.verbose > 1:
                     logger.debug(
                         f"Iteration {i_iter}: loss = {loss:.6f}, Active set size = {len(active_set)}"
@@ -568,7 +502,6 @@ class SolverChampagne(BaseSolver):
         gammas_scaled = np.zeros(n_dipoles)
         gammas_scaled[active_set] = gammas
         gammas_final = gammas_scaled / (L_norms**2)
-        Gamma = diags(gammas_final, 0)
 
         # Scale noise covariance back if learning was enabled
         if self.noise_learning == "learn":
@@ -576,9 +509,10 @@ class SolverChampagne(BaseSolver):
         else:
             noise_cov_final = noise_cov
 
-        Sigma_y = noise_cov_final + L_orig @ Gamma @ L_orig.T
-        Sigma_y_inv = self.robust_inverse(Sigma_y)
-        inverse_operator = Gamma @ L_orig.T @ Sigma_y_inv
+        Sigma_y = noise_cov_final + (L_orig * gammas_final) @ L_orig.T
+        Sigma_y = 0.5 * (Sigma_y + Sigma_y.T)
+        Sigma_y_inv = _cholesky_inv(Sigma_y)
+        inverse_operator = (Sigma_y_inv @ L_orig).T * gammas_final[:, None]
 
         # Store learned noise covariance
         if self.noise_learning == "learn":
@@ -748,6 +682,42 @@ class SolverChampagne(BaseSolver):
         else:
             # No update, return current
             return current_noise_cov
+
+    def _update_noise_covariance_pruned(
+        self, residuals, L_act, gammas, Sigma_y_inv, current_noise_cov, n_times,
+    ):
+        """Update noise covariance using only pruned (active) arrays.
+
+        Avoids reconstructing full-size gamma/leadfield arrays and recomputing
+        Sigma_y_inv (already available from main loop).
+        """
+        n_chans = L_act.shape[0]
+
+        if self.noise_learning_mode == "homoscedastic":
+            residual_power = np.sum(residuals**2) / n_times
+            Sigma_y_inv_L = Sigma_y_inv @ L_act
+            Sigma_X_diag = gammas * (1 - gammas * np.sum(L_act * Sigma_y_inv_L, axis=0))
+            n_act = len(gammas)
+            dof = n_chans - n_act + np.sum(Sigma_X_diag / (gammas + 1e-10))
+            return np.eye(n_chans) * (residual_power / (dof + 1e-10))
+
+        elif self.noise_learning_mode == "full":
+            M_noise = (residuals @ residuals.T) / n_times
+            C_noise = _cholesky_inv(current_noise_cov + 1e-8 * np.eye(n_chans))
+            return self._fun_learning_cov_est(C_noise, M_noise, update_mode="diagonal")
+
+        elif self.noise_learning_mode == "diagonal":
+            diag_residual_power = np.sum(residuals**2, axis=1)
+            normalization = np.diag(Sigma_y_inv) + 1e-10
+            return np.diag(np.sqrt(diag_residual_power / (n_times * normalization)))
+
+        elif self.noise_learning_mode == "precision":
+            diag_residual_power = np.sum(residuals**2, axis=1)
+            return np.diag(np.sqrt(
+                diag_residual_power / (n_times * np.diag(Sigma_y_inv) + 1e-10)
+            ))
+
+        return current_noise_cov
 
     @staticmethod
     def _fun_learning_cov_est(C, M, update_mode="diagonal"):

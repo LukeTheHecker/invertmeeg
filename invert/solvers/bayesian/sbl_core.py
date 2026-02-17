@@ -16,7 +16,6 @@ Typical usage::
         Y=data,
         noise_cov=noise_cov,
         update_rule="mackay",
-        inverse_fn=np.linalg.inv,
     )
     active_set = result.active_set
     gammas = result.gammas
@@ -28,6 +27,27 @@ import dataclasses
 from collections.abc import Callable
 
 import numpy as np
+from scipy.linalg import cho_factor, cho_solve
+
+
+def _cholesky_inv(A):
+    """Fast inverse for symmetric positive (semi-)definite matrices.
+
+    Falls back to np.linalg.inv if Cholesky fails (e.g. near-singular or
+    not quite PSD due to numerical noise).
+    """
+    n = A.shape[0]
+    try:
+        L, low = cho_factor(A)
+        return cho_solve((L, low), np.eye(n))
+    except np.linalg.LinAlgError:
+        # Try with small diagonal loading proportional to trace
+        eps = max(1e-10 * abs(np.trace(A)) / n, 1e-20)
+        try:
+            L, low = cho_factor(A + eps * np.eye(n))
+            return cho_solve((L, low), np.eye(n))
+        except np.linalg.LinAlgError:
+            return np.linalg.inv(A + eps * np.eye(n))
 
 
 @dataclasses.dataclass
@@ -121,7 +141,7 @@ def sbl_iterate(
     prune: bool = True,
     pruning_thresh: float = 1e-3,
     conv_crit: float = 1e-8,
-    inverse_fn: Callable[[np.ndarray], np.ndarray] = np.linalg.inv,
+    inverse_fn: Callable[[np.ndarray], np.ndarray] = _cholesky_inv,
 ) -> SBLResult:
     """Run a generic SBL iteration loop.
 

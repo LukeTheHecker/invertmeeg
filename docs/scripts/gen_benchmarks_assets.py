@@ -324,47 +324,18 @@ def _extract_meta_from_file(path: Path) -> dict[str, dict[str, Any]]:
 
 
 def _build_solver_pages_map(only_solvers: set[str] | None = None) -> dict[str, str]:
-    """Return mapping: benchmark solver short name -> docs-relative solver page URL."""
-    repo_root = Path(__file__).resolve().parents[2]
-    runner_path = repo_root / "invert" / "benchmark" / "runner.py"
-    try:
-        runner_tree = ast.parse(runner_path.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-
-    solver_registry: dict[str, tuple[str, str]] = {}
-    for node in runner_tree.body:
-        if not isinstance(node, ast.Assign):
-            continue
-        targets = [t.id for t in node.targets if isinstance(t, ast.Name)]
-        if "_SOLVER_REGISTRY" not in targets:
-            continue
-        try:
-            literal = ast.literal_eval(node.value)
-        except Exception:
-            continue
-        if not isinstance(literal, dict):
-            continue
-        for key, value in literal.items():
-            if not isinstance(key, str):
-                continue
-            if (
-                isinstance(value, tuple)
-                and len(value) == 2
-                and isinstance(value[0], str)
-                and isinstance(value[1], str)
-            ):
-                solver_registry[key] = (value[0], value[1])
-        break
-
-    if not solver_registry:
-        return {}
+    """Return mapping: benchmark solver_id -> docs-relative solver page URL."""
+    from invert.solver_registry import iter_solver_specs
 
     repo_root = Path(__file__).resolve().parents[2]
     file_cache: dict[Path, dict[str, dict[str, Any]]] = {}
     mapping: dict[str, str] = {}
 
-    for solver_name, (module_path, class_name) in solver_registry.items():
+    for spec in iter_solver_specs(include_internal=False, include_unavailable=True):
+        solver_name = spec.solver_id
+        module_path = spec.module_path
+        class_name = spec.class_name
+
         if only_solvers is not None and solver_name not in only_solvers:
             continue
         if "._old" in module_path or module_path.endswith("._old"):

@@ -73,6 +73,7 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
+  - For Companies: for-companies.md
   - Solvers:
     - solvers/index.md
     - Minimum Norm: solvers/minimum-norm/index.md

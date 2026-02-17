@@ -173,7 +173,15 @@ class SolverBlockChampagne(BaseSolver):
         data_proj = data_proj - data_proj.mean(axis=1, keepdims=True)
 
         data_cov = self.data_covariance(data_proj, center=True, ddof=1)
-        self.get_alphas(reference=data_cov)
+        # Block-Champagne learns diagonal noise (beta) internally via
+        # Convexity/sqrt updates, converging to the same solution regardless
+        # of the initial noise level.  A single alpha avoids a wasted grid
+        # search and spurious edge-of-grid GCV warnings.
+        if self.alpha == "auto":
+            n_chans = data_proj.shape[0]
+            self.alphas = [float(np.trace(data_cov) / n_chans)]
+        else:
+            self.get_alphas(reference=data_cov)
 
         geom = self._prepare_blocks(n_sources=leadfield_proj.shape[1])
         # U = L @ H.T, where each u_i is the sum of leadfield columns in block(i).

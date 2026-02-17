@@ -68,6 +68,11 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         class_name="SolverDSPM",
     ),
     SolverSpec(
+        solver_id="dspm-mne",
+        module_path="invert.solvers.minimum_norm.dspm_mne",
+        class_name="SolverDSPMMNE",
+    ),
+    SolverSpec(
         solver_id="mce",
         module_path="invert.solvers.minimum_norm.minimum_l1_norm",
         class_name="SolverMinimumL1Norm",
@@ -98,7 +103,7 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         solver_id="self-regularized-eloreta",
         module_path="invert.solvers.minimum_norm.self_regularized",
         class_name="SolverSelfRegularizedELORETA",
-        aliases=("sr-eloreta", "sreloreta"),
+        aliases=("sr-eloreta", "sreloreta", "selfregeloreta"),
     ),
     # -- LORETA -------------------------------------------------------------
     SolverSpec(
@@ -160,14 +165,6 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         display_name="MacKay-Champagne",
     ),
     SolverSpec(
-        solver_id="champagne-em",
-        module_path="invert.solvers.bayesian.champagne",
-        class_name="SolverChampagne",
-        default_kwargs={"update_rule": "EM"},
-        aliases=("emchampagne", "em-champagne", "emc"),
-        display_name="EM-Champagne",
-    ),
-    SolverSpec(
         solver_id="champagne-convexity",
         module_path="invert.solvers.bayesian.champagne",
         class_name="SolverChampagne",
@@ -176,7 +173,6 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
             "convexitychampagne",
             "convexity-champagne",
             "coc",
-            "mm-champagne",
         ),
         display_name="Convexity-Champagne",
     ),
@@ -204,13 +200,67 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         aliases=("lowsnrchampagne", "low-snr-champagne", "lowsnr-champagne", "lsc"),
         display_name="Low-SNR-Champagne",
     ),
+    # -- Champagne + noise learning (MacKay) --------------------------------
     SolverSpec(
-        solver_id="champagne-adaptive",
+        solver_id="champagne-mackay-nl-homoscedastic",
         module_path="invert.solvers.bayesian.champagne",
         class_name="SolverChampagne",
-        default_kwargs={"update_rule": "Adaptive"},
-        aliases=("adaptivechampagne", "adaptive-champagne", "ac"),
-        display_name="Adaptive-Champagne",
+        default_kwargs={"update_rule": "MacKay", "noise_learning": "learn", "noise_learning_mode": "homoscedastic"},
+        display_name="MacKay-Champagne (homoscedastic noise)",
+    ),
+    SolverSpec(
+        solver_id="champagne-mackay-nl-diag",
+        module_path="invert.solvers.bayesian.champagne",
+        class_name="SolverChampagne",
+        default_kwargs={"update_rule": "MacKay", "noise_learning": "learn", "noise_learning_mode": "diagonal"},
+        display_name="MacKay-Champagne (diag noise)",
+    ),
+    SolverSpec(
+        solver_id="champagne-mackay-nl-full",
+        module_path="invert.solvers.bayesian.champagne",
+        class_name="SolverChampagne",
+        default_kwargs={"update_rule": "MacKay", "noise_learning": "learn", "noise_learning_mode": "full"},
+        display_name="MacKay-Champagne (full noise)",
+    ),
+    SolverSpec(
+        solver_id="champagne-mackay-nl-prec",
+        module_path="invert.solvers.bayesian.champagne",
+        class_name="SolverChampagne",
+        default_kwargs={"update_rule": "MacKay", "noise_learning": "learn", "noise_learning_mode": "precision"},
+        display_name="MacKay-Champagne (prec noise)",
+    ),
+    # -- Champagne + noise learning (Convexity) ------------------------------
+    SolverSpec(
+        solver_id="champagne-convexity-nl-homoscedastic",
+        module_path="invert.solvers.bayesian.champagne",
+        class_name="SolverChampagne",
+        default_kwargs={"update_rule": "Convexity", "noise_learning": "learn", "noise_learning_mode": "homoscedastic"},
+        aliases=("champagne-em-nl-homoscedastic",),
+        display_name="Convexity-Champagne (homoscedastic noise)",
+    ),
+    SolverSpec(
+        solver_id="champagne-convexity-nl-diag",
+        module_path="invert.solvers.bayesian.champagne",
+        class_name="SolverChampagne",
+        default_kwargs={"update_rule": "Convexity", "noise_learning": "learn", "noise_learning_mode": "diagonal"},
+        aliases=("champagne-em-nl-diag",),
+        display_name="Convexity-Champagne (diag noise)",
+    ),
+    SolverSpec(
+        solver_id="champagne-convexity-nl-full",
+        module_path="invert.solvers.bayesian.champagne",
+        class_name="SolverChampagne",
+        default_kwargs={"update_rule": "Convexity", "noise_learning": "learn", "noise_learning_mode": "full"},
+        aliases=("champagne-em-nl-full",),
+        display_name="Convexity-Champagne (full noise)",
+    ),
+    SolverSpec(
+        solver_id="champagne-convexity-nl-prec",
+        module_path="invert.solvers.bayesian.champagne",
+        class_name="SolverChampagne",
+        default_kwargs={"update_rule": "Convexity", "noise_learning": "learn", "noise_learning_mode": "precision"},
+        aliases=("champagne-em-nl-prec",),
+        display_name="Convexity-Champagne (prec noise)",
     ),
     SolverSpec(
         solver_id="nl-champagne",
@@ -345,16 +395,6 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         aliases=("mvpure-esmv",),
     ),
     SolverSpec(
-        solver_id="esmv2",
-        module_path="invert.solvers.beamformers.esmv2",
-        class_name="SolverESMV2",
-    ),
-    SolverSpec(
-        solver_id="esmv3",
-        module_path="invert.solvers.beamformers.esmv3",
-        class_name="SolverESMV3",
-    ),
-    SolverSpec(
         solver_id="mcmv",
         module_path="invert.solvers.beamformers.mcmv",
         class_name="SolverMCMV",
@@ -403,13 +443,7 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         solver_id="flex-esmv-mvpure",
         module_path="invert.solvers.beamformers.flex_esmv_mvpure",
         class_name="SolverFlexESMVMVPURE",
-        aliases=("flexesmvmvpure", "mvpure-flex-esmv"),
-    ),
-    SolverSpec(
-        solver_id="flex-esmv2",
-        module_path="invert.solvers.beamformers.flex_esmv2",
-        class_name="SolverFlexESMV2",
-        aliases=("flexesmv2",),
+        aliases=("flexesmvmvpure", "flexesmv-mvpure", "mvpure-flex-esmv"),
     ),
     SolverSpec(
         solver_id="deblur-flex-esmv",
@@ -484,6 +518,20 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         module_path="invert.solvers.neural_networks.covcnn",
         class_name="SolverCovCNN",
         aliases=("cov-cnn", "covnet"),
+        requires=("torch",),
+    ),
+    SolverSpec(
+        solver_id="covcnn-kl",
+        module_path="invert.solvers.neural_networks.covcnn_kl",
+        class_name="SolverCovCNNKL",
+        aliases=("cov-cnn-kl",),
+        requires=("torch",),
+    ),
+    SolverSpec(
+        solver_id="covcnn-kl-flexomp",
+        module_path="invert.solvers.neural_networks.covcnn_kl_flexomp",
+        class_name="SolverCovCNNKLFlexOMP",
+        aliases=("cov-cnn-kl-flexomp",),
         requires=("torch",),
     ),
     SolverSpec(
@@ -593,18 +641,6 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         display_name="AP",
     ),
     SolverSpec(
-        solver_id="adaptive-ap",
-        module_path="invert.solvers.music.adaptive_alternating_projections",
-        class_name="SolverAdaptiveAlternatingProjections",
-        aliases=("adaptive-alternating-projections", "aap", "adaptivealtproj"),
-    ),
-    SolverSpec(
-        solver_id="flex-music-2",
-        module_path="invert.solvers.music.flex_music_2",
-        class_name="SolverFLEXMUSIC_2",
-        aliases=("flexmusic2",),
-    ),
-    SolverSpec(
         solver_id="generalized-iterative",
         module_path="invert.solvers.music.generalized_iterative",
         class_name="SolverGeneralizedIterative",
@@ -639,21 +675,6 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         module_path="invert.solvers.music.exso_music",
         class_name="SolverExSoMUSIC",
         aliases=("exsomusic",),
-    ),
-    # -- Artificial Neural Networks (optional torch) ------------------------
-    SolverSpec(
-        solver_id="covcnn-kl",
-        module_path="invert.solvers.neural_networks.covcnn_kl",
-        class_name="SolverCovCNNKL",
-        aliases=("cov-cnn-kl",),
-        requires=("torch",),
-    ),
-    SolverSpec(
-        solver_id="covcnn-kl-flexomp",
-        module_path="invert.solvers.neural_networks.covcnn_kl_flexomp",
-        class_name="SolverCovCNNKLFlexOMP",
-        aliases=("cov-cnn-kl-flexomp",),
-        requires=("torch",),
     ),
     SolverSpec(
         solver_id="random-noise",

@@ -1,10 +1,13 @@
 import logging
+import os
+import time
 import warnings
 from collections import deque
 
 import mne
 import numpy as np
 from scipy.optimize import minimize
+from scipy.stats import rankdata
 from tqdm import tqdm
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
@@ -51,14 +54,18 @@ class SolverCMEM(BaseSolver):
         self,
         name="cMEM",
         num_parcels=200,
-        max_iter=100,
+        max_iter=50,
         batch_size=100,
+        n_outer=3,
+        alpha_tol=5e-2,
         **kwargs,
     ):
         self.name = name
         self.num_parcels = num_parcels
         self.max_iter = max_iter
         self.batch_size = batch_size
+        self.n_outer = n_outer
+        self.alpha_tol = alpha_tol
         return super().__init__(**kwargs)
 
     def make_inverse_operator(
@@ -108,7 +115,16 @@ class SolverCMEM(BaseSolver):
             num_parcels=self.num_parcels,
             max_iter=self.max_iter,
             batch_size=self.batch_size,
+            n_outer=self.n_outer,
+            alpha_tol=self.alpha_tol,
         )
+
+        # Cache the result for immediate apply() on the same object.
+        # cMEM is iterative and expensive; notebooks often do:
+        #   make_inverse_operator(fwd, evoked); apply_inverse_operator(evoked)
+        # so returning the cached solution avoids re-running the full solver.
+        self._cmem_cached_obj = mne_obj
+        self._cmem_cached_J = J
 
         self.parcels = parcels
         self.inverse_operators = [
@@ -121,7 +137,8 @@ class SolverCMEM(BaseSolver):
 
         Since cMEM computes the full source time series during
         ``make_inverse_operator``, applying the operator re-runs the
-        algorithm on the new data.
+        algorithm on the new data unless the same object was used during
+        ``make_inverse_operator`` (cached).
 
         Parameters
         ----------
@@ -133,6 +150,11 @@ class SolverCMEM(BaseSolver):
         stc : mne.SourceEstimate
             The source estimate.
         """
+        J_cached = getattr(self, "_cmem_cached_J", None)
+        obj_cached = getattr(self, "_cmem_cached_obj", None)
+        if J_cached is not None and obj_cached is mne_obj:
+            return self.source_to_object(J_cached)
+
         data = self.unpack_data_obj(mne_obj)
         # Skip validate_operator_data_compatibility: cMEM stores the full
         # solution in InverseOperator (not an operator matrix), so the
@@ -149,7 +171,12 @@ class SolverCMEM(BaseSolver):
             num_parcels=self.num_parcels,
             max_iter=self.max_iter,
             batch_size=self.batch_size,
+            n_outer=self.n_outer,
+            alpha_tol=self.alpha_tol,
         )
+
+        self._cmem_cached_obj = mne_obj
+        self._cmem_cached_J = J
 
         stc = self.source_to_object(J)
         return stc
@@ -160,7 +187,17 @@ class SolverCMEM(BaseSolver):
 # ---------------------------------------------------------------------------
 
 
-def _cmem(Y, L, A=None, num_parcels=200, max_iter=100, batch_size=100):
+def _cmem(
+    Y,
+    L,
+    A=None,
+    num_parcels=200,
+    max_iter=100,
+    batch_size=100,
+    *,
+    n_outer=5,
+    alpha_tol=1e-2,
+):
     """Coherent Maximum Entropy on the Mean (cMEM) source localization.
 
     Assumes whitened data (noise cov = identity).
@@ -183,16 +220,62 @@ def _cmem(Y, L, A=None, num_parcels=200, max_iter=100, batch_size=100):
     m_l, n = L.shape
     assert m == m_l, "Dimension mismatch between Y and L"
 
-    # Ensure parcels have at least ~10 sources for spatial coherence
-    num_parcels = min(num_parcels, max(20, n // 10))
+    timing = os.getenv("INVERT_CMEM_TIMING", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+    t_total = time.perf_counter()
+    if timing:
+        # Also print: notebooks/scripts often don't configure logging handlers.
+        print("cMEM timing enabled (set logging level to see logger output).")
+
+        def _tlog(msg, *args):
+            logger.info(msg, *args)
+            try:
+                print(msg % args)
+            except Exception:
+                # Fallback if formatting fails for any reason.
+                print(msg, *args)
+
+    else:
+
+        def _tlog(msg, *args):
+            return
+
+    # If no explicit noise covariance whitening was provided upstream, cMEM's
+    # whitened-noise assumption can be badly violated on colored-noise data
+    # (including our SimulationGenerator). As a pragmatic default, apply a mild
+    # shrinkage whitening based on the sample sensor covariance.
+    auto_whiten = os.getenv("INVERT_CMEM_AUTO_WHITEN", "0").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+    if auto_whiten and t >= 2:
+        t_step = time.perf_counter()
+        cov = (Y @ Y.T) / float(t)
+        cov = 0.5 * (cov + cov.T)
+        shrink = 0.05
+        cov = (1.0 - shrink) * cov + shrink * np.diag(np.diag(cov))
+        evals, evecs = np.linalg.eigh(cov)
+        evals = np.maximum(evals, 1e-12 * float(np.max(evals)))
+        W = (evecs / np.sqrt(evals)) @ evecs.T  # invsqrt(cov)
+        Y = W @ Y
+        L = W @ L
+        if timing:
+            _tlog("cMEM timing: auto-whiten %.3fs", time.perf_counter() - t_step)
+
+    # Ensure parcels are not too small.
+    # For smooth/patch-like sources (e.g. SimulationGenerator order>=1), parcels of
+    # ~10 vertices tend to fragment true sources, hurting accuracy and increasing
+    # the number of parcel terms in the MEM dual. Prefer larger parcels by default.
+    min_vertices_per_parcel = 60
+    num_parcels = min(num_parcels, max(5, n // min_vertices_per_parcel))
     num_parcels = max(num_parcels, 1)
 
-    # Step 1: Data Driven Parcellation using MSP + region growing
-    logger.info("Performing Data Driven Parcellation...")
-    msp_all = _compute_msp_coefficients(Y, L)
-    parcels = _data_driven_parcellation(Y, L, num_parcels, A=A, msp_scores=msp_all)
-
-    # Step 2: Regularized MNE estimate for energy scaling and alpha init
+    # Step 1: Regularized MNE estimate for robust initialization
+    t_step = time.perf_counter()
     # Avoid forming (n, n) matrices (LtL) which is prohibitive when n_sources >> n_sensors.
     # Use the ridge/MNE identity:
     #   (L^T L + reg I)^{-1} L^T Y = L^T (L L^T + reg I)^{-1} Y
@@ -203,9 +286,27 @@ def _cmem(Y, L, A=None, num_parcels=200, max_iter=100, batch_size=100):
     LLt.flat[:: m + 1] += reg
     J_mne = L.T @ np.linalg.solve(LLt, Y)
     J_mne_power = np.mean(J_mne**2, axis=1)  # per-source RMS power
+    if timing:
+        _tlog("cMEM timing: MNE init %.3fs", time.perf_counter() - t_step)
+
+    # Step 2: Data Driven Parcellation using MSP + region growing
+    logger.info("Performing Data Driven Parcellation...")
+    t_step = time.perf_counter()
+    msp_all = _compute_msp_coefficients(Y, L)
+    parcels = _data_driven_parcellation(Y, L, num_parcels, A=A, msp_scores=msp_all)
+    if timing:
+        _tlog(
+            "cMEM timing: parcellation %.3fs (m=%d n=%d t=%d parcels=%d)",
+            time.perf_counter() - t_step,
+            m,
+            n,
+            t,
+            int(np.unique(parcels).size),
+        )
 
     # Step 3: Initialize parcel parameters
     logger.info("Initializing parcel parameters...")
+    t_step = time.perf_counter()
     unique_parcels = np.unique(parcels)
 
     # Rank parcels by mean MNE power for alpha initialization
@@ -214,14 +315,35 @@ def _cmem(Y, L, A=None, num_parcels=200, max_iter=100, batch_size=100):
         verts = np.where(parcels == parcel_id)[0]
         parcel_powers[parcel_id] = np.mean(J_mne_power[verts])
     power_vals = np.array([parcel_powers[p] for p in unique_parcels])
-    power_ranks = np.argsort(np.argsort(power_vals)).astype(float)
+    # Use tie-aware ranks: at low SNR many parcels can have ~equal power.
+    # A plain argsort(argsort(.)) breaks ties arbitrarily, which leads to
+    # essentially random alpha assignments and can hurt accuracy.
+    power_ranks = rankdata(power_vals, method="average").astype(float) - 1.0
     power_quantiles = power_ranks / max(len(power_ranks) - 1, 1)
     parcel_quantile = dict(zip(unique_parcels, power_quantiles, strict=True))
 
-    xi_ref_full = L.T @ Y[:, 0]
+    # Robust Sigma calibration reference.
+    #
+    # Using a single time point here makes the Sigma scaling extremely sensitive
+    # to noise/outliers (especially when the chosen time point happens to be
+    # noise-dominated). Instead, use a small set of high-energy samples and a
+    # robust aggregation (median), then scale based on a high percentile across
+    # parcels.
+    n_ref = min(10, t)
+    if n_ref == 1:
+        ref_idx = np.array([0], dtype=int)
+    else:
+        time_power = np.sum(Y * Y, axis=0)
+        ref_idx = np.argsort(time_power)[-n_ref:]
+    Y_ref = np.asarray(Y[:, ref_idx], dtype=float, order="F")
+    # Scale out amplitude: Sigma calibration should reflect geometry, not the
+    # absolute momentary signal/noise magnitude at a particular time sample.
+    y_norm = np.linalg.norm(Y_ref, axis=0, keepdims=True)
+    Y_ref = Y_ref / np.maximum(y_norm, 1e-30)
+    Xi_ref = L.T @ Y_ref  # (n_sources, n_ref)
 
     precomputed = []
-    max_E_k = 0.0  # track for calibration
+    E_refs = []  # per-parcel reference energies for calibration
     for parcel_id in unique_parcels:
         verts = np.where(parcels == parcel_id)[0]
         n_v = len(verts)
@@ -241,10 +363,11 @@ def _cmem(Y, L, A=None, num_parcels=200, max_iter=100, batch_size=100):
         Sigma_k = parcel_power * W_k
 
         # Estimate E_k scale: E_k = 0.5 * xi^T Sigma xi for reference lambda
-        # Use y as reference lambda direction (near-optimal for small Sigma)
-        xi_ref = xi_ref_full[verts]
-        E_ref = 0.5 * np.dot(xi_ref, Sigma_k @ xi_ref)
-        max_E_k = max(max_E_k, E_ref)
+        # Use a few high-energy samples and a robust aggregation.
+        xi_ref = Xi_ref[verts, :]  # (n_v, n_ref)
+        Sigma_xi_ref = Sigma_k @ xi_ref
+        E_ref = 0.5 * np.median(np.sum(xi_ref * Sigma_xi_ref, axis=0))
+        E_refs.append(float(E_ref))
 
         # Alpha from power rank: quadratic mapping for sparsity bias
         q = parcel_quantile[parcel_id]
@@ -260,17 +383,41 @@ def _cmem(Y, L, A=None, num_parcels=200, max_iter=100, batch_size=100):
             }
         )
 
-    # Calibrate Sigma scale so max E_k ≈ target at the optimum.
+    # Calibrate Sigma scale so E_k hits a reasonable dynamic range.
     # Without this, E_k >> 1 saturates exp(E_k) and disables alpha.
-    target_E = 10.0
-    if max_E_k > 1e-30:
-        sigma_scale = target_E / max_E_k
+    # Adapt the target based on a simple SNR proxy: at low SNR we want smaller
+    # E_k so the mixture weights stay closer to alpha (avoid noise-driven
+    # saturation), while at high SNR we allow more decisive activations.
+    svals = np.linalg.svd(Y, full_matrices=False, compute_uv=False)
+    noise_s = float(np.median(svals)) if svals.size else 0.0
+    snr_proxy = float(svals[0] / max(noise_s, 1e-30)) if svals.size else 1.0
+    if snr_proxy < 2.0:
+        target_E = 3.0
+    elif snr_proxy < 4.0:
+        target_E = 6.0
+    else:
+        target_E = 10.0
+    # Use a high percentile rather than max to reduce sensitivity to outliers.
+    E_scale = float(np.percentile(E_refs, 95)) if len(E_refs) else 0.0
+    if E_scale > 1e-30:
+        sigma_scale = target_E / E_scale
         for precomp in precomputed:
             precomp["Sigma_k"] *= sigma_scale
+    if timing:
+        median_parcel_size = (
+            int(np.median([len(p["vertices"]) for p in precomputed]))
+            if precomputed
+            else 0
+        )
+        _tlog(
+            "cMEM timing: precompute %.3fs (n_parcels=%d, median parcel size=%d)",
+            time.perf_counter() - t_step,
+            len(precomputed),
+            median_parcel_size,
+        )
 
     # Step 4: Iterative MEM optimization with alpha/eta updates
     # Outer EM loop: optimize lambda (E-step), update alpha/eta (M-step)
-    n_outer = 5
     logger.info("Running MEM optimization (%d outer iterations)...", n_outer)
 
     # Warm-start across time points and outer iterations.
@@ -280,6 +427,7 @@ def _cmem(Y, L, A=None, num_parcels=200, max_iter=100, batch_size=100):
         J = np.zeros((n, t))
         num_batches = (t + batch_size - 1) // batch_size
 
+        t_outer = time.perf_counter()
         for batch_idx in tqdm(
             range(num_batches), desc=f"MEM iter {outer + 1}/{n_outer}", disable=True
         ):
@@ -288,16 +436,42 @@ def _cmem(Y, L, A=None, num_parcels=200, max_iter=100, batch_size=100):
             Y_batch = Y[:, batch_start:batch_end]
 
             lambda_init = lambda_prev[:, batch_start:batch_end]
+            t_opt = time.perf_counter()
             lambda_batch = _optimize_lambda_batch(
                 Y_batch, L, precomputed, max_iter=max_iter, lambda_init=lambda_init
             )
             lambda_prev[:, batch_start:batch_end] = lambda_batch
             J_batch = _compute_sources_batch(lambda_batch, L, precomputed, n)
             J[:, batch_start:batch_end] = J_batch
+            if timing:
+                logger.debug(
+                    "cMEM timing: outer=%d batch=%d/%d optimize+J %.3fs",
+                    outer + 1,
+                    batch_idx + 1,
+                    num_batches,
+                    time.perf_counter() - t_opt,
+                )
 
         if outer < n_outer - 1:
-            _update_parcel_params(J, precomputed)
+            max_alpha_change = _update_parcel_params(J, precomputed)
+            # Early stop if alpha stabilizes: saves expensive re-optimizations.
+            if max_alpha_change < float(alpha_tol):
+                if timing:
+                    _tlog(
+                        "cMEM timing: early stop at outer %d (max Δalpha=%.3g)",
+                        outer + 1,
+                        max_alpha_change,
+                    )
+                break
+        if timing:
+            _tlog(
+                "cMEM timing: outer %d total %.3fs",
+                outer + 1,
+                time.perf_counter() - t_outer,
+            )
 
+    if timing:
+        _tlog("cMEM timing: total %.3fs", time.perf_counter() - t_total)
     return J, parcels
 
 
@@ -373,8 +547,15 @@ def _compute_msp_coefficients(Y, L):
     Returns values in [0, 1].
     """
     U, s, _ = np.linalg.svd(Y, full_matrices=False)
-    cumvar = np.cumsum(s**2) / np.sum(s**2)
-    r = max(1, np.searchsorted(cumvar, 0.99) + 1)
+    # Subspace dimension selection matters a lot at low SNR.
+    # Using a near-1 cumulative-variance threshold can include mostly-noise
+    # singular vectors, making MSP scores nearly flat (and parcellation unstable).
+    #
+    # Use a simple, noise-robust rule: keep components clearly above the median
+    # singular value (noise floor proxy), capped to keep MSP discriminative.
+    noise = float(np.median(s)) if s.size else 0.0
+    r = int(np.sum(s > (1.2 * noise)))
+    r = int(np.clip(r, 1, min(int(Y.shape[0]), 10)))
     U_bar = U[:, :r]
 
     norms = np.linalg.norm(L, axis=0, keepdims=True)
@@ -385,7 +566,7 @@ def _compute_msp_coefficients(Y, L):
     return np.sum(proj**2, axis=0)
 
 
-def _compute_spatial_covariance(vertices, A, alpha=0.2):
+def _compute_spatial_covariance(vertices, A, alpha=0.05):
     """Compute spatial covariance from graph Laplacian: inv(L_graph + alpha*I)."""
     n_v = len(vertices)
 
@@ -420,12 +601,17 @@ def _update_parcel_params(J, precomputed):
         verts = precomp["vertices"]
         parcel_powers.append(np.mean(J_power[verts]))
     power_arr = np.array(parcel_powers)
-    ranks = np.argsort(np.argsort(power_arr)).astype(float)
+    ranks = rankdata(power_arr, method="average").astype(float) - 1.0
     quantiles = ranks / max(len(ranks) - 1, 1)
 
+    max_change = 0.0
     for i, precomp in enumerate(precomputed):
         q = quantiles[i]
-        precomp["alpha_k"] = np.clip(0.01 + 0.98 * q**2, 0.01, 0.99)
+        new_alpha = float(np.clip(0.01 + 0.98 * q**2, 0.01, 0.99))
+        max_change = max(max_change, abs(new_alpha - float(precomp["alpha_k"])))
+        precomp["alpha_k"] = new_alpha
+
+    return float(max_change)
 
 
 def _mem_dual_obj_grad(lambda_vec, y_t, L, precomputed, w_full):
@@ -470,7 +656,109 @@ def _mem_dual_obj_grad(lambda_vec, y_t, L, precomputed, w_full):
 
 
 def _optimize_lambda_batch(Y_batch, L, precomputed, max_iter=100, lambda_init=None):
-    """Optimize Lagrange multipliers for a batch of time points."""
+    """Optimize Lagrange multipliers for a batch of time points.
+
+    cMEM's dual decouples over time points, but calling SciPy's optimizer once
+    per column can be very slow (Python overhead dominates). As a fast default,
+    use a damped fixed-point iteration derived from the stationarity condition
+    ∇D(λ)=0:
+
+        λ = y - L @ w(λ)
+
+    where w(λ) is the parcel-wise posterior mean term.
+
+    Set `INVERT_CMEM_LAMBDA_OPT=fixed_point` to try a faster fixed-point solver.
+    """
+    method = os.getenv("INVERT_CMEM_LAMBDA_OPT", "lbfgs").strip().lower()
+    if method == "fixed_point":
+        return _optimize_lambda_batch_fixed_point(
+            Y_batch, L, precomputed, max_iter=max_iter, lambda_init=lambda_init
+        )
+    return _optimize_lambda_batch_lbfgs(
+        Y_batch, L, precomputed, max_iter=max_iter, lambda_init=lambda_init
+    )
+
+
+def _optimize_lambda_batch_fixed_point(
+    Y_batch, L, precomputed, max_iter=100, lambda_init=None
+):
+    """Vectorized damped fixed-point solver for λ over a batch of time points."""
+    m, batch_size = Y_batch.shape
+    n = L.shape[1]
+
+    if lambda_init is None:
+        lambda_batch = np.zeros((m, batch_size))
+    else:
+        lambda_batch = np.array(lambda_init, dtype=float, copy=True)
+
+    # Damping and tolerance: conservative defaults; we fall back to L-BFGS-B
+    # if the fixed-point iteration becomes unstable.
+    omega = 0.2
+    tol = 1e-4
+
+    xi_full = np.empty((n, batch_size))
+    w_full = np.empty((n, batch_size))
+
+    y_norm = float(np.linalg.norm(Y_batch)) + 1e-30
+
+    max_lambda_norm = 1e6 * y_norm
+
+    for _ in range(int(max_iter)):
+        # xi_full = L.T @ lambda_batch
+        xi_full[:] = L.T @ lambda_batch
+        w_full.fill(0.0)
+
+        for precomp in precomputed:
+            vertices = precomp["vertices"]
+            Sigma_k = precomp["Sigma_k"]
+            mu_k = precomp["mu_k"]
+            alpha_k = float(precomp["alpha_k"])
+
+            xi_k = xi_full[vertices, :]  # (n_v, batch)
+            Sigma_xi = Sigma_k @ xi_k  # (n_v, batch)
+            E_k = mu_k @ xi_k + 0.5 * np.sum(xi_k * Sigma_xi, axis=0)  # (batch,)
+            E_k = np.clip(E_k, -500, 500)
+            exp_E = np.exp(E_k)
+            p_k = alpha_k * exp_E / ((1.0 - alpha_k) + alpha_k * exp_E)  # (batch,)
+
+            w_full[vertices, :] = p_k[np.newaxis, :] * (
+                mu_k[:, np.newaxis] + Sigma_xi
+            )
+
+        lambda_target = Y_batch - (L @ w_full)  # stationarity condition
+        delta = lambda_target - lambda_batch
+
+        # Simple stability check + backtracking on omega.
+        step_norm = float(np.linalg.norm(delta))
+        if not np.isfinite(step_norm):
+            return _optimize_lambda_batch_lbfgs(
+                Y_batch, L, precomputed, max_iter=max_iter, lambda_init=lambda_batch
+            )
+
+        omega_try = omega
+        accepted = False
+        for _ls in range(6):
+            candidate = lambda_batch + omega_try * delta
+            cand_norm = float(np.linalg.norm(candidate))
+            if np.isfinite(cand_norm) and cand_norm < max_lambda_norm:
+                lambda_batch = candidate
+                accepted = True
+                break
+            omega_try *= 0.5
+
+        if not accepted:
+            return _optimize_lambda_batch_lbfgs(
+                Y_batch, L, precomputed, max_iter=max_iter, lambda_init=lambda_batch
+            )
+
+        if step_norm / y_norm < tol:
+            break
+
+    return lambda_batch
+
+
+def _optimize_lambda_batch_lbfgs(Y_batch, L, precomputed, max_iter=100, lambda_init=None):
+    """Original SciPy L-BFGS-B optimizer (slow, but accurate)."""
     m, batch_size = Y_batch.shape
     lambda_batch = np.zeros((m, batch_size))
     n = L.shape[1]
@@ -479,10 +767,13 @@ def _optimize_lambda_batch(Y_batch, L, precomputed, max_iter=100, lambda_init=No
         y_t = Y_batch[:, i]
         if lambda_init is not None:
             x0 = lambda_init[:, i]
+            if not np.any(x0):
+                # Better default than zeros: the quadratic part alone is minimized at λ=y.
+                x0 = y_t
         elif i > 0:
             x0 = lambda_batch[:, i - 1]
         else:
-            x0 = np.zeros(m)
+            x0 = y_t
 
         w_full = np.empty(n)
 
@@ -496,7 +787,7 @@ def _optimize_lambda_batch(Y_batch, L, precomputed, max_iter=100, lambda_init=No
                 x0,
                 method="L-BFGS-B",
                 jac=True,
-                options={"maxiter": max_iter},
+                options={"maxiter": max_iter, "maxfun": int(max_iter) * 25},
             )
 
         lambda_batch[:, i] = result.x

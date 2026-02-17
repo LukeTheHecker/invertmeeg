@@ -160,7 +160,6 @@ class SolverFlexChampagne(BaseSolver):
             max_iter=max_iter,
             pruning_thresh=pruning_thresh,
             conv_crit=conv_crit,
-            inverse_fn=self._robust_inv,
         )
         active_set = result.active_set
         gammas = result.gammas

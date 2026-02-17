@@ -73,7 +73,7 @@ def _build_registry() -> dict[str, Any]:
     _add(["champagne", "champ"], solvers.SolverChampagne)
     _add(
         ["champagne-em", "emchampagne", "em-champagne", "emc"],
-        partial(solvers.SolverChampagne, update_rule="EM"),
+        partial(solvers.SolverChampagne, update_rule="Convexity"),
     )
     _add(
         [
