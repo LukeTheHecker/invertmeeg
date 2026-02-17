@@ -19,6 +19,7 @@ os.environ.setdefault("MNE_CONFIG_DIR", str(Path(tempfile.gettempdir()) / "mne-c
 
 from invert.benchmark import BenchmarkRunner, DatasetConfig
 from invert.forward import create_8channel_montage, create_forward_model, get_info
+from invert.forward.forward import _get_fsaverage_dir
 
 EVAL_RELEASE_CATEGORIES = [
     "beamformer",
@@ -209,6 +210,10 @@ def main() -> None:
     profile = profiles[args.profile]
     out_dir = Path(args.out_dir).expanduser().resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Benchmark metrics call mne.vertex_to_mni(), which requires SUBJECTS_DIR.
+    fs_dir = Path(_get_fsaverage_dir())
+    os.environ.setdefault("SUBJECTS_DIR", str(fs_dir.parent))
 
     info = _build_info(profile)
     fwd = create_forward_model(sampling=profile.sampling, info=info)
