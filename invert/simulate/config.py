@@ -37,6 +37,10 @@ class SimulationConfig(BaseModel):
         simulation_mode: Simulation mode ('patches' or 'mixture')
         background_beta: 1/f^beta exponent for smooth background
         background_mixture_alpha: Mixing coefficient alpha (higher = more background)
+        source_spatial_model: Spatial source model for patch generation
+        source_extent: Number of dipoles per source patch
+        patch_smoothness_sigma: Gaussian smoothness (graph-hop units) within a patch
+        patch_rank: Temporal rank per patch (1=single latent, 2=two latent components)
     """
 
     batch_size: int = Field(default=1284, ge=1)
@@ -116,6 +120,22 @@ class SimulationConfig(BaseModel):
     background_mixture_alpha: float | tuple[float, float] = Field(
         default=(0.7, 0.9),
         description="Mixing coefficient alpha: y = alpha*y_background + (1-alpha)*y_patches",
+    )
+    source_spatial_model: Literal["diffusion_basis", "contiguous_gaussian"] = Field(
+        default="diffusion_basis",
+        description="Spatial source model: legacy diffusion basis or contiguous Gaussian patches.",
+    )
+    source_extent: int | tuple[int, int] = Field(
+        default=(1, 60),
+        description="Source extent as number of dipoles (single value or min/max tuple).",
+    )
+    patch_smoothness_sigma: float | tuple[float, float] = Field(
+        default=(0.8, 2.0),
+        description="Gaussian smoothness in graph-hop units for contiguous patches.",
+    )
+    patch_rank: int | tuple[int, int] = Field(
+        default=(1, 2),
+        description="Temporal rank per patch (1 or 2).",
     )
 
     model_config = ConfigDict(frozen=False)

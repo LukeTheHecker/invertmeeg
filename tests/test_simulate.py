@@ -186,3 +186,69 @@ class TestSimulationGeneratorRealism:
         np.testing.assert_allclose(
             info1["projector_rank"].to_numpy(), info2["projector_rank"].to_numpy()
         )
+
+
+class TestContiguousGaussianSimulation:
+    def test_contiguous_model_shapes_and_metadata(self, forward_model, dimensions):
+        """Contiguous Gaussian model should emit expected shapes and metadata."""
+        n_chans, n_dipoles = dimensions
+        config = SimulationConfig(
+            batch_size=4,
+            batch_repetitions=1,
+            n_sources=(2, 2),
+            n_timepoints=25,
+            source_spatial_model="contiguous_gaussian",
+            source_extent=(8, 12),
+            patch_smoothness_sigma=(1.0, 1.5),
+            patch_rank=(1, 2),
+            random_seed=314,
+        )
+        gen = SimulationGenerator(forward_model, config=config)
+        x, y, info = next(gen.generate())
+
+        assert x.shape == (config.batch_size, n_chans, config.n_timepoints)
+        assert y.shape == (config.batch_size, n_dipoles, config.n_timepoints)
+        assert np.all(info["source_spatial_model"] == "contiguous_gaussian")
+        assert "source_vertices" in info.columns
+        assert "source_ranks" in info.columns
+
+    def test_contiguous_model_is_reproducible(self, forward_model):
+        """Contiguous Gaussian path must be deterministic under fixed random seed."""
+        config = SimulationConfig(
+            batch_size=3,
+            batch_repetitions=1,
+            n_sources=(2, 2),
+            n_timepoints=20,
+            source_spatial_model="contiguous_gaussian",
+            source_extent=(5, 9),
+            patch_rank=(1, 2),
+            random_seed=20260217,
+        )
+        gen1 = SimulationGenerator(forward_model, config=config)
+        x1, y1, info1 = next(gen1.generate())
+        gen2 = SimulationGenerator(forward_model, config=config)
+        x2, y2, info2 = next(gen2.generate())
+
+        np.testing.assert_allclose(x1, x2)
+        np.testing.assert_allclose(y1, y2)
+        for c1, c2 in zip(info1["centers"], info2["centers"], strict=False):
+            np.testing.assert_array_equal(c1, c2)
+        for r1, r2 in zip(info1["source_ranks"], info2["source_ranks"], strict=False):
+            np.testing.assert_array_equal(r1, r2)
+
+    def test_patch_rank_two_is_reported(self, forward_model):
+        """Patch rank metadata should reflect rank-2 when requested."""
+        config = SimulationConfig(
+            batch_size=2,
+            batch_repetitions=1,
+            n_sources=(2, 2),
+            n_timepoints=15,
+            source_spatial_model="contiguous_gaussian",
+            source_extent=(6, 10),
+            patch_rank=2,
+            random_seed=99,
+        )
+        gen = SimulationGenerator(forward_model, config=config)
+        _, _, info = next(gen.generate())
+        for ranks in info["source_ranks"]:
+            assert np.all(np.asarray(ranks) == 2)

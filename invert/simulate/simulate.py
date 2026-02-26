@@ -79,6 +79,13 @@ class SimulationGenerator:
     def _precompute_spatial_operators(self):
         """Precompute graph Laplacian and smoothing operators."""
         self.adjacency = build_adjacency(self.fwd, verbose=self.config.verbose)
+        adjacency_csr = self.adjacency.tocsr()
+        self.neighbors = [
+            adjacency_csr.indices[
+                adjacency_csr.indptr[i] : adjacency_csr.indptr[i + 1]
+            ].astype(int)
+            for i in range(self.n_dipoles)
+        ]
 
         # Parse n_orders parameter
         if isinstance(self.config.n_orders, (tuple, list)):
@@ -139,6 +146,15 @@ class SimulationGenerator:
         nlr = self.config.noise_low_rank_dim
         self.get_noise_low_rank_dim = lambda n=1: _sampler(nlr, n=n, dtype=int)
 
+        se = self.config.source_extent
+        self.get_source_extent = lambda n=1: _sampler(se, n=n, dtype=int)
+
+        pss = self.config.patch_smoothness_sigma
+        self.get_patch_smoothness_sigma = lambda n=1: _sampler(pss, n=n, dtype=float)
+
+        pr = self.config.patch_rank
+        self.get_patch_rank = lambda n=1: _sampler(pr, n=n, dtype=int)
+
     def _generate_smooth_background(self, batch_size):
         """Generate smooth background activity with 1/f^beta temporal dynamics.
 
@@ -189,16 +205,8 @@ class SimulationGenerator:
             )
         return self.leadfield
 
-    def _generate_patches(self, batch_size):
-        """Generate patch-based source activity.
-
-        Returns:
-            y_patches: [batch_size, n_dipoles, n_timepoints] patch activity
-            selection: list of source index arrays
-            amplitude_values: list of amplitude arrays
-            inter_source_correlations: array of correlation values
-            noise_color_coeffs: array of noise color coefficients
-        """
+    def _generate_diffusion_basis_patches(self, batch_size):
+        """Generate patch activity from the legacy diffusion basis."""
         n_sources_batch = self.rng.integers(
             self.min_sources, self.max_sources + 1, batch_size
         )
@@ -232,7 +240,6 @@ class SimulationGenerator:
             )
         ]
 
-        # Generate patch activity using dense source matrix for fast indexing
         y_patches = np.stack(
             [
                 (amplitudes[i] @ self.sources_dense[selection[i]]).T
@@ -242,6 +249,8 @@ class SimulationGenerator:
             axis=0,
         )
 
+        source_meta = {"source_vertices": [None] * batch_size, "source_ranks": None}
+
         return (
             y_patches,
             n_sources_batch,
@@ -249,7 +258,185 @@ class SimulationGenerator:
             amplitude_values,
             inter_source_correlations,
             noise_color_coeffs,
+            source_meta,
         )
+
+    def _sample_connected_vertices(self, target_size):
+        """Sample one contiguous region from the source adjacency graph."""
+        target_size = int(np.clip(target_size, 1, self.n_dipoles))
+        if target_size == 1:
+            return np.array([int(self.rng.integers(0, self.n_dipoles))], dtype=int)
+
+        best_region = None
+        for _ in range(12):
+            seed = int(self.rng.integers(0, self.n_dipoles))
+            region = [seed]
+            region_set = {seed}
+            frontier = {int(v) for v in self.neighbors[seed]}
+
+            while len(region) < target_size and frontier:
+                candidate = int(self.rng.choice(np.fromiter(frontier, dtype=int)))
+                frontier.remove(candidate)
+                if candidate in region_set:
+                    continue
+                region.append(candidate)
+                region_set.add(candidate)
+                for nb in self.neighbors[candidate]:
+                    nb = int(nb)
+                    if nb not in region_set:
+                        frontier.add(nb)
+
+            if len(region) == target_size:
+                return np.asarray(region, dtype=int)
+
+            if best_region is None or len(region) > len(best_region):
+                best_region = region
+
+        return np.asarray(best_region, dtype=int)
+
+    def _bfs_distances_within_region(self, center, region_vertices):
+        """Compute hop distances from center restricted to region vertices."""
+        region_set = {int(v) for v in region_vertices}
+        dists = {int(center): 0}
+        queue = [int(center)]
+        q_idx = 0
+        while q_idx < len(queue):
+            node = queue[q_idx]
+            q_idx += 1
+            for nb in self.neighbors[node]:
+                nb = int(nb)
+                if nb not in region_set or nb in dists:
+                    continue
+                dists[nb] = dists[node] + 1
+                queue.append(nb)
+
+        return np.array([float(dists.get(int(v), np.inf)) for v in region_vertices])
+
+    def _make_contiguous_gaussian_patch_components(self, region_vertices, rank, sigma):
+        """Create rank-1/2 smooth components inside one contiguous source region."""
+        rank = int(np.clip(rank, 1, 2))
+        sigma = float(max(sigma, 1e-3))
+        region_vertices = np.asarray(region_vertices, dtype=int)
+        if region_vertices.size == 0:
+            return []
+
+        components = []
+        used_centers = set()
+        for _ in range(rank):
+            if len(used_centers) < region_vertices.size:
+                available = [v for v in region_vertices if int(v) not in used_centers]
+                center = int(self.rng.choice(available))
+            else:
+                center = int(self.rng.choice(region_vertices))
+            used_centers.add(center)
+
+            hop_dists = self._bfs_distances_within_region(center, region_vertices)
+            weights = np.exp(-(hop_dists**2) / (2.0 * sigma**2))
+            if np.max(weights) > 0:
+                weights = weights / np.max(weights)
+
+            spatial_map = np.zeros(self.n_dipoles, dtype=float)
+            spatial_map[region_vertices] = weights
+            components.append(spatial_map)
+
+        return components
+
+    def _generate_contiguous_gaussian_patches(self, batch_size):
+        """Generate contiguous, irregular source patches with Gaussian smoothness.
+
+        Inter-source correlation is controlled at the source level and patch-internal
+        activity can be rank-1 or rank-2.
+        """
+        n_sources_batch = self.rng.integers(
+            self.min_sources, self.max_sources + 1, batch_size
+        )
+        inter_source_correlations = self.get_inter_source_correlation(n=batch_size)
+        noise_color_coeffs = self.get_noise_color_coeff(n=batch_size)
+
+        y_batch = np.zeros((batch_size, self.n_dipoles, self.config.n_timepoints))
+        selection = []
+        amplitude_values = []
+        source_vertices_meta = []
+        source_ranks_meta = []
+
+        for i, n_sources in enumerate(n_sources_batch):
+            extents = self.get_source_extent(n=n_sources).astype(int)
+            extents = np.clip(extents, 1, self.n_dipoles)
+
+            sigmas = self.get_patch_smoothness_sigma(n=n_sources).astype(float)
+            sigmas = np.clip(sigmas, 1e-3, None)
+
+            patch_ranks = self.get_patch_rank(n=n_sources).astype(int)
+            patch_ranks = np.clip(patch_ranks, 1, 2)
+
+            amps = self.rng.uniform(*self.config.amplitude_range, n_sources)
+            amplitude_values.append(amps)
+
+            cov = get_cov(int(n_sources), float(inter_source_correlations[i]))
+            base_choices_1 = self.rng.choice(self.config.n_timecourses, n_sources)
+            tc_rank1 = (self.time_courses[base_choices_1].T @ cov).T
+
+            base_choices_2 = self.rng.choice(self.config.n_timecourses, n_sources)
+            tc_rank2 = (self.time_courses[base_choices_2].T @ cov).T
+
+            centers_i = []
+            source_vertices_i = []
+            source_ranks_i = []
+
+            for s in range(n_sources):
+                region_vertices = self._sample_connected_vertices(int(extents[s]))
+                components = self._make_contiguous_gaussian_patch_components(
+                    region_vertices=region_vertices,
+                    rank=int(patch_ranks[s]),
+                    sigma=float(sigmas[s]),
+                )
+
+                if len(components) == 0:
+                    continue
+
+                patch_ts = components[0][:, None] * tc_rank1[s][None, :]
+                if int(patch_ranks[s]) >= 2 and len(components) > 1:
+                    patch_ts += components[1][:, None] * tc_rank2[s][None, :]
+
+                y_batch[i] += (amps[s] / int(patch_ranks[s])) * patch_ts
+                center_vertex = int(region_vertices[np.argmax(components[0][region_vertices])])
+                centers_i.append(center_vertex)
+                source_vertices_i.append(region_vertices)
+                source_ranks_i.append(int(patch_ranks[s]))
+
+            selection.append(np.asarray(centers_i, dtype=int))
+            source_vertices_meta.append(source_vertices_i)
+            source_ranks_meta.append(np.asarray(source_ranks_i, dtype=int))
+
+        source_meta = {
+            "source_vertices": source_vertices_meta,
+            "source_ranks": source_ranks_meta,
+        }
+
+        return (
+            y_batch,
+            n_sources_batch,
+            selection,
+            amplitude_values,
+            inter_source_correlations,
+            noise_color_coeffs,
+            source_meta,
+        )
+
+    def _generate_patches(self, batch_size):
+        """Generate patch-based source activity.
+
+        Returns:
+            y_patches: [batch_size, n_dipoles, n_timepoints] patch activity
+            selection: list of source index arrays
+            amplitude_values: list of amplitude arrays
+            inter_source_correlations: array of correlation values
+            noise_color_coeffs: array of noise color coefficients
+        """
+        if self.config.source_spatial_model == "contiguous_gaussian":
+            return self._generate_contiguous_gaussian_patches(batch_size)
+
+        return self._generate_diffusion_basis_patches(batch_size)
 
     def _generate_background(self, batch_size, y_patches):
         """Mix background activity with patches if in mixture mode.
@@ -424,6 +611,7 @@ class SimulationGenerator:
         noise_color_coeffs,
         modes_batch,
         selection,
+        source_meta,
         alphas,
         noise_meta,
     ):
@@ -449,7 +637,13 @@ class SimulationGenerator:
             "forward_error": [self.config.forward_error] * batch_size,
             "centers": selection,
             "simulation_mode": [self.config.simulation_mode] * batch_size,
+            "source_spatial_model": [self.config.source_spatial_model] * batch_size,
         }
+
+        if source_meta.get("source_vertices", None) is not None:
+            info_dict["source_vertices"] = source_meta["source_vertices"]
+        if source_meta.get("source_ranks", None) is not None:
+            info_dict["source_ranks"] = source_meta["source_ranks"]
 
         if self.config.estimate_noise_cov:
             info_dict["noise_cov_rank_est"] = noise_meta["noise_cov_rank_est"]
@@ -501,6 +695,7 @@ class SimulationGenerator:
                 amplitude_values,
                 inter_source_correlations,
                 noise_color_coeffs,
+                source_meta,
             ) = self._generate_patches(self.config.batch_size)
 
             y, alphas = self._generate_background(self.config.batch_size, y_patches)
@@ -520,6 +715,7 @@ class SimulationGenerator:
                 noise_color_coeffs,
                 modes_batch,
                 selection,
+                source_meta,
                 alphas,
                 noise_meta,
             )
