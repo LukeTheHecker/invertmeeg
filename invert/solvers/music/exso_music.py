@@ -15,11 +15,17 @@ logger = logging.getLogger(__name__)
 
 
 class SolverExSoMUSIC(BaseSolver):
-    """(2q)-ExSo-MUSIC extended-source localization (q=1 or q=2).
+    """ExSo-MUSIC extended-source localization (q=1 or q=2).
 
-    Implements the ExSo-MUSIC criterion using the steering vector
-    ``h(theta)^{⊗q}`` and a signal-subspace projector estimated from
-    ``C_{2q,x}`` (and ``C_{2,nu}`` for q=1).
+    Scans pseudo-disks on the source-space mesh, evaluating how well the
+    compound steering vector ``h(theta)^{⊗q}`` (sum of leadfield columns for
+    all vertices in the disk) projects onto the signal subspace estimated from
+    the (2q)-order cumulant matrix.  Disks with lowest metric are selected as
+    active sources and reconstructed via weighted minimum-norm.
+
+    By default uses 2nd-order statistics (q=1, covariance-based).  Set q=2
+    for the 4th-order (quadricovariance) variant, which can handle correlated
+    sources but needs substantially more time samples for a reliable estimate.
 
     Notes
     -----
@@ -31,13 +37,14 @@ class SolverExSoMUSIC(BaseSolver):
     """
 
     meta = SolverMeta(
-        acronym="4-ExSo-MUSIC",
-        full_name="Fourth-Order Extended Signal Subspace MUSIC",
+        acronym="ExSo-MUSIC",
+        full_name="Extended Signal Subspace MUSIC",
         category="Subspace Methods",
         description=(
-            "Fourth-order statistics (quadricovariance) variant of ExSo-MUSIC for "
-            "localizing sources using higher-order cumulants, useful for correlated "
-            "sources."
+            "ExSo-MUSIC extended-source localization via pseudo-disk scanning.  "
+            "Supports 2nd-order (q=1, covariance-based, default) and 4th-order "
+            "(q=2, quadricovariance) subspace estimation.  q=2 can separate "
+            "correlated sources but needs many more time samples."
         ),
         references=[
             "Albera, L., Ferréol, A., Cosandier-Rimélé, D., Merlet, I., & Wendling, F. (2008). Brain source localization using a fourth-order deflation scheme. IEEE Transactions on Biomedical Engineering, 55(2), 490–501.",
@@ -46,17 +53,65 @@ class SolverExSoMUSIC(BaseSolver):
 
     def __init__(
         self,
-        name="4-ExSo-MUSIC",
+        name="ExSo-MUSIC",
         *,
-        q: int = 2,
-        max_disk_size: int = 500,
+        q: int | str = "auto",
+        max_disk_size: int | str = "auto",
         lambda_threshold: float | str = "auto",
         disk_hops: list[int] | str = "auto",
         sensor_rank: int | str | None = "auto",
         **kwargs,
     ):
+        """Initialise ExSo-MUSIC solver.
+
+        Parameters
+        ----------
+        q : int (1 or 2), or "auto"
+            Order of the cumulant tensor used for subspace estimation.
+            q=1 uses the ordinary (2nd-order) covariance matrix C₂ and works
+            well when sources are uncorrelated.  q=2 builds the 4th-order
+            cumulant matrix C₄ (quadricovariance), which can separate
+            correlated sources because Gaussian noise vanishes in 4th-order
+            cumulants.  The trade-off is that C₄ has dimension m² × m² and
+            requires substantially more time samples for a reliable estimate.
+            ``"auto"`` (default) selects q based on the number of time samples
+            and sensors: uses q=2 when ``t >= 8*m`` (enough data for a stable
+            4th-order cumulant estimate), otherwise q=1.
+        max_disk_size : int or "auto"
+            Maximum number of vertices a pseudo-disk may contain during the
+            graph-expansion scan.  At each hop the disk grows by one ring of
+            neighbours on the source-space mesh; expansion stops early if the
+            vertex count exceeds this limit.  Prevents run-away growth on dense
+            meshes (e.g. ico-5 with ~10k vertices per hemisphere).
+            ``"auto"`` (default) uses 15, which captures exactly 1 hop of
+            neighbours on typical icosahedral meshes (~6 neighbours per
+            vertex).  This is mesh-resolution independent.
+        lambda_threshold : float or "auto"
+            Acceptance threshold for the ExSo-MUSIC metric Υ(E, h^{⊗q}).
+            The metric ranges from 0 (perfect match to signal subspace) to 1
+            (orthogonal).  When a float, every disk whose best metric across
+            hop levels is ≤ λ is marked active.  When ``"auto"`` (default),
+            thresholding is skipped and the ``n`` disks with lowest metric are
+            selected globally via a min-heap.
+        disk_hops : list of int, or "auto"
+            Graph-hop distances at which the metric is evaluated during disk
+            expansion.  At hop 0 the disk is just the centre vertex; at hop k
+            it includes all vertices reachable within k edges on the
+            source-space mesh.  The compound steering vector h is the sum of
+            leadfield columns for all vertices in the current disk, so larger
+            hops model broader extended sources.
+            ``"auto"`` defaults to ``[0, 1, 2, 3, 4, 5, 7, 10, 15, 20]``.
+            Note that ``max_disk_size`` caps the actual expansion regardless
+            of the hop schedule.
+        sensor_rank : int, "auto", or None
+            Dimensionality reduction applied to the sensor space *before*
+            computing 4th-order cumulants (q=2 only).  Reduces the C₄ matrix
+            from m² × m² to r² × r² where r < m.  ``"auto"`` sets
+            r = min(m, max(16, 4·n_sources)).  ``None`` disables reduction.
+            Ignored when q=1.
+        """
         self.name = name
-        self.q = int(q)
+        self.q = q
         self.max_disk_size = max_disk_size
         self.lambda_threshold = lambda_threshold
         self.disk_hops = disk_hops
@@ -111,7 +166,9 @@ class SolverExSoMUSIC(BaseSolver):
         data = self.unpack_data_obj(mne_obj)
         data = wf.sensor_transform @ data
 
-        q_eff = self.q if q is None else int(q)
+        m, t = data.shape
+        q_raw = self.q if q is None else q
+        q_eff = _coerce_q(q_raw, m=m, t=t)
         if q_eff not in (1, 2):
             raise ValueError(f"q must be 1 or 2, got {q_eff}")
 
@@ -170,12 +227,14 @@ class SolverExSoMUSIC(BaseSolver):
                     int(L_scan.shape[1]),
                 )
 
+        max_disk_eff = _coerce_max_disk_size(self.max_disk_size)
+
         source_map, metric_map = _exso_music(
             data,
             L_scan,
             q=q_eff,
             num_sources=num_sources,
-            max_disk_size=self.max_disk_size,
+            max_disk_size=max_disk_eff,
             adjacency=adjacency,
             lambda_threshold=lam_eff,
             disk_hops=hops_eff,
@@ -460,6 +519,20 @@ def _exso_music_metric(E: np.ndarray, h: np.ndarray, *, q: int, E3=None) -> floa
 
     proj = min(max(proj, 0.0), 1.0)
     return 1.0 - proj
+
+
+def _coerce_q(q, *, m: int, t: int) -> int:
+    """Resolve q parameter.  'auto' → q=2 if t >= 8*m, else q=1."""
+    if isinstance(q, str) and q.lower() == "auto":
+        return 2 if t >= 8 * m else 1
+    return int(q)
+
+
+def _coerce_max_disk_size(max_disk_size) -> int:
+    """Resolve max_disk_size.  'auto' → 15 (captures 1 hop on any ico mesh)."""
+    if isinstance(max_disk_size, str) and str(max_disk_size).lower() == "auto":
+        return 15
+    return int(max_disk_size)
 
 
 def _coerce_disk_hops(disk_hops: list[int] | str) -> list[int]:
