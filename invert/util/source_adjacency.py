@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import logging
 
 import mne
@@ -8,6 +9,41 @@ from scipy.sparse import csr_matrix
 from scipy.spatial import cKDTree
 
 logger = logging.getLogger(__name__)
+_ADJ_CACHE: dict[tuple[str, str, float], csr_matrix] = {}
+
+
+def _hash_array(arr: np.ndarray) -> bytes:
+    arr = np.ascontiguousarray(arr)
+    hasher = hashlib.blake2b(digest_size=16)
+    hasher.update(np.asarray(arr.shape, dtype=np.int64).tobytes())
+    hasher.update(str(arr.dtype).encode("utf-8"))
+    hasher.update(arr.view(np.uint8).data)
+    return hasher.digest()
+
+
+def source_space_signature(src) -> str:
+    """Stable content signature for source space geometry."""
+    hasher = hashlib.blake2b(digest_size=16)
+    for space in src:
+        hasher.update(str(space.get("type", "")).encode("utf-8"))
+        vertno = np.asarray(space["vertno"], dtype=np.int32)
+        hasher.update(_hash_array(vertno))
+        rr = np.asarray(space["rr"], dtype=np.float32)[vertno]
+        hasher.update(_hash_array(rr))
+    return hasher.hexdigest()
+
+
+def _points_from_src(src) -> np.ndarray:
+    points = []
+    for space in src:
+        vertno = np.asarray(space.get("vertno", []), dtype=int)
+        if vertno.size == 0:
+            continue
+        rr = np.asarray(space["rr"], dtype=float)
+        points.append(rr[vertno])
+    if not points:
+        return np.zeros((0, 3), dtype=float)
+    return np.vstack(points)
 
 
 def _adjacency_from_points(
@@ -140,24 +176,45 @@ def build_source_adjacency(
         msg = f"Unknown adjacency_type: {adjacency_type!r}"
         raise ValueError(msg)
 
+    cache_key = (source_space_signature(src), mode, float(adjacency_distance))
+    cached = _ADJ_CACHE.get(cache_key)
+    if cached is not None:
+        return cached.copy()
+
     if mode == "distance":
         try:
             adjacency = mne.spatial_dist_adjacency(
                 src, adjacency_distance, verbose=verbose
             )
-            return csr_matrix(adjacency)
+            adjacency = csr_matrix(adjacency)
+            _ADJ_CACHE[cache_key] = adjacency
+            return adjacency.copy()
         except Exception as distance_exc:
             logger.warning(
                 "distance adjacency failed (%s). Trying discrete source fallback.",
                 distance_exc,
             )
-            return _adjacency_from_discrete_src(
-                src, adjacency_distance=adjacency_distance
-            )
+            try:
+                adjacency = _adjacency_from_discrete_src(
+                    src, adjacency_distance=adjacency_distance
+                )
+            except Exception as discrete_exc:
+                logger.warning(
+                    "discrete fallback failed (%s). Falling back to coordinate "
+                    "adjacency.",
+                    discrete_exc,
+                )
+                adjacency = _adjacency_from_points(
+                    _points_from_src(src), adjacency_distance=adjacency_distance
+                )
+            _ADJ_CACHE[cache_key] = adjacency
+            return adjacency.copy()
 
     try:
         adjacency = mne.spatial_src_adjacency(src, verbose=verbose)
-        return csr_matrix(adjacency)
+        adjacency = csr_matrix(adjacency)
+        _ADJ_CACHE[cache_key] = adjacency
+        return adjacency.copy()
     except Exception as spatial_exc:
         logger.warning(
             "spatial_src_adjacency failed (%s). Falling back to distance adjacency "
@@ -168,11 +225,25 @@ def build_source_adjacency(
 
     try:
         adjacency = mne.spatial_dist_adjacency(src, adjacency_distance, verbose=verbose)
-        return csr_matrix(adjacency)
+        adjacency = csr_matrix(adjacency)
+        _ADJ_CACHE[cache_key] = adjacency
+        return adjacency.copy()
     except Exception as distance_exc:
         logger.warning(
             "spatial_dist_adjacency also failed (%s). Trying discrete source fallback.",
             distance_exc,
         )
-
-    return _adjacency_from_discrete_src(src, adjacency_distance=adjacency_distance)
+    try:
+        adjacency = _adjacency_from_discrete_src(
+            src, adjacency_distance=adjacency_distance
+        )
+    except Exception as discrete_exc:
+        logger.warning(
+            "discrete fallback failed (%s). Falling back to coordinate adjacency.",
+            discrete_exc,
+        )
+        adjacency = _adjacency_from_points(
+            _points_from_src(src), adjacency_distance=adjacency_distance
+        )
+    _ADJ_CACHE[cache_key] = adjacency
+    return adjacency.copy()
