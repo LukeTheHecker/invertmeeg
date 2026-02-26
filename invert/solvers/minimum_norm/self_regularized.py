@@ -456,8 +456,8 @@ class SolverSelfRegularizedELORETA(BaseSolver):
                 ]  # Get positions of active vertices
                 positions.append(rr * 1000)  # Convert to mm
                 vertex_to_index.extend(range(len(hemi_src["vertno"])))
-            elif hemi_src["type"] == "vol":
-                # Volume source space
+            elif hemi_src["type"] in ("vol", "discrete"):
+                # Volume / discrete source space
                 rr = hemi_src["rr"][hemi_src["vertno"]]
                 positions.append(rr * 1000)  # Convert to mm
                 vertex_to_index.extend(range(len(hemi_src["vertno"])))

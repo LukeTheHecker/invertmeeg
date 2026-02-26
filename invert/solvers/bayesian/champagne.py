@@ -295,7 +295,8 @@ class SolverChampagne(BaseSolver):
                              _ndm=noise_diag_mean, _it=_iter_count):
                     upper = np.mean(mu_x**2, axis=1)
                     snr = upper / _ndm
-                    i = _it[0]; _it[0] += 1
+                    i = _it[0]
+                    _it[0] += 1
                     ifact = 1 - np.exp(-i / 10)
                     sfact = 1 / (1 + np.exp(-snr + 5))
                     mackay = upper / (gammas * z_diag + 1e-20)
@@ -353,7 +354,7 @@ class SolverChampagne(BaseSolver):
             It = np.identity(n_times)
             mu_x_scaled_init = mu_x / (gammas[:, np.newaxis] + 1e-10)
             B_hat = mu_x_scaled_init.T @ mu_x + self.theta * It
-            B = B_hat * (n_times / np.trace(B_hat))
+            B = B_hat / self._frob(B_hat)
 
         for i_iter in range(self.max_iter):
             old_gammas = gammas.copy()
@@ -407,11 +408,11 @@ class SolverChampagne(BaseSolver):
 
                 mu_x_B_inv = mu_x @ B_inv
                 mahalanobis_terms = np.sum(mu_x * mu_x_B_inv, axis=1)
-                gammas = diag_Sigma_x + mahalanobis_terms / n_times
+                gammas = diag_Sigma_x + mahalanobis_terms
 
                 mu_x_scaled_t = mu_x / (gammas[:, np.newaxis] + 1e-10)
                 B_hat = mu_x_scaled_t.T @ mu_x + self.theta * It
-                B = B_hat * (n_times / np.trace(B_hat))
+                B = B_hat / self._frob(B_hat)
 
             elif rule_lower == "adaptive":
                 upper_term = np.mean(mu_x**2, axis=1)

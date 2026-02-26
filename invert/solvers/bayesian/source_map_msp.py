@@ -84,11 +84,8 @@ class SolverSourceMAPMSP(BaseSolver):
         data = wf.sensor_transform @ data
         leadfield = self.leadfield
         data_cov = self.data_covariance(data, center=True, ddof=1)
-        # Reference must match the final inverse operator, which uses the
-        # original (non-smoothed) leadfield.  L_smooth has unit-norm columns
-        # from get_smooth_prior_cov(), so its Gram matrix has inflated
-        # eigenvalues that would push all alphas too high.
-        reg_reference = leadfield @ leadfield.T
+        L_smooth, _gradient = self.get_smooth_prior_cov(leadfield, smoothness_order)
+        reg_reference = L_smooth @ L_smooth.T
         reg_reference = 0.5 * (reg_reference + reg_reference.T)
         if not np.all(np.isfinite(reg_reference)) or np.linalg.norm(reg_reference) == 0:
             reg_reference = data_cov

@@ -2132,10 +2132,58 @@ class BaseSolver:
                             "orientation='fixed' is only supported for surface source spaces. "
                             "Use orientation='pca' (data-driven) or orientation='auto'."
                         )
-                    # Volume/discrete source space: keep free orientation.
-                    # Surface-only fixed normals are meaningless for volume grids.
-                    self._free_orientation = True
-                    self._n_orient = 3
+                    # Volume/discrete source space: free orientation not meaningful
+                    # for most solvers.  Check whether this solver can handle it.
+                    supports_vector = bool(
+                        getattr(self, "SUPPORTS_VECTOR_ORIENTATION", False)
+                    )
+                    if supports_vector:
+                        # Solver handles free orientation natively.
+                        self._free_orientation = True
+                        self._n_orient = 3
+                    elif self._orientation_data_obj is not None:
+                        # Auto PCA reduction: project 3-component leadfield to
+                        # scalar using data-driven orientation estimates.
+                        logger.info(
+                            "%s orientation=auto + volume source: "
+                            "auto PCA reduction (free→scalar).",
+                            solver_label,
+                        )
+                        Y = self.unpack_data_obj(self._orientation_data_obj)
+                        kept_ch_names = list(
+                            getattr(self, "_last_data_ch_names", ()) or []
+                        )
+                        if kept_ch_names:
+                            self.forward = self.forward.pick_channels(
+                                kept_ch_names, ordered=True
+                            )
+                        G_free = np.asarray(
+                            self.forward["sol"]["data"], dtype=float
+                        )
+                        q = estimate_orientation_pca(
+                            G_free,
+                            Y,
+                            reg=float(self.orientation_pca_reg),
+                            deterministic_sign=bool(
+                                self.orientation_pca_deterministic_sign
+                            ),
+                        )
+                        self._orientation_q = q
+                        leadfield = reduce_free_to_scalar(G_free, q)
+                        self._free_orientation = False
+                        self._n_orient = 1
+                    else:
+                        # No data available — keep free and hope for the best.
+                        import warnings
+
+                        warnings.warn(
+                            f"{solver_label}: volume source space with "
+                            "orientation='auto' but no data for PCA reduction. "
+                            "Keeping free orientation; solver may fail.",
+                            stacklevel=2,
+                        )
+                        self._free_orientation = True
+                        self._n_orient = 3
                 else:
                     # Surface source space: convert to fixed (cortical normal).
                     self.forward = mne.convert_forward_solution(
@@ -2183,24 +2231,41 @@ class BaseSolver:
                     getattr(self, "SUPPORTS_VECTOR_ORIENTATION", False)
                 )
                 if not supports_vector:
-                    # All beamformers can operate on free-orientation leadfields
-                    # (at minimum by treating the 3 components as grouped columns).
-                    supports_vector = self._is_beamformer
-                if not supports_vector:
-                    solver_label = getattr(self, "name", self.__class__.__name__)
-                    supported = ["auto", "fixed", "pca"]
-                    raise ValueError(
-                        f"{solver_label} does not support orientation='free'. "
-                        f"Supported: {supported}."
+                    # Surface forwards can be converted to a fixed (cortical-normal)
+                    # orientation; use that as a pragmatic fallback so solvers that
+                    # require scalar leadfields (some beamformers) can still run.
+                    # Volume/discrete forwards have no such canonical fixed-orientation.
+                    if not (is_surface and bool(getattr(self, "_is_beamformer", False))):
+                        solver_label = getattr(self, "name", self.__class__.__name__)
+                        supported = ["auto", "fixed", "pca"]
+                        raise ValueError(
+                            f"{solver_label} does not support orientation='free'. "
+                            f"Supported: {supported}."
+                        )
+                    logger.info(
+                        "%s orientation='free' requested but solver does not support "
+                        "vector leadfields; using surface fixed orientation instead.",
+                        solver_label,
                     )
-                if is_surface:
-                    self.forward = ensure_surface_free_surf_ori(self.forward)
-                self._free_orientation = True
-                self._n_orient = 3
-                logger.info(
-                    "%s orientation: using true free orientation (3-component).",
-                    solver_label,
-                )
+                    self.forward = mne.convert_forward_solution(
+                        self.forward,
+                        surf_ori=True,
+                        force_fixed=True,
+                        use_cps=True,
+                        verbose=0,
+                    )
+                    self._free_orientation = False
+                    self._n_orient = 1
+                    # leadfield will be pulled from forward["sol"]["data"] below.
+                else:
+                    if is_surface:
+                        self.forward = ensure_surface_free_surf_ori(self.forward)
+                    self._free_orientation = True
+                    self._n_orient = 3
+                    logger.info(
+                        "%s orientation: using true free orientation (3-component).",
+                        solver_label,
+                    )
         else:
             if orientation == "free":
                 raise ValueError(
@@ -2340,11 +2405,8 @@ class BaseSolver:
         cond_num = np.linalg.cond(leadfield)
 
         if cond_num > cond_threshold:
-            # Use regularized least squares for ill-conditioned matrices
-            reg_matrix = regularization * np.eye(leadfield.shape[1])
-            result = np.linalg.solve(
-                leadfield.T @ leadfield + reg_matrix, leadfield.T @ data
-            )
+            # Use least-squares for ill-conditioned matrices
+            result = np.linalg.lstsq(leadfield, data, rcond=None)[0]
         else:
             # Use pseudoinverse for well-conditioned matrices
             result = np.linalg.pinv(leadfield) @ data
@@ -2379,11 +2441,8 @@ class BaseSolver:
         cond_num = np.linalg.cond(leadfield)
 
         if cond_num > cond_threshold:
-            # Use regularized projection for ill-conditioned matrices
-            reg_matrix = regularization * np.eye(leadfield.shape[1])
-            proj_coeff = np.linalg.solve(
-                leadfield.T @ leadfield + reg_matrix, leadfield.T @ data
-            )
+            # Use least-squares projection for ill-conditioned matrices
+            proj_coeff = np.linalg.lstsq(leadfield, data, rcond=None)[0]
             return data - leadfield @ proj_coeff
         else:
             # Use pseudoinverse projection for well-conditioned matrices

@@ -7,10 +7,12 @@ from scipy.sparse.csgraph import laplacian
 from scipy.sparse.linalg import splu
 
 from invert.util import build_source_adjacency
+from invert.util.source_adjacency import source_space_signature
 
 from ..base import BaseSolver, InverseOperator, SolverMeta
 
 logger = logging.getLogger(__name__)
+_PATTERN_CACHE: dict[tuple[str, int, float, int], np.ndarray] = {}
 
 
 class SolverMSP(BaseSolver):
@@ -54,6 +56,7 @@ class SolverMSP(BaseSolver):
         n_patterns=None,
         diffusion_parameter=0.1,
         patch_order=2,
+        sensor_rank="auto",
         reduce_rank=True,
         rank="auto",
         **kwargs,
@@ -95,6 +98,7 @@ class SolverMSP(BaseSolver):
         self.n_patterns = n_patterns
         self.diffusion_parameter = diffusion_parameter
         self.patch_order = patch_order
+        self.sensor_rank = sensor_rank
         # MSP operates on scalar source amplitudes; for free-orientation
         # volume/discrete forwards, reduce to scalar orientations by default.
         kwargs.setdefault("orientation", "pca")
@@ -142,37 +146,87 @@ class SolverMSP(BaseSolver):
         # Run MSP-ReML algorithm
         m, v = data.shape
         d = leadfield.shape[1]
-        C = (data @ data.T) / float(v)  # sample covariance over time/epochs
 
-        # Build diagonal source priors as sensor-space covariance components
-        # Q_i = diag(q_i) in source space -> LQL_i = (L * q_i) @ L^T in sensor space
-        n_pats = len(self.patterns)
-        Q_src = np.array(self.patterns)  # n_pats x d
+        # Patterns are treated as *patch vectors* u_i in source space (d,).
+        # Each covariance component is rank-1: Q_i = u_i u_i^T.
+        # In sensor space: L Q_i L^T = (L u_i)(L u_i)^T, trace-normalized.
+        try:
+            patterns = np.asarray(self.patterns, dtype=float)
+            if patterns.ndim != 2:
+                raise ValueError
+        except Exception:
+            patterns = np.stack([np.asarray(p, dtype=float) for p in self.patterns])
+        if patterns.shape[1] != d:
+            raise ValueError(
+                f"patterns have shape {patterns.shape}, expected (*, {d})"
+            )
 
-        # Vectorized LQL computation: LQL[i] = (L * Q_src[i]) @ L.T
-        # Using einsum: LQL[i,j,k] = sum_d L[j,d] * Q_src[i,d] * L[k,d]
-        LQL = np.einsum("jd,id,kd->ijk", leadfield, Q_src, leadfield)  # (n_pats, m, m)
-        tr = np.trace(LQL, axis1=1, axis2=2)  # (n_pats,)
-        valid = tr > 1e-20
-        # Normalize valid components by their trace
-        LQL[valid] /= tr[valid, None, None]
-
-        # Remove invalid patterns
-        if not valid.all():
-            LQL = LQL[valid]
-            Q_src = Q_src[valid]
-            tr = tr[valid]
-            n_pats = int(valid.sum())
-
-        # Add noise component
-        has_noise = self.include_sensor_noise
-        if has_noise:
-            Q_noise = np.eye(m) / m  # trace-normalized identity
-            LQL_all = np.concatenate([LQL, Q_noise[np.newaxis]], axis=0)
-            n_comp = n_pats + 1
+        # Optional: project onto a low-dimensional sensor subspace to reduce
+        # ReML costs, then map back to the full whitened sensor space.
+        sensor_rank = getattr(self, "sensor_rank", "auto")
+        use_projection = False
+        if isinstance(sensor_rank, str):
+            sensor_rank_str = sensor_rank.strip().lower()
+            if sensor_rank_str in {"none", "full"}:
+                r = m
+            elif sensor_rank_str == "auto":
+                r = min(m, 64, v)
+                use_projection = r < m
+            else:
+                try:
+                    r = int(sensor_rank_str)
+                except Exception as err:
+                    raise ValueError(
+                        "sensor_rank must be 'auto', 'full', or an int, "
+                        f"got {sensor_rank!r}"
+                    ) from err
+                r = int(np.clip(r, 1, min(m, v)))
+                use_projection = r < m
         else:
-            LQL_all = LQL
-            n_comp = n_pats
+            try:
+                r = int(sensor_rank)
+            except Exception as err:
+                raise ValueError(
+                    "sensor_rank must be 'auto', 'full', or an int, "
+                    f"got {sensor_rank!r}"
+                ) from err
+            r = int(np.clip(r, 1, min(m, v)))
+            use_projection = r < m
+
+        if use_projection:
+            U_sens, _s, _ = np.linalg.svd(data, full_matrices=False)
+            basis = U_sens[:, :r]  # (m, r), orthonormal
+            data_r = basis.T @ data  # (r, v)
+            leadfield_r = basis.T @ leadfield  # (r, d)
+            basis_T = basis.T  # (r, m)
+        else:
+            data_r = data
+            leadfield_r = leadfield
+            basis_T = None
+
+        m_eff = int(data_r.shape[0])
+        C = (data_r @ data_r.T) / float(v)  # sample covariance over time/epochs
+
+        # Sensor-space pattern vectors: k_i = L u_i
+        K = leadfield_r @ patterns.T  # (m_eff, n_pats)
+        k_norm2 = np.sum(K * K, axis=0)
+        valid = k_norm2 > 1e-20
+        if not np.any(valid):
+            raise ValueError("All MSP patterns are null in sensor space.")
+
+        patterns = patterns[valid]
+        k_norm2 = k_norm2[valid]
+        K = K[:, valid]
+
+        # Trace-normalize components by ||k_i||^2 (equivalently: u_i /= ||k_i||)
+        k_scale = 1.0 / np.sqrt(k_norm2)
+        K = K * k_scale[np.newaxis, :]
+        patterns = patterns * k_scale[:, np.newaxis]
+
+        n_pats = int(patterns.shape[0])
+
+        has_noise = bool(self.include_sensor_noise)
+        n_comp = n_pats + (1 if has_noise else 0)
 
         # Data-driven initialization: h = log(trace(C) / n_comp)
         trC = max(np.trace(C), 1e-20)
@@ -193,44 +247,79 @@ class SolverMSP(BaseSolver):
                 f"h_init={h_init:.2f}, h_bounds=[{lambda_min}, {lambda_max:.1f}]"
             )
 
-        # ReML iterations (SPM-style Fisher scoring with damping)
+        # ReML iterations (SPM-style Fisher scoring with damping).
+        #
+        # Important: MSP can have hundreds of components; building the full
+        # Hessian scales as O(n_comp^2 * m^2) and is prohibitively expensive.
+        # Use a diagonal Hessian approximation (per-component Fisher scoring),
+        # which is fast and works well in practice for ARD-style updates.
         for it in range(1, self.max_iter + 1):
             scales = np.exp(h)
+            scales_src = scales[:n_pats]
 
-            # Model covariance: R = sum_i scales[i] * LQL_all[i]
-            R = np.tensordot(scales, LQL_all, axes=([0], [0]))  # m x m
+            # Model covariance in sensor space:
+            #   R = K diag(scales_src) K^T + scale_noise * I/m
+            K_w = K * np.sqrt(scales_src)[np.newaxis, :]
+            R = K_w @ K_w.T
+            if has_noise:
+                scale_noise = float(scales[-1])
+                R.flat[:: m_eff + 1] += scale_noise / float(m_eff)
 
             # Precision
-            P = self._solve_R(R, np.eye(m))
+            P = self._solve_R(R, np.eye(m_eff))
             if not np.isfinite(P).all():
                 if self.verbose:
                     logger.warning(f"[MSP {it:02d}] Non-finite precision, stopping")
                 break
 
-            # Residual: W = I - P @ C
-            W = np.eye(m) - P @ C
+            PC = P @ C
+            # Pk = P @ K, Cpk = C @ Pk
+            Pk = P @ K
+            Cpk = C @ Pk
 
-            # PQ[i] = P @ LQL_all[i] * scales[i]
-            PQ = np.einsum("jk,ikl->ijl", P, LQL_all) * scales[:, None, None]
+            # g_i = -v/2 * scales[i] * trace(P S_i W), with S_i = k_i k_i^T
+            # trace(P S_i W) = k_i^T W P k_i = k_i^T P k_i - (P k_i)^T C (P k_i)
+            a = np.sum(K * Pk, axis=0)  # k_i^T P k_i
+            b = np.sum(Pk * Cpk, axis=0)  # (P k_i)^T C (P k_i)
+            g_src = -0.5 * float(v) * scales_src * (a - b)
 
-            # Vectorized gradient: g_i = -v/2 * trace(PQ[i] @ W)
-            PQ_flat = PQ.reshape(n_comp, m * m)
-            W_T_flat = W.T.ravel()
-            g = -0.5 * v * (PQ_flat @ W_T_flat)
+            # Diagonal Hessian approximation:
+            # H_ii = -v/2 * scales[i]^2 * trace(P S_i P S_i) = -v/2 * scales[i]^2 * (k_i^T P k_i)^2
+            H_src_diag = -0.5 * float(v) * (scales_src**2) * (a**2)
 
-            # Vectorized Hessian: H_ij = -v/2 * trace(PQ[i] @ PQ[j])
-            PQ_T_flat = PQ.transpose(0, 2, 1).reshape(n_comp, m * m)
-            H = -0.5 * v * (PQ_flat @ PQ_T_flat.T)
+            if has_noise:
+                # Noise component: S_noise = I/m, trace-normalized.
+                trP = float(np.trace(P))
+                trPPC = float(np.sum(P * PC.T))  # trace(P @ (P @ C))
+                g_noise = (
+                    -0.5
+                    * float(v)
+                    * float(scales[-1])
+                    * (trP - trPPC)
+                    / float(m_eff)
+                )
+                H_noise_diag = (
+                    -0.5
+                    * float(v)
+                    * (float(scales[-1]) ** 2)
+                    * float(np.sum(P * P))
+                    / float(m_eff**2)
+                )
 
             # Add hyperprior terms
+            if has_noise:
+                g = np.concatenate([g_src, np.array([g_noise])])
+                H_diag = np.concatenate([H_src_diag, np.array([H_noise_diag])])
+            else:
+                g = g_src
+                H_diag = H_src_diag
+
             g_total = g - Pi_val * (h - hE)
-            H_total = H - Pi_val * np.eye(n_comp)
+            H_total_diag = H_diag - Pi_val
 
             # Newton step
-            try:
-                dh = -np.linalg.solve(H_total, g_total)
-            except np.linalg.LinAlgError:
-                dh = -g_total / (np.abs(np.diag(H_total)).mean() + 1e-6)
+            denom = np.where(np.abs(H_total_diag) > 1e-30, H_total_diag, -1.0)
+            dh = -g_total / denom
 
             if not np.isfinite(dh).all():
                 if self.verbose:
@@ -245,7 +334,7 @@ class SolverMSP(BaseSolver):
             dh /= np.log(it + 2)
 
             # Predicted free energy change
-            dF = float(np.dot(dh, g_total) + 0.5 * dh @ H_total @ dh)
+            dF = float(np.dot(dh, g_total) + 0.5 * np.dot(dh * H_total_diag, dh))
 
             # Update and bound
             h += dh
@@ -271,23 +360,26 @@ class SolverMSP(BaseSolver):
 
         # Final reconstruction
         scales = np.exp(h)
-        source_scales = scales[:n_pats]
+        scales_src = scales[:n_pats]
 
-        # Source prior diagonal: re[j] = sum_i source_scales[i] * Q_src[i,j] / tr[i]
-        valid = tr > 1e-20
-        if valid.any():
-            weights = source_scales[valid] / tr[valid]  # (n_valid,)
-            re = weights @ Q_src[valid]  # (n_valid,) @ (n_valid, d) = (d,)
+        # Final model covariance and precision (in the reduced sensor space)
+        K_w = K * np.sqrt(scales_src)[np.newaxis, :]
+        R = K_w @ K_w.T
+        if has_noise:
+            R.flat[:: m_eff + 1] += float(scales[-1]) / float(m_eff)
+        P = self._solve_R(R, np.eye(m_eff))
+
+        # MAP inverse operator in reduced sensor space:
+        #   M_r = (sum_i scales[i] u_i k_i^T) P = U @ (diag(scales) (K^T P))
+        U_cols = patterns.T  # (d, n_pats)
+        KP = K.T @ P  # (n_pats, m_eff)
+        M_r = U_cols @ (scales_src[:, np.newaxis] * KP)  # (d, m_eff)
+
+        # Map back to full whitened sensor space if projected.
+        if basis_T is not None:
+            M_white = M_r @ basis_T  # (d, m)
         else:
-            re = np.zeros(d)
-
-        # Final model covariance and precision
-        R = np.tensordot(scales, LQL_all, axes=([0], [0]))
-        P = self._solve_R(R, np.eye(m))
-
-        # MAP inverse operator: M = diag(re) @ L^T @ P
-        # Efficiently: (re[:, None] * L^T) @ P  -- no d x d matrix needed
-        M = (re[:, None] * leadfield.T) @ P
+            M_white = M_r
 
         # Store diagnostics
         self.lambdas = h
@@ -295,7 +387,9 @@ class SolverMSP(BaseSolver):
         self.invR = P
 
         # Create inverse operator
-        self.inverse_operators = [InverseOperator(M @ wf.sensor_transform, self.name)]
+        self.inverse_operators = [
+            InverseOperator(M_white @ wf.sensor_transform, self.name)
+        ]
         return self
 
     def _generate_patterns(self, forward):
@@ -328,13 +422,24 @@ class SolverMSP(BaseSolver):
         smoother = speye(n_dipoles, format="csr") + self.diffusion_parameter * L_sparse
 
         # Determine number of patterns — use all dipoles when feasible
-        # (one pattern per source = ARD), cap at 512 for large spaces
-        if self.n_patterns is None:
-            self.n_patterns = min(n_dipoles, 512)
+        # (one pattern per source = ARD), cap at 256 for large spaces
+        n_patterns = (
+            int(self.n_patterns) if self.n_patterns is not None else min(n_dipoles, 256)
+        )
+        n_select = min(n_patterns, n_dipoles)
+        cache_key = (
+            source_space_signature(forward["src"]),
+            int(n_select),
+            float(self.diffusion_parameter),
+            int(self.patch_order),
+        )
+        cached_patterns = _PATTERN_CACHE.get(cache_key)
+        if cached_patterns is not None:
+            return [row.copy() for row in cached_patterns]
 
         if self.verbose:
             logger.info(
-                f"Generating {self.n_patterns} spatial patterns with order {self.patch_order}"
+                f"Generating {n_select} spatial patterns with order {self.patch_order}"
             )
 
         # Farthest-point sampling on 3D source coordinates
@@ -343,7 +448,6 @@ class SolverMSP(BaseSolver):
             coords.append(src_hemi["rr"][src_hemi["vertno"]])
         coords = np.vstack(coords)  # (n_dipoles, 3)
 
-        n_select = min(self.n_patterns, n_dipoles)
         rng = np.random.RandomState(0)
         pattern_centers = np.empty(n_select, dtype=int)
         pattern_centers[0] = rng.randint(n_dipoles)
@@ -357,26 +461,23 @@ class SolverMSP(BaseSolver):
         # Factor the smoother once with splu, then solve for each RHS
         lu = splu(smoother.tocsc())
 
-        patterns = []
-        for center in pattern_centers:
-            rhs = np.zeros(n_dipoles)
-            rhs[center] = 1.0
+        rhs = np.zeros((n_dipoles, n_select), dtype=float)
+        rhs[pattern_centers, np.arange(n_select)] = 1.0
+        smoothed = rhs
+        for _ in range(self.patch_order):
+            smoothed = lu.solve(smoothed)
 
-            pattern = rhs
-            for _ in range(self.patch_order):
-                pattern = lu.solve(pattern)
-
-            norm = np.linalg.norm(pattern)
-            if norm > 0:
-                pattern /= norm
-
-            patterns.append(pattern)
+        norms = np.linalg.norm(smoothed, axis=0)
+        norms = np.maximum(norms, 1e-30)
+        smoothed /= norms[np.newaxis, :]
+        patterns = [smoothed[:, i].copy() for i in range(n_select)]
 
         if self.verbose:
             logger.info(
                 f"Generated {len(patterns)} patterns, each with {n_dipoles} sources"
             )
 
+        _PATTERN_CACHE[cache_key] = np.asarray(patterns, dtype=float)
         return patterns
 
     @staticmethod

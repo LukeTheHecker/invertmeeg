@@ -31,6 +31,8 @@ class SolverReciPSIICOSWhitened(BaseBeamformer):
         with correlated sources. Neuroimage, 228, 117677.
     """
 
+    SUPPORTS_VECTOR_ORIENTATION: bool = False
+
     meta = SolverMeta(
         slug="recipsiicos_whitened",
         full_name="ReciPSIICOS (whitened)",
@@ -107,7 +109,9 @@ class SolverReciPSIICOSWhitened(BaseBeamformer):
 
         # 1) Whiten leadfield and data via standard pipeline (SSP + noise whitening)
         wf = self.prepare_whitened_forward(noise_cov)
-        L = wf.G_white / np.linalg.norm(wf.G_white, axis=0)
+        col_norms = np.linalg.norm(wf.G_white, axis=0)
+        col_norms = np.maximum(col_norms, 1e-30)
+        L = wf.G_white / col_norms
         Yw = wf.sensor_transform @ data
 
         # 2) Virtual sensors via leadfield SVD

@@ -75,14 +75,17 @@ class SolverSourceMAP(BaseSolver):
         if smoothness_prior:
             adjacency = build_source_adjacency(self.forward["src"], verbose=0)
             self.gradient = laplacian(adjacency).toarray().astype(np.float32)
-            self.sigma_s = np.identity(n_dipoles) @ abs(self.gradient)
+            self.sigma_s = abs(self.gradient)
         else:
             self.gradient = None
-            self.sigma_s = np.identity(n_dipoles)
+            self.sigma_s = None
 
         # Scale regularization against the actual sensor-space model term
         # that alpha regularizes: Sigma_b = alpha*I + L*Sigma_s*L^T.
-        reg_reference = leadfield @ self.sigma_s @ leadfield.T
+        if self.sigma_s is None:
+            reg_reference = leadfield @ leadfield.T
+        else:
+            reg_reference = leadfield @ self.sigma_s @ leadfield.T
         reg_reference = 0.5 * (reg_reference + reg_reference.T)
         data_cov = self.data_covariance(data, center=True, ddof=1)
         if not np.all(np.isfinite(reg_reference)) or np.linalg.norm(reg_reference) == 0:
@@ -126,18 +129,19 @@ class SolverSourceMAP(BaseSolver):
         """
 
         L = self.leadfield.copy()
+        B = np.asarray(B, dtype=float)
         db, n = B.shape
         ds = L.shape[1]
 
         # Ensure Common average reference
-        B -= B.mean(axis=0)
+        B = B - B.mean(axis=0)
         L -= L.mean(axis=0)
 
         gammas = np.ones(ds, dtype=float)
         sigma_e = float(alpha) * np.identity(db)
         exponent = float((2.0 - p) / 2.0)
         exponent = float(np.clip(exponent, 1e-6, 2.0))
-        sigma_s_is_identity = np.array_equal(self.sigma_s, np.identity(ds))
+        sigma_s_is_identity = self.sigma_s is None
 
         for _k in range(max_iter):
             old_gammas = gammas.copy()
@@ -146,7 +150,7 @@ class SolverSourceMAP(BaseSolver):
             if sigma_s_is_identity:
                 sigma_b = sigma_e + (L * gammas) @ L.T
             else:
-                sigma_s_hat = gammas[:, None] * self.sigma_s
+                sigma_s_hat = gammas[:, None] * np.asarray(self.sigma_s, dtype=float)
                 sigma_b = sigma_e + L @ sigma_s_hat @ L.T
             sigma_b = 0.5 * (sigma_b + sigma_b.T)
             sigma_b_inv = np.linalg.inv(sigma_b)
@@ -178,7 +182,7 @@ class SolverSourceMAP(BaseSolver):
                 sigma_b_final
             )
         else:
-            sigma_s_hat = gammas_final[:, None] * self.sigma_s
+            sigma_s_hat = gammas_final[:, None] * np.asarray(self.sigma_s, dtype=float)
             inverse_operator = (
                 sigma_s_hat @ L.T @ np.linalg.inv(sigma_e + L @ sigma_s_hat @ L.T)
             )

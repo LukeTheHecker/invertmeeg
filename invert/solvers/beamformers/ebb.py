@@ -2,6 +2,7 @@ import logging
 
 import mne
 import numpy as np
+from scipy.linalg import cho_factor, cho_solve
 
 from ..base import InverseOperator, SolverMeta
 from .base_beamformer import BaseBeamformer
@@ -106,16 +107,23 @@ class SolverEBB(BaseBeamformer):
             for n_iter in range(max_iter):
                 # Model covariance: Sigma_y = L @ diag(gamma) @ L^T + Cn
                 # Invert in sensor space: O(m^3) where m = n_channels
-                Sigma_y = L @ (gamma[:, None] * L.T) + Cn
-                Sigma_y_inv = self.robust_inverse(Sigma_y)
+                Sigma_y = (L * gamma) @ L.T + Cn
+                try:
+                    chol = cho_factor(Sigma_y, overwrite_a=False, check_finite=False)
+                    # Reuse solves instead of forming explicit inverse.
+                    SiL = cho_solve(chol, L, check_finite=False)
+                    SiY = cho_solve(chol, data_w, check_finite=False)
+                except np.linalg.LinAlgError:
+                    Sigma_y_inv = self.robust_inverse(Sigma_y)
+                    SiL = Sigma_y_inv @ L
+                    SiY = Sigma_y_inv @ data_w
 
                 # Posterior source estimates: mu = gamma * L^T @ Sigma_y^{-1} @ Y
-                LT_Sy_inv = L.T @ Sigma_y_inv
-                mu = (gamma[:, None] * LT_Sy_inv) @ data_w
+                mu = gamma[:, None] * (L.T @ SiY)
 
                 # Posterior variance (diagonal only):
                 # diag(Sigma_s) = gamma - gamma^2 * diag(L^T Sigma_y^{-1} L)
-                z_diag = np.sum(L * (Sigma_y_inv @ L), axis=0)
+                z_diag = np.sum(L * SiL, axis=0)
                 diag_Sigma_s = gamma - gamma**2 * z_diag
 
                 # EM update: gamma_new = diag(Sigma_s) + mean(mu^2, axis=1)
@@ -143,9 +151,13 @@ class SolverEBB(BaseBeamformer):
                 )
 
             # Final beamformer weights with converged hyperparameters
-            Sigma_y = L @ (gamma[:, None] * L.T) + Cn
-            Sigma_y_inv = self.robust_inverse(Sigma_y)
-            W = (gamma[:, None] * L.T) @ Sigma_y_inv
+            Sigma_y = (L * gamma) @ L.T + Cn
+            try:
+                chol = cho_factor(Sigma_y, overwrite_a=False, check_finite=False)
+                SiI = cho_solve(chol, I_m, check_finite=False)
+            except np.linalg.LinAlgError:
+                SiI = self.robust_inverse(Sigma_y)
+            W = (gamma[:, None] * L.T) @ SiI
 
             # Unit-noise-gain normalization
             if weight_norm:

@@ -105,7 +105,10 @@ class SolverCMEM(BaseSolver):
 
         # Compute adjacency from forward model if not provided
         if adjacency is None:
-            adjacency = mne.spatial_src_adjacency(self.forward["src"], verbose=0)
+            try:
+                adjacency = mne.spatial_src_adjacency(self.forward["src"], verbose=0)
+            except Exception:
+                adjacency = None  # triggers KMeans fallback in _data_driven_parcellation
         self._adjacency = adjacency
 
         J, parcels = _cmem(
@@ -266,6 +269,51 @@ def _cmem(
         if timing:
             _tlog("cMEM timing: auto-whiten %.3fs", time.perf_counter() - t_step)
 
+    # Optional: project to a low-dimensional sensor subspace to reduce the
+    # dual optimization cost (λ lives in sensor space). This is particularly
+    # important for large source spaces where repeated L.T@λ and L@w dominate.
+    # Sensor-subspace projection is an *approximation* (restricts λ to a
+    # low-dimensional subspace). Keep it opt-in to preserve cMEM accuracy
+    # by default; enable via INVERT_CMEM_SENSOR_RANK="auto" or an int.
+    sensor_rank = os.getenv("INVERT_CMEM_SENSOR_RANK", "full").strip().lower()
+    if sensor_rank not in {"0", "none", "false", "off", "full"} and m > 1:
+        if sensor_rank == "auto":
+            # Heuristic: keep singular vectors above a noise-floor proxy,
+            # with conservative bounds to avoid over-aggressive truncation.
+            U_s, s_s, _ = np.linalg.svd(Y, full_matrices=False)
+            noise = float(np.median(s_s)) if s_s.size else 0.0
+            r0 = int(np.sum(s_s > (1.1 * noise)))
+            r = int(np.clip(r0, 20, 80))
+            r = min(r, m)
+        else:
+            try:
+                r = int(sensor_rank)
+            except Exception as err:
+                raise ValueError(
+                    "INVERT_CMEM_SENSOR_RANK must be 'auto', 'full', or an int, "
+                    f"got {sensor_rank!r}"
+                ) from err
+            r = int(np.clip(r, 1, m))
+
+        # Ensure r is valid for the reduced SVD size k=min(m, t).
+        r = min(r, min(m, t))
+        if 1 <= r < m:
+            t_step = time.perf_counter()
+            # U_s are left singular vectors of Y: use them as an orthonormal basis.
+            # If auto mode did not compute them (manual rank), compute now.
+            if sensor_rank != "auto":
+                U_s, _s, _ = np.linalg.svd(Y, full_matrices=False)
+            basis = U_s[:, :r]
+            Y = basis.T @ Y  # (r, t)
+            L = basis.T @ L  # (r, n)
+            m = r
+            if timing:
+                _tlog(
+                    "cMEM timing: sensor subspace m->%d in %.3fs",
+                    r,
+                    time.perf_counter() - t_step,
+                )
+
     # Ensure parcels are not too small.
     # For smooth/patch-like sources (e.g. SimulationGenerator order>=1), parcels of
     # ~10 vertices tend to fragment true sources, hurting accuracy and increasing
@@ -344,6 +392,9 @@ def _cmem(
 
     precomputed = []
     E_refs = []  # per-parcel reference energies for calibration
+    sigma_rank_max = int(os.getenv("INVERT_CMEM_SIGMA_RANK_MAX", "0") or "0")
+    sigma_rank_max = max(0, sigma_rank_max)
+    sigma_energy = float(os.getenv("INVERT_CMEM_SIGMA_ENERGY", "0.995") or "0.995")
     for parcel_id in unique_parcels:
         verts = np.where(parcels == parcel_id)[0]
         n_v = len(verts)
@@ -361,11 +412,14 @@ def _cmem(
         # Per-source prior variance from MNE power, with spatial structure
         parcel_power = parcel_powers[parcel_id]
         Sigma_k = parcel_power * W_k
+        Sigma_k, Sigma_basis = _compress_sigma_matrix(
+            Sigma_k, rank_max=sigma_rank_max, energy=sigma_energy
+        )
 
         # Estimate E_k scale: E_k = 0.5 * xi^T Sigma xi for reference lambda
         # Use a few high-energy samples and a robust aggregation.
         xi_ref = Xi_ref[verts, :]  # (n_v, n_ref)
-        Sigma_xi_ref = Sigma_k @ xi_ref
+        Sigma_xi_ref = _apply_sigma(Sigma_k, Sigma_basis, xi_ref)
         E_ref = 0.5 * np.median(np.sum(xi_ref * Sigma_xi_ref, axis=0))
         E_refs.append(float(E_ref))
 
@@ -377,6 +431,7 @@ def _cmem(
             {
                 "parcel_id": int(parcel_id),
                 "Sigma_k": Sigma_k,
+                "Sigma_basis": Sigma_basis,
                 "mu_k": mu_k,
                 "alpha_k": alpha_k,
                 "vertices": verts,
@@ -403,6 +458,8 @@ def _cmem(
         sigma_scale = target_E / E_scale
         for precomp in precomputed:
             precomp["Sigma_k"] *= sigma_scale
+            if precomp["Sigma_basis"] is not None:
+                precomp["Sigma_basis"] *= np.sqrt(sigma_scale)
     if timing:
         median_parcel_size = (
             int(np.median([len(p["vertices"]) for p in precomputed]))
@@ -570,7 +627,9 @@ def _compute_spatial_covariance(vertices, A, alpha=0.05):
     """Compute spatial covariance from graph Laplacian: inv(L_graph + alpha*I)."""
     n_v = len(vertices)
 
-    A_sub = A[np.ix_(vertices, vertices)]
+    # Convert to CSR for fancy indexing (COO doesn't support it in older scipy)
+    A_csr = A.tocsr() if hasattr(A, "tocsr") else A
+    A_sub = A_csr[np.ix_(vertices, vertices)]
     if hasattr(A_sub, "toarray"):
         A_sub = A_sub.toarray()
 
@@ -584,6 +643,47 @@ def _compute_spatial_covariance(vertices, A, alpha=0.05):
         Sigma = np.eye(n_v)
 
     return Sigma
+
+
+def _compress_sigma_matrix(
+    Sigma,
+    *,
+    energy=0.995,
+    rank_max=24,
+    min_size=40,
+):
+    """Optionally compress parcel covariance with a low-rank PSD factor."""
+    Sigma = np.asarray(Sigma, dtype=float)
+    n_v = int(Sigma.shape[0])
+    if int(rank_max) <= 0 or n_v < int(min_size):
+        return Sigma, None
+
+    Sigma = 0.5 * (Sigma + Sigma.T)
+    evals, evecs = np.linalg.eigh(Sigma)
+    evals = np.maximum(evals, 0.0)
+    total = float(np.sum(evals))
+    if not np.isfinite(total) or total <= 1e-30:
+        return Sigma, None
+
+    idx = np.argsort(evals)[::-1]
+    evals = evals[idx]
+    evecs = evecs[:, idx]
+
+    target = float(energy) * total
+    r = int(np.searchsorted(np.cumsum(evals), target) + 1)
+    r = int(np.clip(r, 1, min(int(rank_max), n_v)))
+    if r >= int(0.8 * n_v):
+        return Sigma, None
+
+    basis = evecs[:, :r] * np.sqrt(evals[:r])[np.newaxis, :]
+    return Sigma, basis
+
+
+def _apply_sigma(Sigma_k, Sigma_basis, x):
+    """Apply parcel covariance to vector/matrix x."""
+    if Sigma_basis is None:
+        return Sigma_k @ x
+    return Sigma_basis @ (Sigma_basis.T @ x)
 
 
 def _update_parcel_params(J, precomputed):
@@ -633,12 +733,13 @@ def _mem_dual_obj_grad(lambda_vec, y_t, L, precomputed, w_full):
 
     for precomp in precomputed:
         Sigma_k = precomp["Sigma_k"]
+        Sigma_basis = precomp.get("Sigma_basis")
         mu_k = precomp["mu_k"]
         alpha_k = precomp["alpha_k"]
         vertices = precomp["vertices"]
 
         xi_k = xi_full[vertices]
-        Sigma_xi = Sigma_k @ xi_k
+        Sigma_xi = _apply_sigma(Sigma_k, Sigma_basis, xi_k)
         E_k = np.dot(mu_k, xi_k) + 0.5 * np.dot(xi_k, Sigma_xi)
 
         # Numerically stable computation
@@ -667,10 +768,17 @@ def _optimize_lambda_batch(Y_batch, L, precomputed, max_iter=100, lambda_init=No
 
     where w(λ) is the parcel-wise posterior mean term.
 
-    Set `INVERT_CMEM_LAMBDA_OPT=fixed_point` to try a faster fixed-point solver.
+    Set `INVERT_CMEM_LAMBDA_OPT=fixed_point` to force the fast fixed-point solver.
     """
-    method = os.getenv("INVERT_CMEM_LAMBDA_OPT", "lbfgs").strip().lower()
-    if method == "fixed_point":
+    method = os.getenv("INVERT_CMEM_LAMBDA_OPT", "auto").strip().lower()
+    if method == "auto":
+        # Use the stable optimizer on tiny problems (fixed-point can diverge
+        # when the dual is poorly conditioned); use fixed-point otherwise.
+        m = int(L.shape[0])
+        batch = int(Y_batch.shape[1])
+        method = "lbfgs" if (m <= 32 and batch <= 32) else "fixed_point"
+
+    if method in {"fixed_point", "fp"}:
         return _optimize_lambda_batch_fixed_point(
             Y_batch, L, precomputed, max_iter=max_iter, lambda_init=lambda_init
         )
@@ -695,6 +803,10 @@ def _optimize_lambda_batch_fixed_point(
     # if the fixed-point iteration becomes unstable.
     omega = 0.2
     tol = 1e-4
+    anderson_m = int(os.getenv("INVERT_CMEM_ANDERSON_M", "5") or "0")
+    anderson_m = int(np.clip(anderson_m, 0, 10))
+    if n >= 3000:
+        anderson_m = min(anderson_m, 3)
 
     xi_full = np.empty((n, batch_size))
     w_full = np.empty((n, batch_size))
@@ -702,6 +814,12 @@ def _optimize_lambda_batch_fixed_point(
     y_norm = float(np.linalg.norm(Y_batch)) + 1e-30
 
     max_lambda_norm = 1e6 * y_norm
+
+    # Anderson acceleration history (store x and residual r=F(x)-x).
+    # We keep m_hist+1 entries to build up to m_hist differences.
+    x_hist: list[np.ndarray] = []
+    r_hist: list[np.ndarray] = []
+    dim = int(m * batch_size)
 
     for _ in range(int(max_iter)):
         # xi_full = L.T @ lambda_batch
@@ -711,11 +829,12 @@ def _optimize_lambda_batch_fixed_point(
         for precomp in precomputed:
             vertices = precomp["vertices"]
             Sigma_k = precomp["Sigma_k"]
+            Sigma_basis = precomp.get("Sigma_basis")
             mu_k = precomp["mu_k"]
             alpha_k = float(precomp["alpha_k"])
 
             xi_k = xi_full[vertices, :]  # (n_v, batch)
-            Sigma_xi = Sigma_k @ xi_k  # (n_v, batch)
+            Sigma_xi = _apply_sigma(Sigma_k, Sigma_basis, xi_k)  # (n_v, batch)
             E_k = mu_k @ xi_k + 0.5 * np.sum(xi_k * Sigma_xi, axis=0)  # (batch,)
             E_k = np.clip(E_k, -500, 500)
             exp_E = np.exp(E_k)
@@ -726,14 +845,43 @@ def _optimize_lambda_batch_fixed_point(
             )
 
         lambda_target = Y_batch - (L @ w_full)  # stationarity condition
-        delta = lambda_target - lambda_batch
+        residual = lambda_target - lambda_batch
 
         # Simple stability check + backtracking on omega.
-        step_norm = float(np.linalg.norm(delta))
-        if not np.isfinite(step_norm):
+        res_norm = float(np.linalg.norm(residual))
+        if not np.isfinite(res_norm):
             return _optimize_lambda_batch_lbfgs(
                 Y_batch, L, precomputed, max_iter=max_iter, lambda_init=lambda_batch
             )
+
+        # Anderson acceleration candidate (optional).
+        candidate_target = lambda_target
+        if anderson_m > 0:
+            x_hist.append(lambda_batch.copy())
+            r_hist.append(residual.copy())
+            if len(x_hist) > anderson_m + 1:
+                x_hist.pop(0)
+                r_hist.pop(0)
+
+            k = min(anderson_m, len(x_hist) - 1)
+            if k >= 1:
+                try:
+                    dR = np.empty((dim, k))
+                    dX = np.empty((dim, k))
+                    for j in range(k):
+                        dR[:, j] = (r_hist[-(j + 1)] - r_hist[-(j + 2)]).ravel()
+                        dX[:, j] = (x_hist[-(j + 1)] - x_hist[-(j + 2)]).ravel()
+
+                    gamma, *_ = np.linalg.lstsq(dR, r_hist[-1].ravel(), rcond=None)
+                    if np.isfinite(gamma).all():
+                        candidate = lambda_target.ravel() - dX @ gamma
+                        candidate = candidate.reshape(m, batch_size)
+                        if np.isfinite(candidate).all():
+                            candidate_target = candidate
+                except Exception:
+                    candidate_target = lambda_target
+
+        delta = candidate_target - lambda_batch
 
         omega_try = omega
         accepted = False
@@ -751,7 +899,7 @@ def _optimize_lambda_batch_fixed_point(
                 Y_batch, L, precomputed, max_iter=max_iter, lambda_init=lambda_batch
             )
 
-        if step_norm / y_norm < tol:
+        if res_norm / y_norm < tol:
             break
 
     return lambda_batch
@@ -809,11 +957,12 @@ def _compute_sources_batch(lambda_batch, L, precomputed, n):
     for precomp in precomputed:
         vertices = precomp["vertices"]
         Sigma_k = precomp["Sigma_k"]
+        Sigma_basis = precomp.get("Sigma_basis")
         mu_k = precomp["mu_k"]
         alpha_k = precomp["alpha_k"]
 
         xi_k = xi_full[vertices, :]  # (n_v, batch)
-        Sigma_xi = Sigma_k @ xi_k  # (n_v, batch)
+        Sigma_xi = _apply_sigma(Sigma_k, Sigma_basis, xi_k)  # (n_v, batch)
 
         # E_k per time point
         E_k = mu_k @ xi_k + 0.5 * np.sum(xi_k * Sigma_xi, axis=0)

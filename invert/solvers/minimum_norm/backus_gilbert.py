@@ -61,32 +61,23 @@ class SolverBackusGilbert(BaseSolver):
         n_orient = n_dipoles // n_sources  # 1 for fixed, 3 for free
         dist = cdist(pos, pos)
 
-        C = []
-        for i in range(n_dipoles):
-            # Map dipole index to source index (all components of a source
-            # share the same spatial distances)
-            source_idx = i // n_orient
-            d = np.repeat(dist[source_idx, :], n_orient)
-            C_gamma = (leadfield * d) @ leadfield.T
-            C.append(C_gamma)
-
         F = leadfield @ leadfield.T
-
-        E = []
-        for i in range(n_dipoles):
-            E_gamma = C[i] + F
-            E.append(E_gamma)
-
         L = leadfield @ np.ones((n_dipoles, 1))
 
-        T = []
-        for i in range(n_dipoles):
-            E_gamma_pinv = np.linalg.pinv(E[i])
+        # The original implementation computes identical filters for all
+        # orientation components of the same source index; compute once per
+        # source and replicate to dipole rows.
+        T_sources = []
+        for source_idx in range(n_sources):
+            d = np.repeat(dist[source_idx, :], n_orient)
+            E_gamma = (leadfield * d) @ leadfield.T + F
+            E_gamma_pinv = np.linalg.pinv(E_gamma)
             T_gamma = (E_gamma_pinv @ L) / (L.T @ E_gamma_pinv @ L)
-            T.append(T_gamma)
+            T_sources.append(T_gamma[:, 0])
+        T = np.repeat(np.asarray(T_sources, dtype=float), n_orient, axis=0)
 
         inverse_operators = [
-            np.stack(T, axis=0)[:, :, 0] @ wf.sensor_transform,
+            T @ wf.sensor_transform,
         ]
 
         self.inverse_operators = [

@@ -3,6 +3,7 @@ import logging
 import mne
 import numpy as np
 from scipy.sparse.csgraph import laplacian
+from scipy.sparse.linalg import eigsh
 
 from invert.util import build_source_adjacency
 
@@ -108,21 +109,29 @@ class SolverSMAP(BaseSolver):
         adjacency = build_source_adjacency(self.forward["src"], verbose=0)
         # First-order Laplacian smoothness: x^T L x (graph Laplacian), rather
         # than squaring the Laplacian as in LORETA-style penalties.
-        GTG = laplacian(adjacency).astype(float).toarray()
+        GTG_sparse = laplacian(adjacency).astype(float)
+        GTG = GTG_sparse.toarray()
 
         if alpha == "auto":
             r_grid = np.asarray(self.r_values, dtype=float)
         else:
             r_grid = np.asarray([float(alpha)], dtype=float)
-        max_eig_LTL = float(np.linalg.svd(LTL, compute_uv=False).max())
-        max_eig_penalty = float(np.linalg.svd(GTG, compute_uv=False).max())
+        max_eig_LTL = float(np.linalg.svd(leadfield, compute_uv=False).max() ** 2)
+        try:
+            max_eig_penalty = float(
+                np.maximum(
+                    eigsh(GTG_sparse, k=1, which="LM", return_eigenvectors=False)[0], 0.0
+                )
+            )
+        except Exception:
+            max_eig_penalty = float(np.linalg.eigvalsh(GTG).max())
         scale = max_eig_LTL / max(max_eig_penalty, 1e-15)
         self.alphas = list(r_grid * scale)
 
         inverse_operators = []
         # GG_inv = np.linalg.inv(GTG)
         for alpha in self.alphas:
-            kernel_eff = np.linalg.solve(LTL + float(alpha) * GTG, leadfield.T)
+            kernel_eff = np.linalg.lstsq(LTL + float(alpha) * GTG, leadfield.T, rcond=None)[0]
             # inverse_operator = GG_inv @ self.leadfield.T @ np.linalg.inv(self.leadfield @ GG_inv @ self.leadfield.T + alpha * np.identity(n_chans))
             inverse_operators.append(
                 (float(leadfield_scale) * kernel_eff) @ sensor_transform

@@ -41,6 +41,7 @@ class BaseBeamformer(BaseSolver):
     """
 
     _is_beamformer = True
+    SUPPORTS_VECTOR_ORIENTATION: bool = True
 
     def __init__(self, *, reduce_rank=True, rank="auto", **kwargs):
         kwargs.setdefault("regularisation_method", "L")

@@ -2,7 +2,9 @@ import logging
 
 import mne
 import numpy as np
+from scipy.sparse import issparse
 from scipy.sparse.csgraph import laplacian
+from scipy.sparse.linalg import eigsh
 
 from invert.util import build_source_adjacency
 
@@ -113,19 +115,25 @@ class SolverLORETA(BaseSolver):
         sensor_transform = wf.sensor_transform
 
         LTL = leadfield.T @ leadfield
-        adjacency = build_source_adjacency(
-            forward["src"], verbose=self.verbose
-        ).toarray()
+        adjacency = build_source_adjacency(forward["src"], verbose=self.verbose)
         Lap = laplacian(adjacency)
 
         # Fractional Laplacian power: L^p = U diag(λ_i^p) U^T
         p = self.laplacian_power
-        eigvals, eigvecs = np.linalg.eigh(Lap)
-        eigvals = np.maximum(eigvals, 0.0)  # clamp numerical noise
         if p == 1.0:
-            penalty = Lap
+            penalty = Lap.toarray() if issparse(Lap) else np.asarray(Lap, dtype=float)
+            try:
+                max_eig_penalty = float(
+                    np.maximum(eigsh(Lap, k=1, which="LM", return_eigenvectors=False)[0], 0.0)
+                )
+            except Exception:
+                max_eig_penalty = float(np.linalg.eigvalsh(penalty).max())
         else:
+            Lap_dense = Lap.toarray() if issparse(Lap) else np.asarray(Lap, dtype=float)
+            eigvals, eigvecs = np.linalg.eigh(Lap_dense)
+            eigvals = np.maximum(eigvals, 0.0)  # clamp numerical noise
             penalty = eigvecs * (eigvals**p) @ eigvecs.T
+            max_eig_penalty = float(eigvals.max() ** p)
 
         # Free orientation: expand penalty from (n_pos, n_pos) to (n_dipoles, n_dipoles)
         n_orient = getattr(self, "_n_orient", 1)
@@ -136,8 +144,7 @@ class SolverLORETA(BaseSolver):
             r_grid = np.asarray(self.r_values, dtype=float)
         else:
             r_grid = np.asarray([float(alpha)], dtype=float)
-        max_eig_LTL = float(np.linalg.svd(LTL, compute_uv=False).max())
-        max_eig_penalty = float(eigvals.max() ** p)
+        max_eig_LTL = float(np.linalg.svd(leadfield, compute_uv=False).max() ** 2)
         scale = max_eig_LTL / max(max_eig_penalty, 1e-15)
         self.alphas = list(r_grid * scale)
 
