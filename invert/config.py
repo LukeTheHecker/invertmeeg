@@ -13,6 +13,7 @@ all_solvers = [
     "dSPM-MNE",
     "FISTA",
     "L1L2",
+    "MxNE-BCD",
     "GFT-L1",
     "Self-Regularized-eLORETA",
     "GPT",

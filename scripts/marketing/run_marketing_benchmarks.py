@@ -36,6 +36,8 @@ EVAL_RELEASE_EXCLUDE_SOLVERS = [
     "EBB",
     "ReciPSIICOS-Plain",
     "ReciPSIICOS-Whitened",
+    "champagne-ar-em",
+    "champagne-tem",
 ]
 
 
@@ -127,6 +129,8 @@ def _profiles() -> dict[str, Profile]:
                     n_sources=(2, 4),
                     n_orders=(1, 3),
                     snr_range=(-2.0, 2.0),
+                    source_spatial_model="contiguous_gaussian",
+                    patch_rank=(1, 2),
                     n_timepoints=50,
                 ),
                 "epi_noisy": DatasetConfig(

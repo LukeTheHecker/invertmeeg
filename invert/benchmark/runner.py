@@ -35,6 +35,11 @@ from invert.solvers.base import BaseSolver  # noqa: E402
 from invert.util.util import pos_from_forward  # noqa: E402
 
 from .datasets import BENCHMARK_DATASETS, DatasetConfig  # noqa: E402
+from .depth_tuning import (  # noqa: E402
+    RECOMMENDED_DEPTH_BY_CATEGORY,
+    RECOMMENDED_DEPTH_BY_SOLVER,
+    build_depth_solver_params,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -395,6 +400,8 @@ class BenchmarkRunner:
         n_jobs: int | None = None,
         random_seed: int | None = None,
         solver_params: dict[str, dict[str, Any]] | None = None,
+        depth_by_category: dict[str, float] | None = None,
+        depth_by_solver: dict[str, float] | None = None,
     ):
         self.forward = forward
         self.info = info
@@ -411,10 +418,27 @@ class BenchmarkRunner:
         self.datasets = datasets or dict(BENCHMARK_DATASETS)
         self.n_samples = n_samples
         self.random_seed = random_seed
-        # Normalize solver_params keys to canonical solver_ids
-        self.solver_params = {
+        # Normalize solver_params keys to canonical solver_ids.
+        explicit_solver_params = {
             get_solver_spec(k).solver_id: v for k, v in (solver_params or {}).items()
         }
+        # Apply package depth defaults unless explicitly disabled via {}.
+        resolved_depth_by_category = (
+            dict(RECOMMENDED_DEPTH_BY_CATEGORY)
+            if depth_by_category is None
+            else dict(depth_by_category)
+        )
+        resolved_depth_by_solver = (
+            dict(RECOMMENDED_DEPTH_BY_SOLVER)
+            if depth_by_solver is None
+            else dict(depth_by_solver)
+        )
+        self.solver_params = build_depth_solver_params(
+            solvers=self.solvers,
+            depth_by_category=resolved_depth_by_category,
+            depth_by_solver=resolved_depth_by_solver,
+            base_solver_params=explicit_solver_params,
+        )
 
         # Auto-detect n_jobs if not specified
         if n_jobs is None:
@@ -448,19 +472,28 @@ class BenchmarkRunner:
                     n_orders=ds_config.n_orders,
                     snr_range=ds_config.snr_range,
                     n_timepoints=ds_config.n_timepoints,
+                    source_spatial_model=ds_config.source_spatial_model,
+                    patch_rank=ds_config.patch_rank,
                     random_seed=self.random_seed,
                     estimate_noise_cov=True,
                     return_noise_cov=True,
                 )
                 gen = SimulationGenerator(self.forward, config=sim_config)
                 x_batch, y_batch, sim_info = next(gen.generate())
-                noise_cov_array = np.mean(
-                    [sim_info.iloc[j]["noise_cov_est"] for j in range(len(sim_info))],
-                    axis=0,
-                )
-                noise_cov = _make_mne_covariance(
-                    noise_cov_array, self.info, nfree=len(sim_info)
-                )
+                # Per-sample noise covariance (scaled to match the actual
+                # noise level in each sample).  Solvers that recompute per
+                # sample receive the matching covariance; non-recompute
+                # solvers receive sample-0's estimate (consistent with
+                # already using x_batch[0] for their inverse operator).
+                noise_covs = [
+                    _make_mne_covariance(
+                        sim_info.iloc[j]["noise_cov_est_scaled"],
+                        self.info,
+                        nfree=1,
+                    )
+                    for j in range(len(sim_info))
+                ]
+                noise_cov = noise_covs[0]
 
                 for solver_name in self.solvers:
                     logger.info("  Solver: %s", solver_name)
@@ -667,7 +700,7 @@ class BenchmarkRunner:
                             solver.require_data,
                             ds_name,
                             solver_name,
-                            noise_cov,
+                            noise_covs,
                             merged_params,
                         )
                         total_seconds = time.perf_counter() - t_solver_start
@@ -761,7 +794,7 @@ class BenchmarkRunner:
         require_data: bool,
         ds_name: str,
         solver_name: str,
-        noise_cov: mne.Covariance | None = None,
+        noise_covs: list[mne.Covariance] | None = None,
         solver_params: dict[str, Any] | None = None,
     ) -> list[SampleMetrics]:
         """Parallelize full computation (require_recompute=True)."""
@@ -773,6 +806,7 @@ class BenchmarkRunner:
                 position=1,
                 leave=False,
             ):
+                nc = noise_covs[i] if noise_covs else None
                 _, metrics = _compute_and_apply_worker(
                     i,
                     solver_module,
@@ -784,7 +818,7 @@ class BenchmarkRunner:
                     adjacency,
                     pos,
                     require_data,
-                    noise_cov,
+                    nc,
                     solver_params,
                 )
                 sample_metrics.append(self._metrics_from_dict(metrics))
@@ -805,7 +839,7 @@ class BenchmarkRunner:
                     adjacency,
                     pos,
                     require_data,
-                    noise_cov,
+                    noise_covs[i] if noise_covs else None,
                     solver_params,
                 ): i
                 for i in range(self.n_samples)

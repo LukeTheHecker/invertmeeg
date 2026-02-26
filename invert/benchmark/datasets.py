@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel
 
 
@@ -8,6 +10,8 @@ class DatasetConfig(BaseModel):
     n_orders: int | tuple[int, int]
     snr_range: tuple[float, float]
     n_timepoints: int
+    source_spatial_model: Literal["diffusion_basis", "contiguous_gaussian"] = "diffusion_basis"
+    patch_rank: int | tuple[int, int] = (1, 2)
     n_samples: int = 50
 
 
@@ -30,10 +34,12 @@ BENCHMARK_DATASETS: dict[str, DatasetConfig] = {
     ),
     "extended_source": DatasetConfig(
         name="Extended Source",
-        description="Multiple extended patch sources with spatial smoothing",
+        description="Multiple contiguous Gaussian patch sources with spatial smoothing",
         n_sources=(2, 4),
         n_orders=(1, 3),
         snr_range=(1.0, 3.0),
+        source_spatial_model="contiguous_gaussian",
+        patch_rank=(1, 2),
         n_timepoints=50,
     ),
     "noisy": DatasetConfig(

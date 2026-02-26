@@ -1,4 +1,5 @@
 from .datasets import BENCHMARK_DATASETS, DatasetConfig, create_datasets
+from .depth_tuning import RECOMMENDED_DEPTH_BY_CATEGORY, RECOMMENDED_DEPTH_BY_SOLVER
 from .runner import (
     SOLVER_CATEGORIES,
     BenchmarkResult,
@@ -13,6 +14,8 @@ __all__ = [
     "DatasetConfig",
     "BENCHMARK_DATASETS",
     "create_datasets",
+    "RECOMMENDED_DEPTH_BY_CATEGORY",
+    "RECOMMENDED_DEPTH_BY_SOLVER",
     "SOLVER_CATEGORIES",
     "resolve_solvers",
     "visualize_results",

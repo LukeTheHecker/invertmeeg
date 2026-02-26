@@ -6,7 +6,11 @@ variants.  Saves compact results to results/release/leaderboard.json.
 
 from pathlib import Path
 
-from invert.benchmark import BenchmarkRunner
+from invert.benchmark import (
+    BenchmarkRunner,
+    RECOMMENDED_DEPTH_BY_CATEGORY,
+    RECOMMENDED_DEPTH_BY_SOLVER,
+)
 from invert.forward import create_forward_model, get_info
 
 if __name__ == "__main__":
@@ -31,18 +35,24 @@ if __name__ == "__main__":
             "EBB",
             "ReciPSIICOS-Plain",
             "ReciPSIICOS-Whitened",
+            "champagne-ar-em",
+            "champagne-tem",
+            "exhaustive-ml",
+            "cmem",  # scipy.optimize.minimize L-BFGS-B crashes with ThreadPoolExecutor
         ],
         # solvers=[
         #     "CovCNN",
         #     "CovCNN-KL",
         #     "CovCNN-KL-FLEXOMP",
         # ],
-        solver_params={
-            # Script-level ANN speedup: keep global solver defaults unchanged.
-            "CovCNN": {"epochs": 120, "patience": 40},
-            "CovCNN-KL": {"epochs": 250, "patience": 80},
-            "CovCNN-KL-FLEXOMP": {"epochs": 250, "patience": 80},
-        },
+        # solver_params={
+        #     # Script-level ANN speedup: keep global solver defaults unchanged.
+        #     "CovCNN": {"epochs": 120, "patience": 40},
+        #     "CovCNN-KL": {"epochs": 250, "patience": 80},
+        #     "CovCNN-KL-FLEXOMP": {"epochs": 250, "patience": 80},
+        # },
+        depth_by_category=RECOMMENDED_DEPTH_BY_CATEGORY,
+        depth_by_solver=RECOMMENDED_DEPTH_BY_SOLVER,
         random_seed=42,
         n_jobs=-1,
     )
