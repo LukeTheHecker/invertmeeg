@@ -6,8 +6,6 @@ import logging
 from functools import partial
 from typing import TYPE_CHECKING, Any
 
-from . import config
-
 if TYPE_CHECKING:
     from .solvers.base import BaseSolver
 
@@ -52,6 +50,7 @@ def _build_registry() -> dict[str, Any]:
     )
     _add(["gpt", "l1-gpt", "l1gpt"], solvers.SolverMinimumL1NormGPT)
     _add("l1l2", solvers.SolverMinimumL1L2Norm)
+    _add(["mxne", "mxne-bcd", "mixed-norm-bcd"], solvers.SolverMxNEBCD)
     _add(["gft-l1", "gft-minimum-l1"], solvers.SolverGFTMinimumL1Norm)
     _add(
         ["self-regularized-eloreta", "sr-eloreta", "sreloreta"],
@@ -248,6 +247,9 @@ def _build_registry() -> dict[str, Any]:
         solvers.SolverGeneralizedIterative,
     )
     _add(["exso-music", "exsomusic"], solvers.SolverExSoMUSIC)
+    _add(["exhaustive-ml", "exhaustiveml", "subset-ml"], solvers.SolverExhaustiveSubspaceML)
+    _add(["greedy-ml", "greedyml"], solvers.SolverGreedyML)
+    _add(["flex-greedy-ml", "flexgreedyml", "flex-greedyml"], solvers.SolverFlexGreedyML)
 
     # -- Basis Functions ----------------------------------------------------
     _add("gbf", solvers.SolverBasisFunctions)
@@ -295,13 +297,6 @@ def Solver(solver: str = "mne", **kwargs) -> BaseSolver:
     ValueError
         If the solver name is not recognised.
     """
-    registry = _get_registry()
-    key = solver.lower()
+    from .solver_registry import create_solver
 
-    if key not in registry:
-        raise ValueError(
-            f"'{solver}' is not a recognised solver. "
-            f"Available solvers: {config.all_solvers}"
-        )
-
-    return registry[key](**kwargs)
+    return create_solver(solver, **kwargs)

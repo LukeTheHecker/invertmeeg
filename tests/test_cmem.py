@@ -1,7 +1,11 @@
 import numpy as np
 from scipy.sparse import csr_matrix
 
-from invert.solvers.bayesian.cmem import _cmem, _compute_msp_coefficients, _data_driven_parcellation
+from invert.solvers.bayesian.cmem import (
+    _cmem,
+    _compute_msp_coefficients,
+    _data_driven_parcellation,
+)
 
 
 def test_cmem_mne_identity_small():

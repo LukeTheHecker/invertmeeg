@@ -94,6 +94,13 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         aliases=("mce-l1l2",),
     ),
     SolverSpec(
+        solver_id="mxne-bcd",
+        module_path="invert.solvers.minimum_norm.mxne",
+        class_name="SolverMxNEBCD",
+        aliases=("mxne", "mixed-norm-bcd"),
+        display_name="MxNE-BCD",
+    ),
+    SolverSpec(
         solver_id="gft-l1",
         module_path="invert.solvers.minimum_norm.gft_minimum_l1_norm",
         class_name="SolverGFTMinimumL1Norm",
@@ -173,6 +180,11 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
             "convexitychampagne",
             "convexity-champagne",
             "coc",
+            "champagne-em",
+            "emchampagne",
+            "em-champagne",
+            "emc",
+            "mm-champagne",
         ),
         display_name="Convexity-Champagne",
     ),
@@ -199,6 +211,14 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         default_kwargs={"update_rule": "LowSNR"},
         aliases=("lowsnrchampagne", "low-snr-champagne", "lowsnr-champagne", "lsc"),
         display_name="Low-SNR-Champagne",
+    ),
+    SolverSpec(
+        solver_id="champagne-adaptive",
+        module_path="invert.solvers.bayesian.champagne",
+        class_name="SolverChampagne",
+        default_kwargs={"update_rule": "Adaptive"},
+        aliases=("adaptivechampagne", "adaptive-champagne", "ac"),
+        display_name="Adaptive-Champagne",
     ),
     # -- Champagne + noise learning (MacKay) --------------------------------
     SolverSpec(
@@ -389,6 +409,16 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         class_name="SolverESMV",
     ),
     SolverSpec(
+        solver_id="esmv2",
+        module_path="invert.solvers.beamformers.esmv2",
+        class_name="SolverESMV2",
+    ),
+    SolverSpec(
+        solver_id="esmv3",
+        module_path="invert.solvers.beamformers.esmv3",
+        class_name="SolverESMV3",
+    ),
+    SolverSpec(
         solver_id="esmv-mvpure",
         module_path="invert.solvers.beamformers.esmv_mvpure",
         class_name="SolverESMVMVPURE",
@@ -438,6 +468,12 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         module_path="invert.solvers.beamformers.flex_esmv",
         class_name="SolverFlexESMV",
         aliases=("flexesmv",),
+    ),
+    SolverSpec(
+        solver_id="flex-esmv2",
+        module_path="invert.solvers.beamformers.flex_esmv2",
+        class_name="SolverFlexESMV2",
+        aliases=("flexesmv2",),
     ),
     SolverSpec(
         solver_id="flex-esmv-mvpure",
@@ -641,6 +677,18 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         display_name="AP",
     ),
     SolverSpec(
+        solver_id="adaptive-ap",
+        module_path="invert.solvers.music.adaptive_alternating_projections",
+        class_name="SolverAdaptiveAlternatingProjections",
+        aliases=("adaptive-alternating-projections", "aap"),
+    ),
+    SolverSpec(
+        solver_id="flex-music-2",
+        module_path="invert.solvers.music.flex_music_2",
+        class_name="SolverFLEXMUSIC_2",
+        aliases=("flexmusic2",),
+    ),
+    SolverSpec(
         solver_id="generalized-iterative",
         module_path="invert.solvers.music.generalized_iterative",
         class_name="SolverGeneralizedIterative",
@@ -675,6 +723,27 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         module_path="invert.solvers.music.exso_music",
         class_name="SolverExSoMUSIC",
         aliases=("exsomusic",),
+    ),
+    SolverSpec(
+        solver_id="exhaustive-ml",
+        module_path="invert.solvers.music.exhaustive_subspace_ml",
+        class_name="SolverExhaustiveSubspaceML",
+        aliases=("exhaustiveml", "subset-ml"),
+        display_name="ExhaustiveML",
+    ),
+    SolverSpec(
+        solver_id="greedy-ml",
+        module_path="invert.solvers.music.greedy_ml",
+        class_name="SolverGreedyML",
+        aliases=("greedyml",),
+        display_name="GreedyML",
+    ),
+    SolverSpec(
+        solver_id="flex-greedy-ml",
+        module_path="invert.solvers.music.flex_greedy_ml",
+        class_name="SolverFlexGreedyML",
+        aliases=("flexgreedyml", "flex-greedyml"),
+        display_name="FLEX-GreedyML",
     ),
     SolverSpec(
         solver_id="random-noise",
