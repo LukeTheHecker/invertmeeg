@@ -343,6 +343,22 @@ class BaseSolver:
                 self._orientation_data_obj = candidate
 
         self.forward = deepcopy(forward)
+        # MNE conventions: bad channels should not be used to build inverse operators.
+        # If they are kept here but dropped at apply-time, dimensions will mismatch;
+        # worse, they can degrade whitening/inverse quality if kept everywhere.
+        try:
+            forward_bads = list(self.forward["info"].get("bads", []) or [])
+        except Exception:
+            forward_bads = []
+        if forward_bads:
+            bad_set = set(forward_bads)
+            keep = [ch for ch in list(self.forward.ch_names) if ch not in bad_set]
+            if len(keep) <= 1:
+                raise ValueError(
+                    "Forward model contains <= 1 non-bad channel after excluding info['bads']."
+                )
+            if len(keep) != len(self.forward.ch_names):
+                self.forward = self.forward.pick_channels(keep, ordered=True)
         self.prepare_forward()
         # Reset whitening state — will be set by prepare_whitened_forward()
         self._leadfield_orig = None
@@ -740,7 +756,7 @@ class BaseSolver:
         # Prepare Data
         mne_obj = self.prep_data(mne_obj)
         channels_before_pick = list(mne_obj.ch_names)
-        mne_obj_meeg = mne_obj.copy().pick(pick_types)
+        mne_obj_meeg = mne_obj.copy().pick(pick_types, exclude="bads")
         channels_after_pick = list(mne_obj_meeg.ch_names)
         self._last_input_data_ch_names = tuple(channels_after_pick)
         dropped_by_pick_type = [
@@ -781,13 +797,11 @@ class BaseSolver:
             and getattr(self, "_operator_ch_names", ())
             and extra_data_channels
         ):
-            msg = (
-                "Data channels do not match the inverse operator channel set. "
-                f"Extra in data: {len(extra_data_channels)}"
-                f"{self._format_channel_list(extra_data_channels, max_items=None)}. "
-                "Recompute the inverse operator on the current data channel set."
+            logger.info(
+                "Dropping %d data channel(s) not in the inverse operator%s",
+                len(extra_data_channels),
+                self._format_channel_list(extra_data_channels),
             )
-            raise ValueError(msg)
         picks = alignment.kept_ch_names
 
         # Select only data channels in mne_obj
@@ -865,7 +879,7 @@ class BaseSolver:
             pick_types = ["meg", "eeg", "fnirs"]
 
         mne_obj = self.prep_data(mne_obj)
-        obj = mne_obj.copy().pick(pick_types)
+        obj = mne_obj.copy().pick(pick_types, exclude="bads")
 
         forward_ch_names = list(self.forward.ch_names)
         obj_set = set(obj.ch_names)
@@ -1082,7 +1096,20 @@ class BaseSolver:
         rank_tol: float = 1e-12,
         eps: float = 1e-15,
     ) -> np.ndarray:
-        """Compute PCA-space sensor whitener with rank truncation."""
+        """Compute PCA-space sensor whitener with rank truncation.
+
+        Notes
+        -----
+        When an SSP projector is applied, the projected covariance
+        ``P @ Cn @ P.T`` becomes rank-deficient by construction (rank drops by
+        the number of projectors). In native MEG units, the corresponding
+        null-space eigenvalues can be *extremely* small but non-zero due to
+        floating-point error. If those modes are kept, whitening can massively
+        amplify noise and lead to unstable inverse estimates.
+
+        To match MNE-style behavior (e.g. ``rank='info'``), we cap the whitening
+        rank to the (approximate) rank of the projector.
+        """
         noise_cov = np.asarray(noise_cov, dtype=float)
         if noise_cov.ndim != 2 or noise_cov.shape[0] != noise_cov.shape[1]:
             msg = f"noise_cov must be a square 2D array, got shape {noise_cov.shape}"
@@ -1102,6 +1129,14 @@ class BaseSolver:
         Cn_proj = projector @ Cn @ projector.T
         Cn_proj = 0.5 * (Cn_proj + Cn_proj.T)
 
+        # Cap effective rank to the projector rank (if the projector is not full-rank).
+        # For MNE SSP projectors, trace(P) approximates the rank (eigenvalues ~0/1).
+        proj_trace = float(np.trace(projector))
+        desired_rank: int | None = None
+        if 0.0 <= proj_trace <= float(n_chans) and abs(proj_trace - n_chans) > 1e-6:
+            desired_rank = int(round(proj_trace))
+            desired_rank = int(np.clip(desired_rank, 0, n_chans))
+
         eigvals, eigvecs = np.linalg.eigh(Cn_proj)
         order = np.argsort(eigvals)[::-1]
         eigvals = eigvals[order]
@@ -1120,7 +1155,13 @@ class BaseSolver:
         if not np.any(mask):
             return np.zeros((0, n_chans), dtype=float)
 
-        return np.asarray((eigvecs[:, mask] / np.sqrt(eigvals[mask])).T, dtype=float)
+        idx = np.flatnonzero(mask)
+        if desired_rank is not None:
+            idx = idx[:desired_rank]
+            if idx.size == 0:
+                return np.zeros((0, n_chans), dtype=float)
+
+        return np.asarray((eigvecs[:, idx] / np.sqrt(eigvals[idx])).T, dtype=float)
 
     @classmethod
     def compute_sensor_whitener_robust(
@@ -1369,8 +1410,22 @@ class BaseSolver:
         if noise_cov_mat is None and not apply_projector_when_no_cov:
             P = np.eye(n_chans, dtype=float)
         else:
+            # Prefer projectors from the MNE data object passed to make_inverse_operator
+            # (when available). This matches MNE's behavior: whitening/projection is
+            # defined by the *data* preprocessing, and forward solutions loaded from
+            # disk can legitimately have empty info['projs'].
+            projector_source: Any = self.forward
+            data_obj = getattr(self, "_orientation_data_obj", None)
+            data_info = getattr(data_obj, "info", None) if data_obj is not None else None
+            data_projs = list(data_info.get("projs", []) or []) if data_info else []
+            if data_projs:
+                projector_source = {
+                    "projs": data_projs,
+                    "bads": list(data_info.get("bads", []) or []),
+                    "ch_names": list(forward_ch_names),
+                }
             P = self.compute_sensor_projector(
-                forward_or_info=self.forward,
+                forward_or_info=projector_source,
                 n_chans=n_chans,
             )
 

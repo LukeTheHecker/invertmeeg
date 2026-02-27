@@ -56,6 +56,18 @@ def test_compute_sensor_whitener_whitens_retained_subspace():
     np.testing.assert_allclose(whitened_cov, np.eye(2), atol=1e-12)
 
 
+def test_compute_sensor_whitener_respects_projector_rank_cap():
+    """Projected covariances should not keep SSP null-space modes."""
+    noise_cov = np.diag([4.0, 1.0, 9.0])
+    projector = np.diag([1.0, 1.0, 0.0])  # rank-2 projector
+    whitener = BaseSolver.compute_sensor_whitener(
+        noise_cov, projector=projector, rank_tol=1e-15, eps=1e-30
+    )
+    assert whitener.shape == (2, 3)
+    whitened_cov = whitener @ (projector @ noise_cov @ projector.T) @ whitener.T
+    np.testing.assert_allclose(whitened_cov, np.eye(2), atol=1e-12)
+
+
 def test_compute_depth_prior_whitened_depth_zero_returns_inverse_sensitivity():
     G_white = np.array([[1.0, 0.5, 2.0], [0.0, 0.5, 0.0]])
     prior = BaseSolver.compute_depth_prior_whitened(
@@ -311,8 +323,8 @@ def test_apply_raises_clear_error_when_data_channels_missing(
         solver.apply_inverse_operator(evoked_missing)
 
 
-def test_apply_raises_clear_error_when_data_channels_include_extra_meeg(
-    forward_model, simulated_evoked
+def test_apply_drops_extra_data_channels_with_log(
+    forward_model, simulated_evoked, caplog
 ):
     solver = SolverDSPMMNE(n_reg_params=1)
     n_chans = int(forward_model["sol"]["data"].shape[0])
@@ -337,8 +349,11 @@ def test_apply_raises_clear_error_when_data_channels_include_extra_meeg(
         data, info, tmin=float(simulated_evoked.tmin), verbose=0
     )
 
-    with pytest.raises(ValueError, match="Extra in data: 1"):
-        solver.apply_inverse_operator(evoked_extra)
+    caplog.set_level("INFO")
+    stc = solver.apply_inverse_operator(evoked_extra)
+    assert stc is not None
+    assert "Dropping 1 data channel(s) not in the inverse operator" in caplog.text
+    assert "EEG999" in caplog.text
 
 
 def test_log_channel_alignment_lists_all_dropped_channels(caplog):
