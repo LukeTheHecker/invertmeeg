@@ -108,7 +108,9 @@ class SolverCMEM(BaseSolver):
             try:
                 adjacency = mne.spatial_src_adjacency(self.forward["src"], verbose=0)
             except Exception:
-                adjacency = None  # triggers KMeans fallback in _data_driven_parcellation
+                adjacency = (
+                    None  # triggers KMeans fallback in _data_driven_parcellation
+                )
         self._adjacency = adjacency
 
         J, parcels = _cmem(
@@ -840,9 +842,7 @@ def _optimize_lambda_batch_fixed_point(
             exp_E = np.exp(E_k)
             p_k = alpha_k * exp_E / ((1.0 - alpha_k) + alpha_k * exp_E)  # (batch,)
 
-            w_full[vertices, :] = p_k[np.newaxis, :] * (
-                mu_k[:, np.newaxis] + Sigma_xi
-            )
+            w_full[vertices, :] = p_k[np.newaxis, :] * (mu_k[:, np.newaxis] + Sigma_xi)
 
         lambda_target = Y_batch - (L @ w_full)  # stationarity condition
         residual = lambda_target - lambda_batch
@@ -905,7 +905,9 @@ def _optimize_lambda_batch_fixed_point(
     return lambda_batch
 
 
-def _optimize_lambda_batch_lbfgs(Y_batch, L, precomputed, max_iter=100, lambda_init=None):
+def _optimize_lambda_batch_lbfgs(
+    Y_batch, L, precomputed, max_iter=100, lambda_init=None
+):
     """Original SciPy L-BFGS-B optimizer (slow, but accurate)."""
     m, batch_size = Y_batch.shape
     lambda_batch = np.zeros((m, batch_size))

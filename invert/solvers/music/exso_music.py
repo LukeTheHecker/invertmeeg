@@ -208,7 +208,9 @@ class SolverExSoMUSIC(BaseSolver):
                 )
                 self.leadfield = reduce_free_to_scalar(self.leadfield, q_loc)
 
-        lam_eff = self.lambda_threshold if lambda_threshold is None else lambda_threshold
+        lam_eff = (
+            self.lambda_threshold if lambda_threshold is None else lambda_threshold
+        )
         hops_eff = self.disk_hops if disk_hops is None else disk_hops
         rank_eff = self.sensor_rank if sensor_rank is None else sensor_rank
 
@@ -371,7 +373,9 @@ def _exso_music(
 
                 if auto:
                     if len(top_disks) < num_sources:
-                        heapq.heappush(top_disks, (-metric, center, list(disk_vertices)))
+                        heapq.heappush(
+                            top_disks, (-metric, center, list(disk_vertices))
+                        )
                     else:
                         worst = -top_disks[0][0]
                         if metric < worst:

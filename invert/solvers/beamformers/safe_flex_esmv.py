@@ -6,8 +6,8 @@ import mne
 import numpy as np
 
 from ..base import SolverMeta
+from .adapt_flex_esmv import SolverAdaptFlexESMV
 from .base_beamformer import BaseBeamformer
-from .flex_esmv2 import SolverFlexESMV2
 from .utils import _estimate_rank_mdl
 
 
@@ -24,7 +24,7 @@ class _SafeContrastParams:
 
 
 class SolverSafeFlexESMV(BaseBeamformer):
-    """FlexESMV6: FlexESMV2 + *safe* adaptive contrast.
+    """SafeFlexESMV: AdaptFlexESMV + *safe* adaptive contrast.
 
     Unlike FlexESMV5, this caps the contrast exponent per sample so that the
     K-th strongest peak (K estimated via MDL on sensor covariance) stays above
@@ -50,7 +50,7 @@ class SolverSafeFlexESMV(BaseBeamformer):
 
     def __init__(
         self,
-        name: str = "SafeFlexESMV (FlexESMV2+SafeContrast) Beamformer",
+        name: str = "SafeFlexESMV (AdaptFlexESMV+SafeContrast) Beamformer",
         params: _SafeContrastParams | None = None,
         reduce_rank: bool = True,
         rank: str | int = "auto",
@@ -85,7 +85,9 @@ class SolverSafeFlexESMV(BaseBeamformer):
         data = self.unpack_data_obj(mne_obj)
         self.validate_operator_data_compatibility(data)
 
-        base = SolverFlexESMV2(
+        base = SolverAdaptFlexESMV(
+            n_orders=2,
+            diffusion_parameter=0.1,
             reduce_rank=self.reduce_rank,
             rank=self.rank,
             verbose=self.verbose,

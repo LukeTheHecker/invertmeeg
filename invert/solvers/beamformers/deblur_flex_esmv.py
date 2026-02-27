@@ -13,7 +13,7 @@ from invert.util import build_source_adjacency
 
 from ..base import SolverMeta
 from .base_beamformer import BaseBeamformer
-from .flex_esmv2 import SolverFlexESMV2
+from .flex_esmv import SolverFlexESMV
 
 logger = logging.getLogger(__name__)
 
@@ -29,12 +29,12 @@ class _FlexSharpParams:
 
 
 class SolverDeblurFlexESMV(BaseBeamformer):
-    """FlexESMV3: FlexESMV2 + graph unsharp-mask deblurring.
+    """FlexESMV: FlexESMV + graph unsharp-mask deblurring.
 
-    FlexESMV2 is very strong on MLE/EMD/AP but tends to over-blur in the
+    FlexESMV is very strong on MLE/EMD/AP but tends to over-blur in the
     FWHM-based spatial dispersion metric. This variant applies a light,
     graph-based unsharp mask to reduce leakage/blur while keeping the time
-    courses from FlexESMV2.
+    courses from FlexESMV.
     """
 
     meta = SolverMeta(
@@ -55,7 +55,7 @@ class SolverDeblurFlexESMV(BaseBeamformer):
 
     def __init__(
         self,
-        name: str = "DeblurFlexESMV (FlexESMV2+GraphSharp) Beamformer",
+        name: str = "DeblurFlexESMV (FlexESMV+GraphSharp) Beamformer",
         params: _FlexSharpParams | None = None,
         reduce_rank: bool = True,
         rank: str | int = "auto",
@@ -94,7 +94,7 @@ class SolverDeblurFlexESMV(BaseBeamformer):
         self.validate_operator_data_compatibility(data)
 
         # Base solution
-        base = SolverFlexESMV2(
+        base = SolverFlexESMV(
             reduce_rank=self.reduce_rank,
             rank=self.rank,
             verbose=self.verbose,

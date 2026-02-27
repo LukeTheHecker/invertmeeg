@@ -64,7 +64,9 @@ def test_cmem_parcellation_respects_num_parcels_with_adjacency():
 
     msp = _compute_msp_coefficients(Y, L)
     num_parcels = 40
-    parcels = _data_driven_parcellation(Y, L, num_parcels=num_parcels, A=A, msp_scores=msp)
+    parcels = _data_driven_parcellation(
+        Y, L, num_parcels=num_parcels, A=A, msp_scores=msp
+    )
     assert np.unique(parcels).size == num_parcels
 
 

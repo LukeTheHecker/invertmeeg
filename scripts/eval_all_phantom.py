@@ -50,14 +50,18 @@ MODE_NAMES = {"no_whitening": "phantom-no-whitening", "whitening": "phantom-whit
 USE_EPOCHS_FOR_COV = {"lcmv", "esmv"}
 DEFAULT_EXCLUDE = ["champagne-tem", "champagne-ar-em"]
 
-ACTUAL_POS = 0.01 * np.array(
-    [
-        [0.16, 1.61, 5.13],
-        [0.17, 1.35, 4.15],
-        [0.16, 1.05, 3.19],
-        [0.13, 0.80, 2.26],
-    ]
-) @ np.array([[0, 1, 0], [-1, 0, 0], [0, 0, 1]])
+ACTUAL_POS = (
+    0.01
+    * np.array(
+        [
+            [0.16, 1.61, 5.13],
+            [0.17, 1.35, 4.15],
+            [0.16, 1.05, 3.19],
+            [0.13, 0.80, 2.26],
+        ]
+    )
+    @ np.array([[0, 1, 0], [-1, 0, 0], [0, 0, 1]])
+)
 
 
 @dataclass
@@ -71,7 +75,9 @@ class PhantomRun:
     y_true: np.ndarray
 
 
-def load_run(run_id: int, data_path: str) -> tuple[mne.Epochs, mne.Evoked, mne.Covariance]:
+def load_run(
+    run_id: int, data_path: str
+) -> tuple[mne.Epochs, mne.Evoked, mne.Covariance]:
     raw = mne.io.read_raw_bti(
         op.join(data_path, f"{run_id}/e,rfhp1.0Hz"),
         rename_channels=False,
@@ -166,7 +172,9 @@ def _make_ground_truth(pos: np.ndarray, true_pos: np.ndarray) -> np.ndarray:
     return y_true
 
 
-def _crop_peak_window(evoked: mne.Evoked, peak_time: float, window: float) -> mne.Evoked:
+def _crop_peak_window(
+    evoked: mne.Evoked, peak_time: float, window: float
+) -> mne.Evoked:
     half = float(max(window, 0.0)) / 2.0
     tmin = float(max(evoked.times[0], peak_time - half))
     tmax = float(min(evoked.times[-1], peak_time + half))
@@ -268,13 +276,12 @@ def _evaluate_solver_mode(
             solver = solver_cls(**solver_kwargs)
             mne_obj = run.epochs if solver_id in USE_EPOCHS_FOR_COV else run.evoked
             try:
-                timed_out = False
                 if per_run_timeout and per_run_timeout > 0:
                     old_handler = signal.getsignal(signal.SIGALRM)
 
-                    def _alarm_handler(_signum, _frame):
+                    def _alarm_handler(_signum, _frame, _rid=rid):
                         raise TimeoutError(
-                            f"Timeout after {per_run_timeout:.1f}s in run {rid}"
+                            f"Timeout after {per_run_timeout:.1f}s in run {_rid}"
                         )
 
                     signal.signal(signal.SIGALRM, _alarm_handler)
@@ -369,13 +376,13 @@ def _save_runner_like(
     runner.forward = forward
     runner.solvers = solvers
     runner.datasets = {
-        MODE_NAMES["no_whitening"]: {
+        MODE_NAMES["no_whitening"]: {  # type: ignore[dict-item]
             "kind": "phantom_4dbti",
             "whitening": False,
             "n_runs": len(RUN_IDS),
             "n_sources": 1,
         },
-        MODE_NAMES["whitening"]: {
+        MODE_NAMES["whitening"]: {  # type: ignore[dict-item]
             "kind": "phantom_4dbti",
             "whitening": True,
             "n_runs": len(RUN_IDS),
@@ -517,7 +524,9 @@ def main() -> int:
         print(f"Mode: {mode}", flush=True)
         for i, solver_id in enumerate(solver_ids, start=1):
             skip_reason = None
-            if (not args.include_neural_networks) and _is_neural_network_solver(solver_id):
+            if (not args.include_neural_networks) and _is_neural_network_solver(
+                solver_id
+            ):
                 skip_reason = (
                     "Skipped by default: neural-network solver requires simulation "
                     "training. Re-run with --include-neural-networks to evaluate it."
@@ -548,7 +557,9 @@ def main() -> int:
     args.compact_output.parent.mkdir(parents=True, exist_ok=True)
     args.summary_output.parent.mkdir(parents=True, exist_ok=True)
 
-    _save_runner_like(all_results, solver_ids, runs[RUN_IDS[0]].forward, args.output, compact=False)
+    _save_runner_like(
+        all_results, solver_ids, runs[RUN_IDS[0]].forward, args.output, compact=False
+    )
     _save_runner_like(
         all_results,
         solver_ids,

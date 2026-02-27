@@ -22,9 +22,19 @@ def _score_single(Gram, Q, subset):
     return np.trace(np.linalg.solve(G_sub, Q_sub))
 
 
-def greedy_ml_search(Gram, Q, total_var, n_eff, T, n_ext, k_max,
-                     n_starts, n_refine_iters, penalty_mode,
-                     excluded_fn=None):
+def greedy_ml_search(
+    Gram,
+    Q,
+    total_var,
+    n_eff,
+    T,
+    n_ext,
+    k_max,
+    n_starts,
+    n_refine_iters,
+    penalty_mode,
+    excluded_fn=None,
+):
     """Multi-start greedy forward ML search with coordinate-wise refinement.
 
     Parameters
@@ -68,9 +78,7 @@ def greedy_ml_search(Gram, Q, total_var, n_eff, T, n_ext, k_max,
         blocked = set(selected)
         if excluded_fn is not None:
             blocked |= excluded_fn(selected)
-        return np.array(
-            [j for j in range(n_ext) if j not in blocked], dtype=np.intp
-        )
+        return np.array([j for j in range(n_ext) if j not in blocked], dtype=np.intp)
 
     null_bic = _bic(0.0, 0)
 
@@ -203,11 +211,19 @@ class SolverGreedyML(BaseSolver):
         Gram[np.diag_indices_from(Gram)] += eps_gram
         R = G_w.T @ data_w
         Q = R @ R.T
-        total_var = np.sum(data_w ** 2)
+        total_var = np.sum(data_w**2)
 
         selected = greedy_ml_search(
-            Gram, Q, total_var, n_eff, T, n_sources,
-            k_max, n_starts, n_refine_iters, penalty_mode,
+            Gram,
+            Q,
+            total_var,
+            n_eff,
+            T,
+            n_sources,
+            k_max,
+            n_starts,
+            n_refine_iters,
+            penalty_mode,
         )
         selected_sources = np.array(selected, dtype=np.intp)
 

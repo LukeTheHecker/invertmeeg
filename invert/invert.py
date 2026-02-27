@@ -158,8 +158,6 @@ def _build_registry() -> dict[str, Any]:
     _add("hocmv", solvers.SolverHOCMV)
     _add("esmv", solvers.SolverESMV)
     _add(["esmv-mvpure", "mvpure-esmv"], solvers.SolverESMVMVPURE)
-    _add("esmv2", solvers.SolverESMV2)
-    _add("esmv3", solvers.SolverESMV3)
     _add("mcmv", solvers.SolverMCMV)
     _add("hocmcmv", solvers.SolverHOCMCMV)
     _add(["recipsiicos-plain", "recipsiicos"], solvers.SolverReciPSIICOSPlain)
@@ -172,11 +170,9 @@ def _build_registry() -> dict[str, Any]:
         ["flex-esmv-mvpure", "flexesmvmvpure", "mvpure-flex-esmv"],
         solvers.SolverFlexESMVMVPURE,
     )
-    _add(["flex-esmv2", "flexesmv2"], solvers.SolverFlexESMV2)
     _add(["deblur-flex-esmv", "deblurflexesmv"], solvers.SolverDeblurFlexESMV)
     _add(["safe-flex-esmv", "safeflexesmv"], solvers.SolverSafeFlexESMV)
     _add(["sharp-flex-esmv", "sharpflexesmv"], solvers.SolverSharpFlexESMV)
-    _add(["sharp-flex-esmv2", "sharpflexesmv2"], solvers.SolverSharpFlexESMV2)
     _add(["ssp-esmv", "sspesmv"], solvers.SolverSSPESMV)
     _add(["ir-esmv", "iresmv"], solvers.SolverIRESMV)
     _add(["ssp-ir-esmv", "sspiresmv"], solvers.SolverSSPIRESMV)
@@ -247,9 +243,14 @@ def _build_registry() -> dict[str, Any]:
         solvers.SolverGeneralizedIterative,
     )
     _add(["exso-music", "exsomusic"], solvers.SolverExSoMUSIC)
-    _add(["exhaustive-ml", "exhaustiveml", "subset-ml"], solvers.SolverExhaustiveSubspaceML)
+    _add(
+        ["exhaustive-ml", "exhaustiveml", "subset-ml"],
+        solvers.SolverExhaustiveSubspaceML,
+    )
     _add(["greedy-ml", "greedyml"], solvers.SolverGreedyML)
-    _add(["flex-greedy-ml", "flexgreedyml", "flex-greedyml"], solvers.SolverFlexGreedyML)
+    _add(
+        ["flex-greedy-ml", "flexgreedyml", "flex-greedyml"], solvers.SolverFlexGreedyML
+    )
 
     # -- Basis Functions ----------------------------------------------------
     _add("gbf", solvers.SolverBasisFunctions)

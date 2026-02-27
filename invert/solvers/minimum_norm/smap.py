@@ -120,7 +120,8 @@ class SolverSMAP(BaseSolver):
         try:
             max_eig_penalty = float(
                 np.maximum(
-                    eigsh(GTG_sparse, k=1, which="LM", return_eigenvectors=False)[0], 0.0
+                    eigsh(GTG_sparse, k=1, which="LM", return_eigenvectors=False)[0],
+                    0.0,
                 )
             )
         except Exception:
@@ -131,7 +132,9 @@ class SolverSMAP(BaseSolver):
         inverse_operators = []
         # GG_inv = np.linalg.inv(GTG)
         for alpha in self.alphas:
-            kernel_eff = np.linalg.lstsq(LTL + float(alpha) * GTG, leadfield.T, rcond=None)[0]
+            kernel_eff = np.linalg.lstsq(
+                LTL + float(alpha) * GTG, leadfield.T, rcond=None
+            )[0]
             # inverse_operator = GG_inv @ self.leadfield.T @ np.linalg.inv(self.leadfield @ GG_inv @ self.leadfield.T + alpha * np.identity(n_chans))
             inverse_operators.append(
                 (float(leadfield_scale) * kernel_eff) @ sensor_transform

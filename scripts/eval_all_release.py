@@ -7,15 +7,15 @@ variants.  Saves compact results to results/release/leaderboard.json.
 from pathlib import Path
 
 from invert.benchmark import (
-    BenchmarkRunner,
     RECOMMENDED_DEPTH_BY_CATEGORY,
     RECOMMENDED_DEPTH_BY_SOLVER,
+    BenchmarkRunner,
 )
 from invert.forward import create_forward_model, get_info
 
 if __name__ == "__main__":
     info = get_info(kind="biosemi32")
-    fwd = create_forward_model(sampling="ico2", info=info)
+    fwd = create_forward_model(sampling="ico3", info=info)
 
     runner = BenchmarkRunner(
         fwd,
@@ -30,7 +30,7 @@ if __name__ == "__main__":
             "matching_pursuit",
             "other",
         ],
-        exclude_solvers = [
+        exclude_solvers=[
             "SESAME",
             "EBB",
             "ReciPSIICOS-Plain",

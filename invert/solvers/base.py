@@ -1416,9 +1416,12 @@ class BaseSolver:
             # disk can legitimately have empty info['projs'].
             projector_source: Any = self.forward
             data_obj = getattr(self, "_orientation_data_obj", None)
-            data_info = getattr(data_obj, "info", None) if data_obj is not None else None
+            data_info = (
+                getattr(data_obj, "info", None) if data_obj is not None else None
+            )
             data_projs = list(data_info.get("projs", []) or []) if data_info else []
             if data_projs:
+                assert data_info is not None  # guaranteed by data_projs being non-empty
                 projector_source = {
                     "projs": data_projs,
                     "bads": list(data_info.get("bads", []) or []),
@@ -2212,9 +2215,7 @@ class BaseSolver:
                             self.forward = self.forward.pick_channels(
                                 kept_ch_names, ordered=True
                             )
-                        G_free = np.asarray(
-                            self.forward["sol"]["data"], dtype=float
-                        )
+                        G_free = np.asarray(self.forward["sol"]["data"], dtype=float)
                         q = estimate_orientation_pca(
                             G_free,
                             Y,
@@ -2290,7 +2291,9 @@ class BaseSolver:
                     # orientation; use that as a pragmatic fallback so solvers that
                     # require scalar leadfields (some beamformers) can still run.
                     # Volume/discrete forwards have no such canonical fixed-orientation.
-                    if not (is_surface and bool(getattr(self, "_is_beamformer", False))):
+                    if not (
+                        is_surface and bool(getattr(self, "_is_beamformer", False))
+                    ):
                         solver_label = getattr(self, "name", self.__class__.__name__)
                         supported = ["auto", "fixed", "pca"]
                         raise ValueError(

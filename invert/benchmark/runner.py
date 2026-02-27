@@ -684,9 +684,7 @@ class BenchmarkRunner:
                         merged_params = {
                             f"init__{k}": v for k, v in spec.default_kwargs.items()
                         }
-                        merged_params.update(
-                            self.solver_params.get(solver_name, {})
-                        )
+                        merged_params.update(self.solver_params.get(solver_name, {}))
 
                         sample_metrics = self._run_parallel_compute(
                             spec.module_path,

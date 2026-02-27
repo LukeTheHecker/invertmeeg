@@ -10,7 +10,9 @@ class DatasetConfig(BaseModel):
     n_orders: int | tuple[int, int]
     snr_range: tuple[float, float]
     n_timepoints: int
-    source_spatial_model: Literal["diffusion_basis", "contiguous_gaussian"] = "diffusion_basis"
+    source_spatial_model: Literal["diffusion_basis", "contiguous_gaussian"] = (
+        "diffusion_basis"
+    )
     patch_rank: int | tuple[int, int] = (1, 2)
     n_samples: int = 50
 

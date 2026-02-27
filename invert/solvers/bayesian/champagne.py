@@ -273,16 +273,22 @@ class SolverChampagne(BaseSolver):
 
         # Fast path: delegate to shared SBL engine for standard rules
         rule_lower = self.update_rule.lower()
-        _fast_rules = {"mackay", "convexity", "mm", "em", "lowsnr",
-                       "adaptive", "dynamic_adaptive"}
+        _fast_rules = {
+            "mackay",
+            "convexity",
+            "mm",
+            "em",
+            "lowsnr",
+            "adaptive",
+            "dynamic_adaptive",
+        }
         if rule_lower in _fast_rules and self.noise_learning != "learn":
             if rule_lower == "lowsnr":
                 sbl_rule = "convexity"
             elif rule_lower == "adaptive":
                 noise_diag_mean = float(np.mean(np.diag(noise_cov)))
 
-                def sbl_rule(mu_x, gammas, z_diag, n_times,
-                             _ndm=noise_diag_mean):
+                def sbl_rule(mu_x, gammas, z_diag, n_times, _ndm=noise_diag_mean):
                     upper = np.mean(mu_x**2, axis=1)
                     snr = upper / _ndm
                     exp = 0.5 + 0.5 / (1 + np.exp(-snr + 5))
@@ -291,8 +297,9 @@ class SolverChampagne(BaseSolver):
                 noise_diag_mean = float(np.mean(np.diag(noise_cov)))
                 _iter_count = [0]
 
-                def sbl_rule(mu_x, gammas, z_diag, n_times,
-                             _ndm=noise_diag_mean, _it=_iter_count):
+                def sbl_rule(
+                    mu_x, gammas, z_diag, n_times, _ndm=noise_diag_mean, _it=_iter_count
+                ):
                     upper = np.mean(mu_x**2, axis=1)
                     snr = upper / _ndm
                     i = _it[0]
@@ -431,7 +438,9 @@ class SolverChampagne(BaseSolver):
                     snr_factor * mackay_update + (1 - snr_factor) * convexity_update
                 ) ** iteration_factor
                 smoothing_factor = 0.1 * (1 - iteration_factor)
-                gammas = (1 - smoothing_factor) * weighted_update + smoothing_factor * gammas
+                gammas = (
+                    1 - smoothing_factor
+                ) * weighted_update + smoothing_factor * gammas
 
             # Remove nans
             gammas[np.isnan(gammas)] = 0
@@ -459,7 +468,12 @@ class SolverChampagne(BaseSolver):
                 mu_x_noise = (SiL_act.T @ Y_scaled) * gammas[:, None]
                 residuals = Y_scaled - L_act_full @ mu_x_noise
                 noise_cov = self._update_noise_covariance_pruned(
-                    residuals, L_act_full, gammas, Sigma_y_inv, noise_cov, n_times,
+                    residuals,
+                    L_act_full,
+                    gammas,
+                    Sigma_y_inv,
+                    noise_cov,
+                    n_times,
                 )
 
             # Recompute posterior with Cholesky
@@ -685,7 +699,13 @@ class SolverChampagne(BaseSolver):
             return current_noise_cov
 
     def _update_noise_covariance_pruned(
-        self, residuals, L_act, gammas, Sigma_y_inv, current_noise_cov, n_times,
+        self,
+        residuals,
+        L_act,
+        gammas,
+        Sigma_y_inv,
+        current_noise_cov,
+        n_times,
     ):
         """Update noise covariance using only pruned (active) arrays.
 
@@ -714,9 +734,9 @@ class SolverChampagne(BaseSolver):
 
         elif self.noise_learning_mode == "precision":
             diag_residual_power = np.sum(residuals**2, axis=1)
-            return np.diag(np.sqrt(
-                diag_residual_power / (n_times * np.diag(Sigma_y_inv) + 1e-10)
-            ))
+            return np.diag(
+                np.sqrt(diag_residual_power / (n_times * np.diag(Sigma_y_inv) + 1e-10))
+            )
 
         return current_noise_cov
 

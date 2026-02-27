@@ -38,4 +38,3 @@ To discuss a commercial license, email: `lukas.hecker.job@gmail.com`.
 ## Next step
 
 If you share (1) your channel setup, (2) a representative forward model (or your constraints), and (3) your target use case, we can define a small, repeatable benchmark that answers: “which solver family is a good default for *our* product?”
-

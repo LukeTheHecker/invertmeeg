@@ -1,4 +1,3 @@
-
 import mne
 import numpy as np
 from scipy.sparse import csr_matrix
@@ -72,7 +71,11 @@ class SolverFlexGreedyML(BaseSolver):
 
         # --- Build extended dictionary ---
         leadfields, gradients = self._build_patch_dictionary(
-            G_w, forward, n_orders, diffusion_parameter, adjacency_distance,
+            G_w,
+            forward,
+            n_orders,
+            diffusion_parameter,
+            adjacency_distance,
         )
         n_total_orders = len(leadfields)  # 1 + n_orders
 
@@ -85,7 +88,7 @@ class SolverFlexGreedyML(BaseSolver):
         Gram[np.diag_indices_from(Gram)] += eps_gram
         R = G_ext.T @ data_w
         Q = R @ R.T
-        total_var = np.sum(data_w ** 2)
+        total_var = np.sum(data_w**2)
 
         # Mutual exclusivity: selecting extended index e blocks all other
         # orders at the same dipole position.
@@ -98,8 +101,16 @@ class SolverFlexGreedyML(BaseSolver):
             return blocked
 
         selected_ext = greedy_ml_search(
-            Gram, Q, total_var, n_eff, T, n_ext,
-            k_max, n_starts, n_refine_iters, penalty_mode,
+            Gram,
+            Q,
+            total_var,
+            n_eff,
+            T,
+            n_ext,
+            k_max,
+            n_starts,
+            n_refine_iters,
+            penalty_mode,
             excluded_fn=_excluded_fn,
         )
 
@@ -127,8 +138,9 @@ class SolverFlexGreedyML(BaseSolver):
         return self
 
     @staticmethod
-    def _build_patch_dictionary(G_w, forward, n_orders, diffusion_parameter,
-                                adjacency_distance):
+    def _build_patch_dictionary(
+        G_w, forward, n_orders, diffusion_parameter, adjacency_distance
+    ):
         """Build extended dictionary with diffusion-smoothed patch leadfields.
 
         Returns
@@ -163,11 +175,7 @@ class SolverFlexGreedyML(BaseSolver):
         # Normalize gradients row-wise
         for i in range(len(gradients)):
             row_sums = gradients[i].sum(axis=1).ravel()
-            scaling = 1.0 / np.maximum(
-                np.abs(np.asarray(row_sums).ravel()), 1e-12
-            )
-            gradients[i] = csr_matrix(
-                gradients[i].multiply(scaling.reshape(-1, 1))
-            )
+            scaling = 1.0 / np.maximum(np.abs(np.asarray(row_sums).ravel()), 1e-12)
+            gradients[i] = csr_matrix(gradients[i].multiply(scaling.reshape(-1, 1)))
 
         return leadfields, gradients

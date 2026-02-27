@@ -62,4 +62,3 @@ def test_dspm_noise_cov_matches_manual_prewhitened_excluding_bads(
     stc_manual = solver_manual.apply_inverse_operator(ev_white)
 
     np.testing.assert_allclose(stc_cov.data, stc_manual.data, atol=1e-10, rtol=1e-10)
-

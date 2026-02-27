@@ -399,7 +399,9 @@ class SimulationGenerator:
                     patch_ts += components[1][:, None] * tc_rank2[s][None, :]
 
                 y_batch[i] += (amps[s] / int(patch_ranks[s])) * patch_ts
-                center_vertex = int(region_vertices[np.argmax(components[0][region_vertices])])
+                center_vertex = int(
+                    region_vertices[np.argmax(components[0][region_vertices])]
+                )
                 centers_i.append(center_vertex)
                 source_vertices_i.append(region_vertices)
                 source_ranks_i.append(int(patch_ranks[s]))

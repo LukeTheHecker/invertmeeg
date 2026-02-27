@@ -6,8 +6,8 @@ import mne
 import numpy as np
 
 from ..base import SolverMeta
+from .adapt_flex_esmv import SolverAdaptFlexESMV
 from .base_beamformer import BaseBeamformer
-from .flex_esmv2 import SolverFlexESMV2
 
 
 @dataclass(frozen=True)
@@ -19,7 +19,7 @@ class _ContrastParams:
 
 
 class SolverFlexESMV(BaseBeamformer):
-    """FlexESMV5: FlexESMV2 + adaptive contrast (power-law) to reduce dispersion.
+    """FlexESMV: AdaptFlexESMV + adaptive contrast (power-law) to reduce dispersion.
 
     This is a lightweight, monotone reweighting on the per-dipole mean |y|
     map intended to suppress mid-level leakage (which drives the 50%-FWHM
@@ -44,7 +44,7 @@ class SolverFlexESMV(BaseBeamformer):
 
     def __init__(
         self,
-        name: str = "FlexESMV (FlexESMV2+Contrast) Beamformer",
+        name: str = "FlexESMV (AdaptFlexESMV+Contrast) Beamformer",
         params: _ContrastParams | None = None,
         reduce_rank: bool = True,
         rank: str | int = "auto",
@@ -80,7 +80,9 @@ class SolverFlexESMV(BaseBeamformer):
         data = self.unpack_data_obj(mne_obj)
         self.validate_operator_data_compatibility(data)
 
-        base = SolverFlexESMV2(
+        base = SolverAdaptFlexESMV(
+            n_orders=2,
+            diffusion_parameter=0.1,
             reduce_rank=self.reduce_rank,
             rank=self.rank,
             verbose=self.verbose,

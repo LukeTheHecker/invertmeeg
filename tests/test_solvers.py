@@ -65,7 +65,6 @@ FREE_ORIENTATION_SOLVERS = {
     "ESMV-MVPURE",
     "Flex-ESMV",
     "Flex-ESMV-MVPURE",
-    "Flex-ESMV2",
     "HOCMCMV",
     "HOCMV",
     "IR-ESMV",
@@ -79,7 +78,6 @@ FREE_ORIENTATION_SOLVERS = {
     "SSP-IR-ESMV",
     "Safe-Flex-ESMV",
     "Sharp-Flex-ESMV",
-    "Sharp-Flex-ESMV2",
     "Unit-Noise-Gain",
     "WNMV",
 }

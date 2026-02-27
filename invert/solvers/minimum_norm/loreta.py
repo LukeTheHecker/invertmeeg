@@ -124,7 +124,9 @@ class SolverLORETA(BaseSolver):
             penalty = Lap.toarray() if issparse(Lap) else np.asarray(Lap, dtype=float)
             try:
                 max_eig_penalty = float(
-                    np.maximum(eigsh(Lap, k=1, which="LM", return_eigenvectors=False)[0], 0.0)
+                    np.maximum(
+                        eigsh(Lap, k=1, which="LM", return_eigenvectors=False)[0], 0.0
+                    )
                 )
             except Exception:
                 max_eig_penalty = float(np.linalg.eigvalsh(penalty).max())

@@ -157,9 +157,7 @@ class SolverMSP(BaseSolver):
         except Exception:
             patterns = np.stack([np.asarray(p, dtype=float) for p in self.patterns])
         if patterns.shape[1] != d:
-            raise ValueError(
-                f"patterns have shape {patterns.shape}, expected (*, {d})"
-            )
+            raise ValueError(f"patterns have shape {patterns.shape}, expected (*, {d})")
 
         # Optional: project onto a low-dimensional sensor subspace to reduce
         # ReML costs, then map back to the full whitened sensor space.
@@ -292,11 +290,7 @@ class SolverMSP(BaseSolver):
                 trP = float(np.trace(P))
                 trPPC = float(np.sum(P * PC.T))  # trace(P @ (P @ C))
                 g_noise = (
-                    -0.5
-                    * float(v)
-                    * float(scales[-1])
-                    * (trP - trPPC)
-                    / float(m_eff)
+                    -0.5 * float(v) * float(scales[-1]) * (trP - trPPC) / float(m_eff)
                 )
                 H_noise_diag = (
                     -0.5

@@ -6,8 +6,8 @@ import mne
 import numpy as np
 
 from ..base import SolverMeta
+from .adapt_flex_esmv import SolverAdaptFlexESMV
 from .base_beamformer import BaseBeamformer
-from .flex_esmv2 import SolverFlexESMV2
 
 
 @dataclass(frozen=True)
@@ -42,7 +42,7 @@ def _anchored_power(rel: np.ndarray, *, anchor: float, gamma: float) -> np.ndarr
 
 
 class SolverSharpFlexESMV(BaseBeamformer):
-    """FlexESMV7: FlexESMV2 + anchored contrast shaping.
+    """SharpFlexESMV: AdaptFlexESMV + anchored contrast shaping.
 
     This postprocess is designed specifically for the benchmark metrics:
     - Keep the EMD support threshold (0.25*max) stable (good EMD/AP)
@@ -69,7 +69,7 @@ class SolverSharpFlexESMV(BaseBeamformer):
 
     def __init__(
         self,
-        name: str = "SharpFlexESMV (FlexESMV2+AnchoredContrast) Beamformer",
+        name: str = "SharpFlexESMV (AdaptFlexESMV+AnchoredContrast) Beamformer",
         params: _AnchoredContrastParams | None = None,
         reduce_rank: bool = True,
         rank: str | int = "auto",
@@ -104,7 +104,9 @@ class SolverSharpFlexESMV(BaseBeamformer):
         data = self.unpack_data_obj(mne_obj)
         self.validate_operator_data_compatibility(data)
 
-        base = SolverFlexESMV2(
+        base = SolverAdaptFlexESMV(
+            n_orders=2,
+            diffusion_parameter=0.1,
             reduce_rank=self.reduce_rank,
             rank=self.rank,
             verbose=self.verbose,

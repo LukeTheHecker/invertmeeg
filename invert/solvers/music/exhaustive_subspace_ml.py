@@ -10,8 +10,8 @@ def _batch_score(Gram, Q, idx_array):
     """Vectorised score for all subsets: tr(Gram_S^{-1} Q_S)."""
     rows = idx_array[:, :, None]  # (n_subsets, k, 1)
     cols = idx_array[:, None, :]  # (n_subsets, 1, k)
-    G_batch = Gram[rows, cols]    # (n_subsets, k, k)
-    Q_batch = Q[rows, cols]       # (n_subsets, k, k)
+    G_batch = Gram[rows, cols]  # (n_subsets, k, k)
+    Q_batch = Q[rows, cols]  # (n_subsets, k, k)
     # solve G_batch @ X = Q_batch  =>  tr(G^{-1} Q) = tr(X)
     X = np.linalg.solve(G_batch, Q_batch)
     return np.trace(X, axis1=-2, axis2=-1)
@@ -85,7 +85,7 @@ class SolverExhaustiveSubspaceML(BaseSolver):
         Gram[np.diag_indices_from(Gram)] += eps_gram
         R = G_w.T @ data_w
         Q = R @ R.T
-        total_var = np.sum(data_w ** 2)
+        total_var = np.sum(data_w**2)
 
         def _penalty(k):
             if penalty_mode == "bic_per_timepoint":
@@ -111,6 +111,7 @@ class SolverExhaustiveSubspaceML(BaseSolver):
 
         # Limit exhaustive search to feasible sizes (< 2M subsets).
         from math import comb as _comb
+
         _max_exhaustive_subsets = 2_000_000
 
         for k in range(1, min(k_max, n_sources) + 1):
@@ -120,7 +121,7 @@ class SolverExhaustiveSubspaceML(BaseSolver):
 
                 all_score_chunks = []
                 for start in range(0, len(idx_array), chunk_size):
-                    chunk = idx_array[start:start + chunk_size]
+                    chunk = idx_array[start : start + chunk_size]
                     scores = _batch_score(Gram, Q, chunk)
                     all_score_chunks.append(scores)
 
@@ -146,7 +147,7 @@ class SolverExhaustiveSubspaceML(BaseSolver):
                     ext_array = np.array(extended, dtype=np.intp)
 
                     for start in range(0, len(ext_array), chunk_size):
-                        chunk = ext_array[start:start + chunk_size]
+                        chunk = ext_array[start : start + chunk_size]
                         scores = _batch_score(Gram, Q, chunk)
                         for idx, sc in enumerate(scores):
                             sub = extended[start + idx]
@@ -241,7 +242,7 @@ class SolverGreedyML(BaseSolver):
         Gram[np.diag_indices_from(Gram)] += eps_gram
         R = G_w.T @ data_w
         Q = R @ R.T
-        total_var = np.sum(data_w ** 2)
+        total_var = np.sum(data_w**2)
 
         def _penalty(k):
             if penalty_mode == "bic_per_timepoint":

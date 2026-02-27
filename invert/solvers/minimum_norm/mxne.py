@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 # L21 norm helpers
 # ---------------------------------------------------------------------------
 
+
 def _groups_norm2(X, n_orient):
     """Squared Frobenius norm per source position.
 
@@ -44,7 +45,7 @@ def _groups_norm2(X, n_orient):
     if X.ndim == 1:
         X = X[:, np.newaxis]
     if n_orient == 1:
-        return np.sum(X ** 2, axis=1)
+        return np.sum(X**2, axis=1)
     n_pos = X.shape[0] // n_orient
     return np.sum(X.reshape(n_pos, n_orient, -1) ** 2, axis=(1, 2))
 
@@ -62,12 +63,12 @@ def _compute_lipschitz(G, n_orient):
     n_orient>1: lc[j] = largest singular value of G_j squared
     """
     if n_orient == 1:
-        return np.sum(G ** 2, axis=0)
+        return np.sum(G**2, axis=0)
     n_positions = G.shape[1] // n_orient
     lc = np.empty(n_positions)
     for j in range(n_positions):
         s = j * n_orient
-        lc[j] = np.linalg.norm(G[:, s:s + n_orient], ord=2) ** 2
+        lc[j] = np.linalg.norm(G[:, s : s + n_orient], ord=2) ** 2
     return lc
 
 
@@ -94,14 +95,14 @@ def _compute_depth_weights(G, n_orient, depth, depth_limit=10.0):
     n_positions = n_sources // n_orient
 
     if n_orient == 1:
-        col_norms = np.sqrt(np.sum(G ** 2, axis=0))
+        col_norms = np.sqrt(np.sum(G**2, axis=0))
     else:
         col_norms = np.empty(n_positions)
         for j in range(n_positions):
             s = j * n_orient
-            col_norms[j] = np.linalg.norm(G[:, s:s + n_orient])
+            col_norms[j] = np.linalg.norm(G[:, s : s + n_orient])
 
-    w_pos = col_norms ** depth
+    w_pos = col_norms**depth
     w_max = w_pos.max()
     if w_max > 0:
         w_pos /= w_max
@@ -115,6 +116,7 @@ def _compute_depth_weights(G, n_orient, depth, depth_limit=10.0):
 # ---------------------------------------------------------------------------
 # Core BCD routines
 # ---------------------------------------------------------------------------
+
 
 def _bcd_pass(G, X, R, positions, lipschitz, n_orient, alpha):
     """One BCD pass with L21 block soft-thresholding.
@@ -148,18 +150,18 @@ def _bcd_pass(G, X, R, positions, lipschitz, n_orient, alpha):
         X_j_old = X[s:e]
         has_old = np.any(X_j_old != 0)
         if has_old:
-            R += G_j @ X_j_old        # restore: R becomes R_without_j
+            R += G_j @ X_j_old  # restore: R becomes R_without_j
             X_j_new += X_j_old
 
         # Block soft-thresholding (L21 proximal)
-        block_norm = np.sqrt(np.sum(X_j_new ** 2))
+        block_norm = np.sqrt(np.sum(X_j_new**2))
         threshold = alpha / lc_j
 
         if block_norm <= threshold:
             X[s:e] = 0.0
             # R already equals R_without_j
         else:
-            X_j_new *= (1.0 - threshold / block_norm)
+            X_j_new *= 1.0 - threshold / block_norm
             X[s:e] = X_j_new
             R -= G_j @ X_j_new
             nonzero.add(j)
@@ -172,14 +174,14 @@ def _dgap_l21(G, X, R, alpha, n_orient):
 
     Returns (gap, primal_objective).
     """
-    resid_sq = np.sum(R ** 2)
+    resid_sq = np.sum(R**2)
     l21 = np.sum(np.sqrt(_groups_norm2(X, n_orient)))
     p_obj = 0.5 * resid_sq + alpha * l21
 
     dual_norm = _norm_l2inf(G.T @ R, n_orient)
     scaling = min(1.0, alpha / max(dual_norm, 1e-30))
 
-    d_obj = (scaling - 0.5 * scaling ** 2) * resid_sq
+    d_obj = (scaling - 0.5 * scaling**2) * resid_sq
     if l21 > 0:
         d_obj += scaling * np.sum(R * (G @ X))
 
@@ -196,15 +198,15 @@ def _debias(G, M, X, n_orient, max_iter=200, tol=1e-6):
     if len(active_pos) == 0:
         return X
 
-    active_idx = np.concatenate([
-        np.arange(j * n_orient, (j + 1) * n_orient) for j in active_pos
-    ])
+    active_idx = np.concatenate(
+        [np.arange(j * n_orient, (j + 1) * n_orient) for j in active_pos]
+    )
     G_act = G[:, active_idx]
     X_act = X[active_idx]
     n_act = len(active_idx)
 
     # Lipschitz constant for the diagonal-scaling sub-problem
-    x_norms = np.sqrt(np.sum(X_act ** 2, axis=1))
+    x_norms = np.sqrt(np.sum(X_act**2, axis=1))
     lip = 1.1 * np.linalg.norm(G_act * x_norms, ord=2) ** 2
     lip = max(lip, 1e-30)
 
@@ -227,7 +229,7 @@ def _debias(G, M, X, n_orient, max_iter=200, tol=1e-6):
             D = np.maximum(D, 1.0)
 
         # FISTA acceleration
-        t_new = 0.5 * (1.0 + np.sqrt(1.0 + 4.0 * t ** 2))
+        t_new = 0.5 * (1.0 + np.sqrt(1.0 + 4.0 * t**2))
         Y_d = D + (t - 1.0) / t_new * (D - D_old)
         t = t_new
 
@@ -242,6 +244,7 @@ def _debias(G, M, X, n_orient, max_iter=200, tol=1e-6):
 # ---------------------------------------------------------------------------
 # Solver class
 # ---------------------------------------------------------------------------
+
 
 class SolverMxNEBCD(BaseSolver):
     """Mixed-Norm Estimate via Block Coordinate Descent with Active Set.
@@ -371,7 +374,10 @@ class SolverMxNEBCD(BaseSolver):
         depth_w = None
         if depth > 0:
             depth_w = _compute_depth_weights(
-                G, n_orient, depth, depth_limit,
+                G,
+                n_orient,
+                depth,
+                depth_limit,
             )
             G = G / depth_w[np.newaxis, :]
 
@@ -419,7 +425,13 @@ class SolverMxNEBCD(BaseSolver):
             # --- BCD iterations on current active set ---
             for bcd_it in range(bcd_maxit):
                 active = _bcd_pass(
-                    G, X, R, sorted(active), lipschitz, n_orient, alpha_eff,
+                    G,
+                    X,
+                    R,
+                    sorted(active),
+                    lipschitz,
+                    n_orient,
+                    alpha_eff,
                 )
 
                 if (bcd_it + 1) % dgap_freq == 0:

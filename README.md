@@ -164,8 +164,6 @@ stc.plot()
 | Weight-Normalized Minimum Variance | "wnmv" |
 | Higher-Order Covariance Minimum Variance | "hocmv" |
 | Eigenspace Scalar Minimum Variance | "esmv" |
-| Eigenspace Scalar Minimum Variance 2 | "esmv2" |
-| Eigenspace Scalar Minimum Variance 3 | "esmv3" |
 | Multiple Constraint Minimum Variance | "mcmv" |
 | Higher-Order Covariance MCMV | "hocmcmv" |
 | Reciprocal PSIICOS (Plain) | "recipsiicos" |
@@ -174,11 +172,9 @@ stc.plot()
 | Empirical Bayesian Beamformer | "ebb" |
 | Adaptive Flexible ESMV | "adapt-flex-esmv" |
 | Flexible ESMV | "flex-esmv" |
-| Flexible ESMV 2 | "flex-esmv2" |
 | Deblurring Flexible ESMV | "deblur-flex-esmv" |
 | Safe Flexible ESMV | "safe-flex-esmv" |
 | Sharp Flexible ESMV | "sharp-flex-esmv" |
-| Sharp Flexible ESMV 2 | "sharp-flex-esmv2" |
 | Signal Subspace Projection ESMV | "ssp-esmv" |
 | Iteratively Reweighted ESMV | "ir-esmv" |
 | SSP Iteratively Reweighted ESMV | "ssp-ir-esmv" |
