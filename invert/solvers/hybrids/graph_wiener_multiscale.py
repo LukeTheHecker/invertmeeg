@@ -4,8 +4,7 @@ import logging
 
 import mne
 import numpy as np
-from scipy.optimize import nnls
-from scipy.optimize import minimize
+from scipy.optimize import minimize, nnls
 from scipy.sparse.csgraph import laplacian
 
 from invert.util import build_source_adjacency

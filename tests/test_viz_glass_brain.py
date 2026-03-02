@@ -3,7 +3,6 @@ import numpy as np
 
 from invert.viz.glass_brain import plot_glass_brain
 
-
 matplotlib.use("Agg", force=True)
 import matplotlib.pyplot as plt
 

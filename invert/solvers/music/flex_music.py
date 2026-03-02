@@ -18,7 +18,8 @@ def _stable_argmax_2d(arr: np.ndarray, *, tol: float = 1e-12) -> tuple[int, int]
         return 0, 0
     near = np.argwhere(a >= (max_val - float(tol)))
     if near.size == 0:
-        return tuple(np.unravel_index(int(np.argmax(a)), a.shape))
+        idx = np.unravel_index(int(np.argmax(a)), a.shape)
+        return int(idx[0]), int(idx[1])
     # Deterministic lexicographic tie-break (order, dipole).
     idx = near[np.lexsort((near[:, 1], near[:, 0]))][0]
     return int(idx[0]), int(idx[1])

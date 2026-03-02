@@ -1017,7 +1017,6 @@ class BenchmarkRunner:
             - per_dataset_ranks: {dataset_name: {solver_name: avg_rank}}
             - global_ranks: {solver_name: avg_rank}
         """
-        lower_is_better = {"mean_localization_error", "emd"}
         higher_is_better = {"average_precision", "correlation"}
 
         datasets = sorted(set(r.dataset_name for r in self._results))
