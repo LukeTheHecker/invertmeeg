@@ -52,6 +52,7 @@ class SolverLORETA(BaseSolver):
         use_trace_normalization: bool = True,
         rank_tol: float = 1e-12,
         eps: float = 1e-15,
+        pinv_rcond: float = 1e-10,
         laplacian_power: float = 1.0,
         **kwargs,
     ):
@@ -60,6 +61,7 @@ class SolverLORETA(BaseSolver):
         self.use_trace_normalization = bool(use_trace_normalization)
         self.rank_tol = float(rank_tol)
         self.eps = float(eps)
+        self.pinv_rcond = float(pinv_rcond)
         self.laplacian_power = float(laplacian_power)
         super().__init__(**kwargs)
         # LORETA's smoothness penalty can push the optimal alpha above the
@@ -122,14 +124,20 @@ class SolverLORETA(BaseSolver):
         p = self.laplacian_power
         if p == 1.0:
             penalty = Lap.toarray() if issparse(Lap) else np.asarray(Lap, dtype=float)
-            try:
-                max_eig_penalty = float(
-                    np.maximum(
-                        eigsh(Lap, k=1, which="LM", return_eigenvectors=False)[0], 0.0
+            if int(penalty.shape[0]) <= 4000:
+                max_eig_penalty = float(np.maximum(np.linalg.eigvalsh(penalty).max(), 0.0))
+            else:
+                try:
+                    v0 = np.ones(int(penalty.shape[0]), dtype=float)
+                    v0 /= np.linalg.norm(v0)
+                    max_eig_penalty = float(
+                        np.maximum(
+                            eigsh(Lap, k=1, which="LM", return_eigenvectors=False, v0=v0)[0],
+                            0.0,
+                        )
                     )
-                )
-            except Exception:
-                max_eig_penalty = float(np.linalg.eigvalsh(penalty).max())
+                except Exception:
+                    max_eig_penalty = float(np.linalg.eigvalsh(penalty).max())
         else:
             Lap_dense = Lap.toarray() if issparse(Lap) else np.asarray(Lap, dtype=float)
             eigvals, eigvecs = np.linalg.eigh(Lap_dense)
@@ -155,7 +163,11 @@ class SolverLORETA(BaseSolver):
             M = LTL + float(alpha) * penalty
             # Add small diagonal for numerical stability (Laplacian has zero eigenvalues)
             M += self.eps * np.trace(M) / M.shape[0] * np.eye(M.shape[0])
-            kernel_eff = np.linalg.solve(M, leadfield.T)
+            # LORETA systems can be near-singular due to Laplacian null modes.
+            # Use the Moore-Penrose pseudoinverse for numerically stable,
+            # mathematically consistent generalized-Tikhonov solutions.
+            rcond = max(float(self.pinv_rcond), float(self.eps))
+            kernel_eff = np.linalg.pinv(M, rcond=rcond) @ leadfield.T
             inverse_operators.append(
                 (float(leadfield_scale) * kernel_eff) @ sensor_transform
             )

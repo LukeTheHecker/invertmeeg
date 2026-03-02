@@ -73,6 +73,7 @@ class SolverMinimumL1Norm(BaseSolver):
         max_iter=1000,
         l1_reg=5e-2,
         l2_reg=0,
+        temporal_smoothness=5e-2,
         tol=1e-4,
         depth_weighting=0.0,
         center_data=True,
@@ -90,6 +91,9 @@ class SolverMinimumL1Norm(BaseSolver):
             Controls the spatial L1 regularization
         l2_reg : float
             Controls the spatial L2 regularization
+        temporal_smoothness : float
+            Strength of temporal coupling via a finite-difference penalty.
+            Higher values make source trajectories smoother over time.
         tol : float
             Tolerance at which convergence is met.
         depth_weighting : float
@@ -114,6 +118,7 @@ class SolverMinimumL1Norm(BaseSolver):
             max_iter=max_iter,
             l1_reg=l1_reg,
             l2_reg=l2_reg,
+            temporal_smoothness=temporal_smoothness,
             tol=tol,
             depth_weighting=depth_weighting,
             center_data=center_data,
@@ -128,6 +133,7 @@ class SolverMinimumL1Norm(BaseSolver):
         max_iter=1000,
         l1_reg=5e-2,
         l2_reg=0,
+        temporal_smoothness=5e-2,
         tol=1e-4,
         depth_weighting=0.0,
         center_data=True,
@@ -138,6 +144,7 @@ class SolverMinimumL1Norm(BaseSolver):
             max_iter=max_iter,
             l1_reg=l1_reg,
             l2_reg=l2_reg,
+            temporal_smoothness=temporal_smoothness,
             tol=tol,
             depth_weighting=depth_weighting,
             center_data=center_data,
@@ -149,6 +156,7 @@ class SolverMinimumL1Norm(BaseSolver):
         y,
         l1_reg=5e-2,
         l2_reg=0,
+        temporal_smoothness=5e-2,
         max_iter=1000,
         tol=1e-4,
         depth_weighting=0.0,
@@ -157,7 +165,10 @@ class SolverMinimumL1Norm(BaseSolver):
     ):
         """
         Solves the EEG inverse problem:
-            min_X 0.5 * ||Y - A X||_F^2 + lambda * ||X||_1 + 0.5 * l2_reg * ||X||_F^2
+            min_X 0.5 * ||Y - A X||_F^2
+                  + lambda * ||X||_1
+                  + 0.5 * l2_reg * ||X||_F^2
+                  + 0.5 * temporal_smoothness * ||X[:, 1:] - X[:, :-1]||_F^2
         using FISTA over all timepoints jointly.
 
         Parameters
@@ -173,6 +184,9 @@ class SolverMinimumL1Norm(BaseSolver):
             interpreted as a fraction of lambda_max.
         l2_reg : float, optional (default: 0)
             L2 regularization strength.
+        temporal_smoothness : float, optional (default: 5e-2)
+            Temporal coupling strength. Applies a quadratic penalty on
+            frame-to-frame source changes to promote stable time courses.
         max_iter : int, optional (default: 1000)
             Maximum number of iterations to run.
         tol : float, optional (default: 1e-6)
@@ -190,6 +204,7 @@ class SolverMinimumL1Norm(BaseSolver):
         y_mat = np.asarray(y, dtype=float)
         if y_mat.ndim == 1:
             y_mat = y_mat[:, np.newaxis]
+        temporal_smoothness = max(float(temporal_smoothness), 0.0)
 
         A = self.leadfield.copy()
         if not self.prep_leadfield and depth_weighting > 0:
@@ -204,9 +219,18 @@ class SolverMinimumL1Norm(BaseSolver):
             Y -= Y.mean(axis=0, keepdims=True)
         if np.allclose(Y, 0):
             return np.zeros((A.shape[1], Y.shape[1]), dtype=float)
+        n_times = Y.shape[1]
 
         # Compute step size from Lipschitz constant
-        L = np.linalg.norm(A, ord=2) ** 2 + l2_reg
+        temporal_lipschitz = 0.0
+        if temporal_smoothness > 0 and n_times > 1:
+            # Largest eigenvalue of 1D path-graph Laplacian with Neumann boundaries.
+            temporal_lipschitz = 2.0 + 2.0 * np.cos(np.pi / n_times)
+        L = (
+            np.linalg.norm(A, ord=2) ** 2
+            + l2_reg
+            + temporal_smoothness * temporal_lipschitz
+        )
         L = max(float(L), 1e-12)
         lr = 1.0 / L
 
@@ -231,6 +255,15 @@ class SolverMinimumL1Norm(BaseSolver):
             x_prev = x.copy()
             # grad = A.T @ (A @ z - Y) + l2_reg * z = ATA @ z - ATY + l2_reg * z
             grad = ATA @ z - ATY + l2_reg * z
+            if temporal_smoothness > 0 and n_times > 1:
+                temporal_grad = np.empty_like(z)
+                temporal_grad[:, 0] = z[:, 0] - z[:, 1]
+                temporal_grad[:, -1] = z[:, -1] - z[:, -2]
+                if n_times > 2:
+                    temporal_grad[:, 1:-1] = (
+                        2.0 * z[:, 1:-1] - z[:, :-2] - z[:, 2:]
+                    )
+                grad += temporal_smoothness * temporal_grad
             x = z - lr * grad
             # Soft thresholding step (proximal for L1)
             x = soft_threshold(x, lambda_eff * lr)

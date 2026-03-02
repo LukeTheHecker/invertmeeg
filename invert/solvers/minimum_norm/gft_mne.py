@@ -83,11 +83,23 @@ class SolverGFTMNE(BaseSolver):
         adjacency = build_source_adjacency(forward["src"], verbose=0)
         lap = laplacian(adjacency).astype(float)
 
-        num_eigenvalues = lap.shape[0]
+        num_eigenvalues = int(lap.shape[0])
         cutoff_index = int(num_eigenvalues * cutoff)
+        cutoff_index = max(1, min(cutoff_index, num_eigenvalues))
         logger.info(f"Keeping {cutoff_index}/{num_eigenvalues} eigenvalues")
-        eigenvalues, U = eigsh(lap, k=cutoff_index, which="SM")
-        U = np.real(U)
+        if cutoff_index >= num_eigenvalues:
+            U = np.eye(num_eigenvalues, dtype=float)
+        elif num_eigenvalues <= 2000:
+            # Dense eigendecomposition is deterministic and avoids ARPACK
+            # start-vector jitter that can alter near-degenerate subspaces.
+            evals, evecs = np.linalg.eigh(np.asarray(lap.toarray(), dtype=float))
+            order = np.argsort(evals)[:cutoff_index]
+            U = np.real(evecs[:, order])
+        else:
+            v0 = np.ones(num_eigenvalues, dtype=float)
+            v0 /= np.linalg.norm(v0)
+            _, U = eigsh(lap, k=cutoff_index, which="SM", v0=v0)
+            U = np.real(U)
 
         # Transform leadfield into GFT basis
         leadfield_gft = leadfield @ U
@@ -97,9 +109,8 @@ class SolverGFTMNE(BaseSolver):
         self.get_alphas(reference=LLT)
         inverse_operators = []
         for alpha in self.alphas:
-            inverse_operator = np.linalg.solve(
-                LLT + alpha * np.identity(n_chans), leadfield_gft
-            ).T
+            M = LLT + float(alpha) * np.identity(n_chans)
+            inverse_operator = (self.robust_inverse(M) @ leadfield_gft).T
             inverse_operators.append(U @ inverse_operator @ wf.sensor_transform)
 
         self.inverse_operators = [

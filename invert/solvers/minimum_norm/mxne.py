@@ -390,7 +390,10 @@ class SolverMxNEBCD(BaseSolver):
             Vh = Vh[:rank]
 
         n_times = M.shape[1]
-        if n_times == 0 or np.allclose(M, 0):
+        # MEG/EEG data are often ~1e-13..1e-6 in native units; using np.allclose
+        # with default tolerances can incorrectly treat valid data as zeros.
+        max_abs = float(np.nanmax(np.abs(M))) if M.size else 0.0
+        if n_times == 0 or not np.isfinite(max_abs) or max_abs <= 0.0:
             return self.source_to_object(np.zeros((n_sources, data.shape[1])))
 
         # ------------------------------------------------------------------
