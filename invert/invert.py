@@ -44,7 +44,6 @@ def _build_registry() -> dict[str, Any]:
     _add("gft-mne", solvers.SolverGFTMNE)
     _add("wmne", solvers.SolverWMNE)
     _add("dspm", solvers.SolverDSPM)
-    _add(["dspm-mne", "dspm_mne", "mne-dspm"], solvers.SolverDSPMMNE)
     _add(
         ["l1", "fista", "mce", "minimum current estimate"], solvers.SolverMinimumL1Norm
     )
@@ -69,10 +68,17 @@ def _build_registry() -> dict[str, Any]:
     _add(["s-map", "smap"], solvers.SolverSMAP)
 
     # -- Bayesian / Champagne -----------------------------------------------
-    _add(["champagne", "champ"], solvers.SolverChampagne)
+    _add(
+        ["champagne", "champ"],
+        partial(solvers.SolverChampagne, regularisation_method="R1GCV"),
+    )
     _add(
         ["champagne-em", "emchampagne", "em-champagne", "emc"],
-        partial(solvers.SolverChampagne, update_rule="Convexity"),
+        partial(
+            solvers.SolverChampagne,
+            update_rule="Convexity",
+            regularisation_method="R1GCV",
+        ),
     )
     _add(
         [
@@ -82,11 +88,19 @@ def _build_registry() -> dict[str, Any]:
             "coc",
             "mm-champagne",
         ],
-        partial(solvers.SolverChampagne, update_rule="Convexity"),
+        partial(
+            solvers.SolverChampagne,
+            update_rule="Convexity",
+            regularisation_method="R1GCV",
+        ),
     )
     _add(
         ["champagne-mackay", "mackaychampagne", "mackay-champagne", "mcc"],
-        partial(solvers.SolverChampagne, update_rule="MacKay"),
+        partial(
+            solvers.SolverChampagne,
+            update_rule="MacKay",
+            regularisation_method="R1GCV",
+        ),
     )
     _add(
         ["champagne-tem", "temchampagne", "tem-champagne", "temc", "t-em-champagne"],
@@ -140,7 +154,14 @@ def _build_registry() -> dict[str, Any]:
     _add("gamma-map-msp", solvers.SolverGammaMAPMSP)
     _add("source-map-msp", solvers.SolverSourceMAPMSP)
     _add(["multiple-sparse-priors", "msp"], solvers.SolverMSP)
-    _add("cmem", solvers.SolverCMEM)
+    _add(
+        ["mem", "maximum-entropy-on-the-mean"],
+        partial(solvers.SolverMEM, clustered=False),
+    )
+    _add(
+        ["cmem", "coherent-mem"],
+        partial(solvers.SolverMEM, clustered=True, name="cMEM"),
+    )
     _add(["subspace-sbl", "ssm-nlc", "subspacesbl"], solvers.SolverSubspaceSBL)
     _add(
         ["subspace-sbl-plus", "ssm-nlc-plus", "subspacesblplus"],
@@ -234,11 +255,6 @@ def _build_registry() -> dict[str, Any]:
     )
 
     _add(
-        ["adaptive-ap", "adaptive-alternating-projections", "aap"],
-        solvers.SolverAdaptiveAlternatingProjections,
-    )
-    _add(["flex-music-2", "flexmusic2"], solvers.SolverFLEXMUSIC_2)
-    _add(
         ["generalized-iterative", "gi"],
         solvers.SolverGeneralizedIterative,
     )
@@ -259,6 +275,36 @@ def _build_registry() -> dict[str, Any]:
     _add("epifocus", solvers.SolverEPIFOCUS)
     _add("apse", solvers.hybrids.SolverAPSE)
     _add("chimera", solvers.hybrids.SolverChimera)
+    _add(
+        ["graph-wiener-mixture", "gw-mix", "gwmix", "graph-wiener"],
+        solvers.hybrids.SolverGraphWienerMixture,
+    )
+    _add(
+        ["graph-wiener-multiscale", "gw-mseb", "gw-ms", "gw-multiscale"],
+        solvers.hybrids.SolverGraphWienerMultiScale,
+    )
+    _add(
+        ["graph-wiener-smooth-sparse", "gw-ss", "gwss", "wiener-smooth-sparse"],
+        solvers.hybrids.SolverGraphWienerSmoothSparseEB,
+    )
+    _add(
+        [
+            "graph-wiener-smooth-sparse-adaptive",
+            "gw-ssa",
+            "gwssa",
+            "wiener-smooth-sparse-adaptive",
+        ],
+        solvers.hybrids.SolverGraphWienerSmoothSparseAdaptiveEB,
+    )
+    _add(
+        [
+            "graph-wiener-smooth-sparse-adaptive-robust",
+            "gw-ssar",
+            "gwssar",
+            "wiener-smooth-sparse-adaptive-robust",
+        ],
+        solvers.hybrids.SolverGraphWienerSmoothSparseAdaptiveRobustEB,
+    )
     _add(["random-noise", "random", "noise-baseline"], solvers.SolverRandomNoise)
 
     return reg

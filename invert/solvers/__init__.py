@@ -23,7 +23,6 @@ __all__ = [
     "SolverGFTMNE",
     "SolverWMNE",
     "SolverDSPM",
-    "SolverDSPMMNE",
     "SolverMinimumL1Norm",
     "SolverMinimumL1NormGPT",
     "SolverMinimumL1L2Norm",
@@ -52,6 +51,7 @@ __all__ = [
     "SolverGammaMAPMSP",
     "SolverSourceMAPMSP",
     "SolverMSP",
+    "SolverMEM",
     "SolverCMEM",
     "SolverSubspaceSBL",
     "SolverSubspaceSBLPlus",
@@ -98,8 +98,6 @@ __all__ = [
     "SolverFLEXMUSIC",
     "SolverSignalSubspaceMatching",
     "SolverAlternatingProjections",
-    "SolverAdaptiveAlternatingProjections",
-    "SolverFLEXMUSIC_2",
     "SolverGeneralizedIterative",
     "SolverExSoMUSIC",
     # Basis Functions
@@ -109,6 +107,11 @@ __all__ = [
     # Hybrids
     "SolverAPSE",
     "SolverChimera",
+    "SolverGraphWienerMixture",
+    "SolverGraphWienerMultiScale",
+    "SolverGraphWienerSmoothSparseEB",
+    "SolverGraphWienerSmoothSparseAdaptiveEB",
+    "SolverGraphWienerSmoothSparseAdaptiveRobustEB",
     # ANN (optional)
     "SolverCNN",
     "SolverCovCNN",

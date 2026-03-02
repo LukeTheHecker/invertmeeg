@@ -17,8 +17,9 @@ class SolverRandomNoise(BaseSolver):
         references=["Lukas Hecker 2025, unpublished"],
     )
 
-    def __init__(self, name="Random Noise", **kwargs):
+    def __init__(self, name="Random Noise", random_seed: int | None = None, **kwargs):
         self.name = name
+        self.random_seed = random_seed
         super().__init__(**kwargs)
         self.require_recompute = False
         self.require_data = False
@@ -34,5 +35,6 @@ class SolverRandomNoise(BaseSolver):
         data = self.unpack_data_obj(mne_obj)
         self.validate_operator_data_compatibility(data)
         n_time = data.shape[1] if data.ndim > 1 else 1
-        source_mat = np.random.randn(self.n_sources, n_time)
+        rng = np.random.default_rng(self.random_seed)
+        source_mat = rng.standard_normal((self.n_sources, n_time))
         return self.source_to_object(source_mat)

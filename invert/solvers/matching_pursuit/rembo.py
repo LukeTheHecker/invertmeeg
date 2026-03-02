@@ -46,8 +46,14 @@ class SolverREMBO(BaseSolver):
         ],
     )
 
-    def __init__(self, name="Reduce Multi-Measurement-Vector and Boost", **kwargs):
+    def __init__(
+        self,
+        name="Reduce Multi-Measurement-Vector and Boost",
+        random_seed: int | None = None,
+        **kwargs,
+    ):
         self.name = name
+        self.random_seed = random_seed
         return super().__init__(**kwargs)
 
     def make_inverse_operator(
@@ -193,8 +199,9 @@ class SolverREMBO(BaseSolver):
         best_support = np.array([], dtype=int)
         best_rel_resid = np.inf
 
+        rng = np.random.default_rng(self.random_seed)
         for _ in range(max_boost_iter):
-            a = np.random.standard_normal(n_time)
+            a = rng.standard_normal(n_time)
             y_vec = y @ a
             x_vec = self.calc_omp_solution(
                 y_vec,
