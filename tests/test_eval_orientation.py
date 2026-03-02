@@ -54,6 +54,7 @@ FREE_ORIENTATION_SOLVERS = {
     for sid, spec in _ALL_SPECS.items()
     if sid in _VECTOR_MIN_NORM or ".beamformers." in spec.module_path
 }
+RANDOMIZED_SOLVER_KWARGS = {"rembo": {"random_seed": 42}}
 
 
 def _solver_ids():
@@ -182,7 +183,11 @@ def test_orientation_emd_on_tangential(solver_name, tangential_setup):
         )
 
         for ori in orientations:
-            solver = Solver(solver_name, orientation=ori)
+            solver = Solver(
+                solver_name,
+                orientation=ori,
+                **RANDOMIZED_SOLVER_KWARGS.get(solver_name, {}),
+            )
             solver.make_inverse_operator(fwd, evoked_train, **extra_kwargs)
             stc = solver.apply_inverse_operator(evoked_test)
             source_pred = np.sum(stc.data**2, axis=1)

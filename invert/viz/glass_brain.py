@@ -36,7 +36,7 @@ def plot_glass_brain(
     src,
     time_idx=None,
     threshold=0.2,
-    cmap="magma",
+    cmap="Reds",
     alpha=0.8,
     marker_size=15,
     brain_alpha=0.1,
@@ -44,6 +44,11 @@ def plot_glass_brain(
     figsize=(12, 4),
     title=None,
     ax=None,
+    true_sources=None,
+    true_source_marker="+",
+    true_source_color="green",
+    true_source_size=None,
+    true_source_alpha=1.0,
 ):
     """Plot a glass-brain projection of a SourceEstimate.
 
@@ -78,6 +83,18 @@ def plot_glass_brain(
         Figure title.
     ax : array of Axes | None
         Three matplotlib Axes to draw into. If None, a new figure is created.
+    true_sources : array-like | None
+        Optional ground-truth source indices in full source-space ordering
+        (matching ``_get_source_positions(src)``), or a boolean mask of length
+        ``n_sources``.
+    true_source_marker : str
+        Matplotlib marker used to draw true sources. Default ``"+"``.
+    true_source_color : str
+        Marker color for true sources.
+    true_source_size : float | None
+        Marker size for true sources. If None, uses ``marker_size * 1.8``.
+    true_source_alpha : float
+        Marker alpha for true sources.
 
     Returns
     -------
@@ -86,6 +103,7 @@ def plot_glass_brain(
     """
     all_pos = _get_source_positions(src)  # all source space vertices
     all_pos_mm = all_pos * 1e3
+    n_all_sources = int(all_pos_mm.shape[0])
 
     # Select time point
     data = stc.data
@@ -103,6 +121,29 @@ def plot_glass_brain(
     for i, hemi in enumerate(src):
         active_pos.append(hemi["rr"][stc.vertices[i]])
     active_pos = np.concatenate(active_pos, axis=0) * 1e3
+
+    # Optional overlay of known true source locations (in full-source indexing).
+    true_pos = None
+    if true_sources is not None:
+        true_sources_arr = np.asarray(true_sources)
+        if true_sources_arr.dtype == bool:
+            if true_sources_arr.ndim != 1 or true_sources_arr.shape[0] != n_all_sources:
+                raise ValueError(
+                    "Boolean true_sources must be 1D with length equal to "
+                    f"number of sources ({n_all_sources}), got {true_sources_arr.shape}."
+                )
+            true_indices = np.flatnonzero(true_sources_arr)
+        else:
+            true_indices = np.asarray(true_sources_arr, dtype=int).ravel()
+            if true_indices.size:
+                if np.any(true_indices < 0) or np.any(true_indices >= n_all_sources):
+                    raise ValueError(
+                        "true_sources contains out-of-range indices for source "
+                        f"space size {n_all_sources}."
+                    )
+                true_indices = np.unique(true_indices)
+        if true_indices.size:
+            true_pos = all_pos_mm[true_indices]
 
     # Apply threshold
     peak = values.max()
@@ -181,6 +222,18 @@ def plot_glass_brain(
             edgecolors="none",
             zorder=10,
         )
+        if true_pos is not None:
+            ts_size = float(marker_size) * 1.8 if true_source_size is None else true_source_size
+            ax_i.scatter(
+                true_pos[:, xi],
+                true_pos[:, yi],
+                c=true_source_color,
+                marker=true_source_marker,
+                s=ts_size,
+                alpha=true_source_alpha,
+                linewidths=1.5,
+                zorder=20,
+            )
 
         # 4. Styling
         ax_i.set_aspect("equal")

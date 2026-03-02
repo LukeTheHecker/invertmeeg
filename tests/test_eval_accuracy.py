@@ -49,6 +49,7 @@ _ALL_SPECS = {
 NN_SOLVERS = {sid for sid, spec in _ALL_SPECS.items() if "torch" in spec.requires}
 MUSIC_SOLVERS = {"music", "rap-music", "trap-music", "flex-music"}
 EXCLUDED = {"random-noise", "cmem"}  # random-noise: by design random; cmem: too slow
+RANDOMIZED_SOLVER_KWARGS = {"rembo": {"random_seed": 42}}
 
 
 def _solver_ids():
@@ -203,7 +204,9 @@ def test_solver_localization(solver_name, accuracy_setup, update_baselines):
         evoked, y_true = _simulate_focal_source(leadfield, n_dipoles, info, seed)
 
         try:
-            solver = Solver(solver_name)
+            solver = Solver(
+                solver_name, **RANDOMIZED_SOLVER_KWARGS.get(solver_name, {})
+            )
             solver.make_inverse_operator(fwd, evoked, **extra_kwargs)
             stc = solver.apply_inverse_operator(evoked)
         except Exception:

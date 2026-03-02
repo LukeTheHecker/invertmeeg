@@ -231,6 +231,63 @@ class TestSolverLORETA:
             f"1.2 * MNE ({lap_norm_mne:.4f})"
         )
 
+    def test_unit_invariance_with_consistent_scaling(
+        self, forward_model, simulated_evoked
+    ):
+        """LORETA spatial map should be invariant to consistent unit scaling.
+
+        Scale data (Y), forward (G), and covariance (C) as:
+            Y' = c Y, G' = c G, C' = c^2 C
+        """
+        from invert.solvers.minimum_norm.loreta import SolverLORETA
+
+        scale = 1e6
+        evoked = simulated_evoked.copy()
+        fwd = deepcopy(forward_model)
+        n_chans = len(fwd.ch_names)
+        cov = mne.Covariance(
+            data=np.eye(n_chans, dtype=float),
+            names=list(fwd.ch_names),
+            bads=[],
+            projs=[],
+            nfree=1,
+        )
+
+        solver_ref = SolverLORETA()
+        solver_ref.make_inverse_operator(fwd, evoked, alpha="auto", noise_cov=cov)
+        stc_ref = solver_ref.apply_inverse_operator(evoked)
+
+        evoked_s = evoked.copy()
+        evoked_s._data = np.asarray(evoked.data, dtype=float) * scale
+
+        cov_s = cov.copy()
+        cov_s["data"] = np.asarray(cov["data"], dtype=float) * (scale**2)
+        if cov_s.get("eig") is not None:
+            cov_s["eig"] = np.asarray(cov_s["eig"], dtype=float) * (scale**2)
+
+        fwd_s = deepcopy(fwd)
+        fwd_s["sol"]["data"] = np.asarray(fwd_s["sol"]["data"], dtype=float) * scale
+        if "sol_grad" in fwd_s and isinstance(fwd_s["sol_grad"], dict):
+            if "data" in fwd_s["sol_grad"]:
+                fwd_s["sol_grad"]["data"] = (
+                    np.asarray(fwd_s["sol_grad"]["data"], dtype=float) * scale
+                )
+        if "_orig_sol" in fwd_s:
+            fwd_s["_orig_sol"] = np.asarray(fwd_s["_orig_sol"], dtype=float) * scale
+
+        solver_s = SolverLORETA()
+        solver_s.make_inverse_operator(fwd_s, evoked_s, alpha="auto", noise_cov=cov_s)
+        stc_s = solver_s.apply_inverse_operator(evoked_s)
+
+        t_idx = 0
+        p_ref = np.abs(stc_ref.data[:, t_idx])
+        p_ref /= np.sum(p_ref)
+        p_s = np.abs(stc_s.data[:, t_idx])
+        p_s /= np.sum(p_s)
+
+        corr = np.corrcoef(p_ref, p_s)[0, 1]
+        assert corr > 0.999
+
 
 # ---------------------------------------------------------------------------
 # 4. SolverLCMV: unit-gain constraint (before weight normalization)
@@ -643,6 +700,14 @@ class TestFISTAMathCorrectness:
             + 0.5 * l2_reg * np.dot(x, x)
         )
 
+    @staticmethod
+    def _temporal_roughness(x_mat):
+        """Compute squared frame-to-frame variation."""
+        if x_mat.shape[1] < 2:
+            return 0.0
+        diffs = np.diff(x_mat, axis=1)
+        return float(np.sum(diffs**2))
+
     def test_ista_objective_decreases(self):
         """On a small synthetic problem, ISTA (no momentum) iterates should
         decrease the objective function monotonically."""
@@ -769,6 +834,75 @@ class TestFISTAMathCorrectness:
         assert obj_fista < obj_ref * 1.1, (
             f"FISTA obj {obj_fista:.6f} much worse than reference {obj_ref:.6f}"
         )
+
+    def test_temporal_smoothing_matches_closed_form_when_l1_zero(self):
+        """With A=I and l1=0, temporal coupling should match the linear solve."""
+        from invert.solvers.minimum_norm.minimum_l1_norm import SolverMinimumL1Norm
+
+        rng = np.random.RandomState(9)
+        n_sources, n_times = 6, 18
+        y = rng.randn(n_sources, n_times)
+        temporal_smoothness = 0.2
+
+        solver = SolverMinimumL1Norm(prep_leadfield=False)
+        solver.leadfield = np.eye(n_sources)
+        x_fista = solver.fista(
+            y,
+            l1_reg=0.0,
+            l2_reg=0.0,
+            temporal_smoothness=temporal_smoothness,
+            max_iter=3000,
+            tol=1e-10,
+            center_data=False,
+            scale_l1_by_lmax=False,
+        )
+
+        temporal_laplacian = np.zeros((n_times, n_times))
+        temporal_laplacian[np.arange(n_times), np.arange(n_times)] = 2.0
+        temporal_laplacian[0, 0] = 1.0
+        temporal_laplacian[-1, -1] = 1.0
+        temporal_laplacian[np.arange(n_times - 1), np.arange(1, n_times)] = -1.0
+        temporal_laplacian[np.arange(1, n_times), np.arange(n_times - 1)] = -1.0
+
+        system = np.eye(n_times) + temporal_smoothness * temporal_laplacian
+        x_ref = np.linalg.solve(system, y.T).T
+        np.testing.assert_allclose(x_fista, x_ref, atol=1e-5, rtol=1e-5)
+
+    def test_temporal_coupling_is_enabled_by_default(self):
+        """Default settings should smooth temporal trajectories."""
+        from invert.solvers.minimum_norm.minimum_l1_norm import SolverMinimumL1Norm
+
+        n_sources, n_times = 4, 40
+        y = np.zeros((n_sources, n_times))
+        y[0, : n_times // 2] = 1.0
+        y[0, n_times // 2 :] = -1.0
+
+        solver = SolverMinimumL1Norm(prep_leadfield=False)
+        solver.leadfield = np.eye(n_sources)
+
+        x_default = solver.fista(
+            y,
+            l1_reg=0.0,
+            l2_reg=0.0,
+            max_iter=3000,
+            tol=1e-10,
+            center_data=False,
+            scale_l1_by_lmax=False,
+        )
+        x_no_temporal = solver.fista(
+            y,
+            l1_reg=0.0,
+            l2_reg=0.0,
+            temporal_smoothness=0.0,
+            max_iter=3000,
+            tol=1e-10,
+            center_data=False,
+            scale_l1_by_lmax=False,
+        )
+
+        rough_default = self._temporal_roughness(x_default)
+        rough_no_temporal = self._temporal_roughness(x_no_temporal)
+        assert rough_default < rough_no_temporal
 
 
 # ---------------------------------------------------------------------------

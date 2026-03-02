@@ -82,6 +82,14 @@ FREE_ORIENTATION_SOLVERS = {
     "WNMV",
 }
 
+RANDOMIZED_SOLVER_IDS = {"random-noise", "rembo"}
+
+
+def _solver_kwargs_for_tests(solver_name: str) -> dict:
+    if solver_name.lower() in RANDOMIZED_SOLVER_IDS:
+        return {"random_seed": 42}
+    return {}
+
 
 def _solver_ids():
     return [s for s in all_solvers if s not in KNOWN_MISSING and s not in NN_SOLVERS]
@@ -94,7 +102,7 @@ def test_solver_smoke(solver_name, forward_model, simulated_evoked, leadfield):
     n_time = simulated_evoked.data.shape[1]
 
     alpha = 0.1 if solver_name in NO_AUTO_ALPHA else 0.1
-    solver = Solver(solver_name)
+    solver = Solver(solver_name, **_solver_kwargs_for_tests(solver_name))
 
     extra_kwargs = dict(alpha=alpha, epochs=1, n=2, k=2)
     if solver_name in MUSIC_SOLVERS:
@@ -131,7 +139,9 @@ def test_solver_fixed_orientation_smoke(
     n_dipoles = int(forward_model_free_surface["nsource"])
     n_time = simulated_evoked_free_surface.data.shape[1]
 
-    solver = Solver(solver_name, orientation="fixed")
+    solver = Solver(
+        solver_name, orientation="fixed", **_solver_kwargs_for_tests(solver_name)
+    )
 
     extra_kwargs = dict(alpha=0.1, epochs=1, n=2, k=2)
     if solver_name in MUSIC_SOLVERS:
@@ -161,7 +171,9 @@ def test_solver_pca_orientation_smoke(
     n_dipoles = int(forward_model_free_surface["nsource"])
     n_time = simulated_evoked_free_surface.data.shape[1]
 
-    solver = Solver(solver_name, orientation="pca")
+    solver = Solver(
+        solver_name, orientation="pca", **_solver_kwargs_for_tests(solver_name)
+    )
 
     extra_kwargs = dict(alpha=0.1, epochs=1, n=2, k=2)
     if solver_name in MUSIC_SOLVERS:
@@ -195,7 +207,9 @@ def test_solver_free_orientation_smoke(
     n_dipoles = int(forward_model_free_surface["nsource"])
     n_time = simulated_evoked_free_surface.data.shape[1]
 
-    solver = Solver(solver_name, orientation="free")
+    solver = Solver(
+        solver_name, orientation="free", **_solver_kwargs_for_tests(solver_name)
+    )
 
     extra_kwargs = dict(alpha=0.1, epochs=1, n=2, k=2)
     if solver_name in MUSIC_SOLVERS:
@@ -223,7 +237,12 @@ def test_discrete_forward_scalar_solver_runs_with_pca(
     solver_name, forward_model_discrete_free, simulated_evoked_discrete_free
 ):
     """A discrete free-orientation forward should run via PCA reduction on scalar solvers."""
-    solver = Solver(solver_name, orientation="pca", n_reg_params=1)
+    solver = Solver(
+        solver_name,
+        orientation="pca",
+        n_reg_params=1,
+        **_solver_kwargs_for_tests(solver_name),
+    )
     solver.make_inverse_operator(
         forward_model_discrete_free,
         simulated_evoked_discrete_free,

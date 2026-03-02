@@ -68,6 +68,48 @@ def test_compute_sensor_whitener_respects_projector_rank_cap():
     np.testing.assert_allclose(whitened_cov, np.eye(2), atol=1e-12)
 
 
+def test_compute_channel_type_scaler_from_leadfield_balances_type_rms():
+    """Per-type scaling should equalize leadfield RMS across channel types."""
+    G = np.array(
+        [
+            [2.0e-8, -1.0e-8, 0.5e-8],   # mag
+            [-1.5e-8, 1.0e-8, -0.2e-8],  # mag
+            [3.0e-6, -2.0e-6, 1.0e-6],   # eeg
+            [-2.5e-6, 2.2e-6, -1.1e-6],  # eeg
+        ],
+        dtype=float,
+    )
+    channel_types = ["mag", "mag", "eeg", "eeg"]
+
+    gains = BaseSolver.compute_channel_type_scaler_from_leadfield(
+        G, channel_types, eps=1e-15
+    )
+    G_scaled = gains[:, np.newaxis] * G
+    mag_rms = float(np.sqrt(np.mean(G_scaled[:2] * G_scaled[:2])))
+    eeg_rms = float(np.sqrt(np.mean(G_scaled[2:] * G_scaled[2:])))
+    np.testing.assert_allclose(mag_rms, eeg_rms, rtol=1e-12, atol=1e-12)
+
+
+def test_prepare_whitened_forward_sensor_scaling_keeps_single_type_unchanged(
+    forward_model,
+):
+    solver_ref = BaseSolver(sensor_scaling="none")
+    solver_ref.make_inverse_operator(forward_model, alpha=0.1)
+    wf_ref = solver_ref.prepare_whitened_forward(None)
+
+    solver_scaled = BaseSolver(sensor_scaling="leadfield_per_type")
+    solver_scaled.make_inverse_operator(forward_model, alpha=0.1)
+    wf_scaled = solver_scaled.prepare_whitened_forward(None)
+
+    np.testing.assert_allclose(wf_scaled.G_white, wf_ref.G_white, atol=1e-12, rtol=1e-12)
+    np.testing.assert_allclose(
+        wf_scaled.sensor_transform,
+        wf_ref.sensor_transform,
+        atol=1e-12,
+        rtol=1e-12,
+    )
+
+
 def test_compute_depth_prior_whitened_depth_zero_returns_inverse_sensitivity():
     G_white = np.array([[1.0, 0.5, 2.0], [0.0, 0.5, 0.0]])
     prior = BaseSolver.compute_depth_prior_whitened(
@@ -105,6 +147,52 @@ def test_solve_tikhonov_svd_matches_closed_form():
         @ np.linalg.inv(A @ A.T + lambda2 * np.eye(A.shape[0]))
     )
     np.testing.assert_allclose(K, K_expected, atol=1e-10)
+
+
+def test_solve_tikhonov_svd_preserves_scale_invariance():
+    """Regression: absolute eps floors must not break scaling."""
+    rng = np.random.RandomState(0)
+    A = rng.randn(8, 12)
+    lambda2 = 0.1
+    scale = 1e6
+
+    K = BaseSolver.solve_tikhonov_svd(A, lambda2, eps=1e-15)
+    K_scaled = BaseSolver.solve_tikhonov_svd(
+        A / scale, lambda2 / (scale**2), eps=1e-15
+    )
+    # For A' = A/scale and lambda' = lambda/scale^2: kernel scales by +scale.
+    np.testing.assert_allclose(K_scaled / scale, K, rtol=1e-8, atol=1e-10)
+
+
+def test_noise_normalize_rows_is_scale_invariant():
+    rng = np.random.RandomState(0)
+    K_white = rng.randn(5, 7)
+    K_full = rng.randn(5, 7)
+    K_norm0, std0 = BaseSolver.noise_normalize_rows(K_white, K_full=K_full, eps=1e-15)
+
+    scale = 1e6
+    K_norm1, std1 = BaseSolver.noise_normalize_rows(
+        K_white * scale, K_full=K_full * scale, eps=1e-15
+    )
+
+    np.testing.assert_allclose(K_norm1, K_norm0, rtol=1e-10, atol=1e-12)
+    np.testing.assert_allclose(std1 / scale, std0, rtol=1e-10, atol=1e-12)
+
+
+def test_robust_inverse_is_scale_invariant_for_global_rescaling():
+    rng = np.random.RandomState(0)
+    X = rng.randn(10, 10)
+    C = X @ X.T
+    C = 0.5 * (C + C.T)
+
+    solver = BaseSolver()
+    C_inv0 = solver.robust_inverse(C, regularization=1e-12)
+
+    scale = 1e6
+    C_inv1 = solver.robust_inverse(C * scale, regularization=1e-12)
+
+    # inv(scale*C) == inv(C) / scale
+    np.testing.assert_allclose(C_inv1 * scale, C_inv0, rtol=1e-8, atol=1e-10)
 
 
 def test_noise_normalize_rows_returns_finite_unit_norm_rows():
