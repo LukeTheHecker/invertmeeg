@@ -41,6 +41,9 @@ class SimulationConfig(BaseModel):
         source_extent: Number of dipoles per source patch
         patch_smoothness_sigma: Gaussian smoothness (graph-hop units) within a patch
         patch_rank: Temporal rank per patch (1=single latent, 2=two latent components)
+        amplitude_distribution: How to sample per-source amplitudes
+        correlation_modes: Allowed spatial noise correlation modes when correlation_mode="auto"
+        correlation_mode_weights: Sampling weights for correlation_modes (must sum to 1)
     """
 
     batch_size: int = Field(default=1284, ge=1)
@@ -53,6 +56,13 @@ class SimulationConfig(BaseModel):
     )
     amplitude_range: tuple[float, float] = Field(
         default=(0.5, 1.0), description="Source amplitude range"
+    )
+    amplitude_distribution: Literal["uniform", "log_uniform"] = Field(
+        default="uniform",
+        description=(
+            "Distribution for sampling per-source amplitudes within amplitude_range. "
+            "'log_uniform' yields a heavy-tailed amplitude ratio distribution."
+        ),
     )
     n_timepoints: int = Field(default=20, ge=1)
     snr_range: tuple[float, float] = Field(
@@ -68,6 +78,22 @@ class SimulationConfig(BaseModel):
     correlation_mode: (
         Literal["auto", "cholesky", "banded", "diagonal", "low_rank"] | None
     ) = Field(default=None)
+    correlation_modes: (
+        list[Literal["cholesky", "banded", "diagonal", "low_rank"]] | None
+    ) = Field(
+        default=None,
+        description=(
+            "Allowed spatial correlation modes when correlation_mode='auto'. "
+            "If None, defaults to ['cholesky','banded','diagonal','low_rank',None] behavior."
+        ),
+    )
+    correlation_mode_weights: list[float] | None = Field(
+        default=None,
+        description=(
+            "Sampling weights for correlation_modes when correlation_mode='auto'. "
+            "If provided, must match correlation_modes length."
+        ),
+    )
     noise_color_coeff: float | tuple[float, float] = Field(default=(0.25, 0.75))
     noise_temporal_beta: float | tuple[float, float] = Field(
         default=0.0,

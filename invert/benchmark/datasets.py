@@ -14,6 +14,19 @@ class DatasetConfig(BaseModel):
         "diffusion_basis"
     )
     patch_rank: int | tuple[int, int] = (1, 2)
+    simulation_mode: Literal["patches", "mixture"] = "patches"
+    background_beta: float | tuple[float, float] | None = None
+    background_mixture_alpha: float | tuple[float, float] | None = None
+    amplitude_range: tuple[float, float] | None = None
+    amplitude_distribution: Literal["uniform", "log_uniform"] | None = None
+    correlation_mode: (
+        Literal["auto", "banded", "diagonal", "low_rank", "cholesky"] | None
+    ) = None
+    correlation_modes: list[Literal["banded", "diagonal", "low_rank"]] | None = None
+    correlation_mode_weights: list[float] | None = None
+    noise_temporal_beta: float | tuple[float, float] | None = None
+    noise_low_rank_dim: int | tuple[int, int] | None = None
+    source_extent: int | tuple[int, int] | None = None
     n_samples: int = 50
 
 
@@ -51,6 +64,30 @@ BENCHMARK_DATASETS: dict[str, DatasetConfig] = {
         n_orders=(0, 2),
         snr_range=(-5.0, 0.0),
         n_timepoints=50,
+    ),
+    "ongoing_mixture": DatasetConfig(
+        name="Ongoing Mixture",
+        description=(
+            "Non-sparse ongoing background activity (mixture) plus multiple "
+            "contiguous patches with heavy-tailed amplitudes under structured noise."
+        ),
+        n_sources=(4, 12),
+        n_orders=(1, 3),
+        snr_range=(-3.0, 1.0),
+        n_timepoints=50,
+        source_spatial_model="contiguous_gaussian",
+        source_extent=(10, 80),
+        patch_rank=(1, 2),
+        simulation_mode="mixture",
+        background_beta=(0.5, 2.0),
+        background_mixture_alpha=(0.5, 0.8),
+        amplitude_range=(0.05, 1.0),
+        amplitude_distribution="log_uniform",
+        correlation_mode="auto",
+        correlation_modes=["low_rank", "banded", "diagonal"],
+        correlation_mode_weights=[1 / 3, 1 / 3, 1 / 3],
+        noise_temporal_beta=(0.5, 2.0),
+        noise_low_rank_dim=(2, 8),
     ),
 }
 

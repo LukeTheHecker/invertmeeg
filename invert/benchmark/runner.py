@@ -32,7 +32,7 @@ from invert.solver_registry import (  # noqa: E402
     iter_solver_specs,
 )
 from invert.solvers.base import BaseSolver  # noqa: E402
-from invert.util.util import pos_from_forward  # noqa: E402
+from invert.util.util import pos_from_forward, pos_from_forward_info  # noqa: E402
 
 from .datasets import BENCHMARK_DATASETS, DatasetConfig  # noqa: E402
 from .depth_tuning import (  # noqa: E402
@@ -466,7 +466,7 @@ class BenchmarkRunner:
                 logger.info("Dataset: %s", ds_name)
 
                 # Generate all samples for this dataset once
-                sim_config = SimulationConfig(
+                sim_kwargs: dict[str, Any] = dict(
                     batch_size=self.n_samples,
                     n_sources=ds_config.n_sources,
                     n_orders=ds_config.n_orders,
@@ -474,10 +474,33 @@ class BenchmarkRunner:
                     n_timepoints=ds_config.n_timepoints,
                     source_spatial_model=ds_config.source_spatial_model,
                     patch_rank=ds_config.patch_rank,
+                    simulation_mode=getattr(ds_config, "simulation_mode", "patches"),
                     random_seed=self.random_seed,
                     estimate_noise_cov=True,
                     return_noise_cov=True,
                 )
+                if getattr(ds_config, "background_beta", None) is not None:
+                    sim_kwargs["background_beta"] = ds_config.background_beta
+                if getattr(ds_config, "background_mixture_alpha", None) is not None:
+                    sim_kwargs["background_mixture_alpha"] = ds_config.background_mixture_alpha
+                if getattr(ds_config, "amplitude_range", None) is not None:
+                    sim_kwargs["amplitude_range"] = ds_config.amplitude_range
+                if getattr(ds_config, "amplitude_distribution", None) is not None:
+                    sim_kwargs["amplitude_distribution"] = ds_config.amplitude_distribution
+                if getattr(ds_config, "correlation_mode", None) is not None:
+                    sim_kwargs["correlation_mode"] = ds_config.correlation_mode
+                if getattr(ds_config, "correlation_modes", None) is not None:
+                    sim_kwargs["correlation_modes"] = ds_config.correlation_modes
+                if getattr(ds_config, "correlation_mode_weights", None) is not None:
+                    sim_kwargs["correlation_mode_weights"] = ds_config.correlation_mode_weights
+                if getattr(ds_config, "noise_temporal_beta", None) is not None:
+                    sim_kwargs["noise_temporal_beta"] = ds_config.noise_temporal_beta
+                if getattr(ds_config, "noise_low_rank_dim", None) is not None:
+                    sim_kwargs["noise_low_rank_dim"] = ds_config.noise_low_rank_dim
+                if getattr(ds_config, "source_extent", None) is not None:
+                    sim_kwargs["source_extent"] = ds_config.source_extent
+
+                sim_config = SimulationConfig(**sim_kwargs)
                 gen = SimulationGenerator(self.forward, config=sim_config)
                 x_batch, y_batch, sim_info = next(gen.generate())
                 # Per-sample noise covariance (scaled to match the actual
@@ -922,7 +945,7 @@ class BenchmarkRunner:
             Structure: {dataset_name: {metric_name: {"solver": solver_name, "value": metric_value}}}
         """
         # Metrics where lower is better
-        lower_is_better = {"mean_localization_error", "emd", "spatial_dispersion"}
+        lower_is_better = {"mean_localization_error", "emd"}
         # Metrics where higher is better
         higher_is_better = {"average_precision", "correlation"}
 
@@ -956,7 +979,14 @@ class BenchmarkRunner:
                     continue
 
                 # Determine best based on metric type
-                if metric in lower_is_better:
+                if metric == "spatial_dispersion":
+                    def _sd_err(v: float) -> float:
+                        if v is None or np.isnan(v) or v <= 0:
+                            return float("inf")
+                        return float(abs(np.log(v)))
+
+                    best_solver = min(solver_values.items(), key=lambda x: _sd_err(x[1]))
+                elif metric in lower_is_better:
                     best_solver = min(solver_values.items(), key=lambda x: x[1])
                 elif metric in higher_is_better:
                     best_solver = max(solver_values.items(), key=lambda x: x[1])
@@ -987,7 +1017,8 @@ class BenchmarkRunner:
             - per_dataset_ranks: {dataset_name: {solver_name: avg_rank}}
             - global_ranks: {solver_name: avg_rank}
         """
-        lower_is_better = {"mean_localization_error", "emd", "spatial_dispersion"}
+        lower_is_better = {"mean_localization_error", "emd"}
+        higher_is_better = {"average_precision", "correlation"}
 
         datasets = sorted(set(r.dataset_name for r in self._results))
         all_metrics: set[str] = set()
@@ -1012,9 +1043,17 @@ class BenchmarkRunner:
                 if not solver_values:
                     continue
 
-                # Sort: ascending for lower-is-better, descending for higher-is-better
-                reverse = metric not in lower_is_better
-                solver_values.sort(key=lambda x: x[1], reverse=reverse)
+                if metric in higher_is_better:
+                    solver_values.sort(key=lambda x: x[1], reverse=True)
+                elif metric == "spatial_dispersion":
+                    def _sd_err(v: float) -> float:
+                        if v is None or np.isnan(v) or v <= 0:
+                            return float("inf")
+                        return float(abs(np.log(v)))
+
+                    solver_values.sort(key=lambda x: _sd_err(x[1]), reverse=False)
+                else:
+                    solver_values.sort(key=lambda x: x[1], reverse=False)
 
                 # Dense ranking: tied values get the same rank
                 rank = 1
@@ -1107,6 +1146,16 @@ class BenchmarkRunner:
         ):
             n_orient = int(n_leadfield_columns // n_sources_space)
 
+        pos_coord_frame = None
+        pos_original_units = None
+        try:
+            _pos, pos_info = pos_from_forward_info(self.forward, verbose=0)
+            pos_coord_frame = pos_info.get("coord_frame")
+            pos_original_units = pos_info.get("original_units")
+        except Exception:
+            pos_coord_frame = None
+            pos_original_units = None
+
         if compact:
             # Minimal payload for the MkDocs dashboard: aggregated metrics only.
             output = {
@@ -1125,6 +1174,15 @@ class BenchmarkRunner:
                     "n_sources": n_sources_space,
                     "n_leadfield_columns": n_leadfield_columns,
                     "n_orient": n_orient,
+                    "pos_units": "m",
+                    "pos_coord_frame": pos_coord_frame,
+                    "pos_original_units": pos_original_units,
+                    "evaluation_protocol": {
+                        "time_sampling": {"kind": "equidistant", "n_time_samples": 5},
+                        "localization_signal": "magnitude",
+                        "correlation_signal": "signed",
+                        "spatial_dispersion_ranking": "abs_log_error",
+                    },
                 },
                 "datasets": datasets_payload,
                 "results": [
@@ -1180,6 +1238,15 @@ class BenchmarkRunner:
                 "n_sources": n_sources_space,
                 "n_leadfield_columns": n_leadfield_columns,
                 "n_orient": n_orient,
+                "pos_units": "m",
+                "pos_coord_frame": pos_coord_frame,
+                "pos_original_units": pos_original_units,
+                "evaluation_protocol": {
+                    "time_sampling": {"kind": "equidistant", "n_time_samples": 5},
+                    "localization_signal": "magnitude",
+                    "correlation_signal": "signed",
+                    "spatial_dispersion_ranking": "abs_log_error",
+                },
             },
             "datasets": datasets_payload,
             "results": [r.model_dump() for r in self._results],

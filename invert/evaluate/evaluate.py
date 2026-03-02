@@ -15,6 +15,16 @@ from sklearn.metrics import auc, roc_curve
 logger = logging.getLogger(__name__)
 
 
+def _equidistant_time_indices(n_times: int, n: int = 5) -> np.ndarray:
+    n_times = int(n_times)
+    if n_times <= 0:
+        return np.array([], dtype=int)
+    if n_times <= n:
+        return np.arange(n_times, dtype=int)
+    idx = np.linspace(0, n_times - 1, num=int(n), dtype=int)
+    return np.unique(idx)
+
+
 def evaluate_all(
     y_true,
     y_pred,
@@ -24,6 +34,7 @@ def evaluate_all(
     pos_pred,
     mode: str = "dle",
     threshold: float = 0.1,
+    n_time_samples: int = 5,
 ):
     """
     Comprehensive evaluation of source reconstruction.
@@ -64,16 +75,30 @@ def evaluate_all(
     distance_matrix_true = cdist(pos_true, pos_true)  # For spatial dispersion of true
     distance_matrix_pred = cdist(pos_pred, pos_pred)  # For spatial dispersion of pred
 
-    y_true_collapsed = abs(y_true).mean(axis=-1)
-    y_pred_collapsed = abs(y_pred).mean(axis=-1)
+    y_true = np.asarray(y_true)
+    y_pred = np.asarray(y_pred)
+
+    if y_true.ndim == 1:
+        y_true = y_true[:, np.newaxis]
+    if y_pred.ndim == 1:
+        y_pred = y_pred[:, np.newaxis]
+
+    if y_true.shape != y_pred.shape:
+        raise ValueError(
+            f"y_true and y_pred shape mismatch: {y_true.shape} vs {y_pred.shape}"
+        )
+
+    n_times = int(y_true.shape[1])
+    time_idc = _equidistant_time_indices(n_times, n=int(n_time_samples))
 
     logger.debug(
-        "Shapes - y_true: %s, y_pred: %s, adj_true: %s, adj_pred: %s, dist_matrix: %s",
-        y_true_collapsed.shape,
-        y_pred_collapsed.shape,
+        "Shapes - y_true: %s, y_pred: %s, adj_true: %s, adj_pred: %s, dist_matrix: %s, time_idc: %s",
+        y_true.shape,
+        y_pred.shape,
         adjacency_true.shape,
         adjacency_pred.shape,
         distance_matrix_true_pred.shape,
+        time_idc,
     )
 
     # mse = [eval_mse(yy_true, yy_pred) for yy_true, yy_pred in zip(y_true.T, y_pred.T)]
@@ -85,38 +110,68 @@ def evaluate_all(
     # active_true = eval_active(y_true)
     # active_pred = eval_active(y_pred)
 
-    mle = eval_mean_localization_error(
-        y_true_collapsed,
-        y_pred_collapsed,
-        adjacency_true,
-        adjacency_pred,
-        pos_true,
-        pos_pred,
-        distance_matrix_true_pred,
-        mode=mode,
-        threshold=threshold,
-    )
-    emd = eval_emd(distance_matrix_true_pred, y_true_collapsed, y_pred_collapsed)
-    sd = get_spatial_dispersion(
-        y_pred,
-        y_true,
-        distance_matrix_pred,
-        distance_matrix_true,
-        adjacency_pred.toarray(),
-        adjacency_true.toarray(),
-    )
+    # Magnitude-based metrics for localization/support
+    y_true_mag = np.abs(y_true)
+    y_pred_mag = np.abs(y_pred)
 
-    precision, recall, _ = precision_recall_curve(y_true, y_pred)
-    average_precision = compute_average_precision(precision, recall)
+    mles = []
+    emds = []
+    sds = []
+    aps = []
+    cors = []
 
-    correlation = np.nanmedian(corr(y_true, y_pred))
+    for t in time_idc:
+        y_true_t = y_true_mag[:, int(t)]
+        y_pred_t = y_pred_mag[:, int(t)]
+
+        mle_t = eval_mean_localization_error(
+            y_true_t,
+            y_pred_t,
+            adjacency_true,
+            adjacency_pred,
+            pos_true,
+            pos_pred,
+            distance_matrix_true_pred,
+            mode=mode,
+            threshold=threshold,
+        )
+        mles.append(float(mle_t))
+
+        emds.append(float(eval_emd(distance_matrix_true_pred, y_true_t, y_pred_t)))
+
+        sd_t = get_spatial_dispersion(
+            y_pred_t,
+            y_true_t,
+            distance_matrix_pred,
+            distance_matrix_true,
+            adjacency_pred.toarray(),
+            adjacency_true.toarray(),
+        )
+        sds.append(float(sd_t))
+
+        # Define "active" sources from ground truth magnitude at this timepoint.
+        # This keeps AP meaningful even when the simulation includes ongoing background.
+        if np.max(y_true_t) > 0:
+            y_true_mask = (
+                y_true_t >= float(threshold) * float(np.max(y_true_t))
+            ).astype(int)
+        else:
+            y_true_mask = np.zeros_like(y_true_t, dtype=int)
+        precision, recall, _ = precision_recall_curve(y_true_mask, y_pred_t)
+        aps.append(float(compute_average_precision(precision, recall)))
+
+        # Signed correlation (do not take abs), one value per selected timepoint.
+        try:
+            cors.append(float(pearsonr(y_true[:, int(t)], y_pred[:, int(t)])[0]))
+        except Exception:
+            cors.append(float("nan"))
 
     d = dict(
-        Mean_Localization_Error=np.nanmedian(mle),
-        EMD=emd,
-        sd=sd,
-        average_precision=average_precision,
-        correlation=correlation,
+        Mean_Localization_Error=float(np.nanmedian(np.asarray(mles, dtype=float))),
+        EMD=float(np.nanmedian(np.asarray(emds, dtype=float))),
+        sd=float(np.nanmedian(np.asarray(sds, dtype=float))),
+        average_precision=float(np.nanmedian(np.asarray(aps, dtype=float))),
+        correlation=float(np.nanmedian(np.asarray(cors, dtype=float))),
     )
 
     return d

@@ -155,6 +155,27 @@ class SimulationGenerator:
         pr = self.config.patch_rank
         self.get_patch_rank = lambda n=1: _sampler(pr, n=n, dtype=int)
 
+    def _sample_source_amplitudes(self, n_sources: int) -> np.ndarray:
+        """Sample per-source amplitudes.
+
+        Uses ``config.amplitude_distribution`` to optionally create a heavy-tailed
+        distribution of amplitude ratios while keeping amplitudes within
+        ``config.amplitude_range``.
+        """
+        lo, hi = self.config.amplitude_range
+        lo = float(lo)
+        hi = float(hi)
+        if hi <= 0:
+            raise ValueError("amplitude_range upper bound must be > 0")
+        if lo <= 0:
+            lo = 1e-6
+
+        if self.config.amplitude_distribution == "log_uniform":
+            amps = np.exp(self.rng.uniform(np.log(lo), np.log(hi), int(n_sources)))
+            return amps.astype(float)
+
+        return self.rng.uniform(lo, hi, int(n_sources)).astype(float)
+
     def _generate_smooth_background(self, batch_size):
         """Generate smooth background activity with 1/f^beta temporal dynamics.
 
@@ -218,7 +239,7 @@ class SimulationGenerator:
 
         # Sample amplitudes and timecourses
         amplitude_values = [
-            self.rng.uniform(*self.config.amplitude_range, n) for n in n_sources_batch
+            self._sample_source_amplitudes(int(n)) for n in n_sources_batch
         ]
         timecourse_choices = [
             self.rng.choice(self.config.n_timecourses, n) for n in n_sources_batch
@@ -369,7 +390,7 @@ class SimulationGenerator:
             patch_ranks = self.get_patch_rank(n=n_sources).astype(int)
             patch_ranks = np.clip(patch_ranks, 1, 2)
 
-            amps = self.rng.uniform(*self.config.amplitude_range, n_sources)
+            amps = self._sample_source_amplitudes(int(n_sources))
             amplitude_values.append(amps)
 
             cov = get_cov(int(n_sources), float(inter_source_correlations[i]))
@@ -682,8 +703,27 @@ class SimulationGenerator:
             isinstance(self.config.correlation_mode, str)
             and self.config.correlation_mode.lower() == "auto"
         ):
-            correlation_modes = ["cholesky", "banded", "diagonal", "low_rank", None]
-            modes_batch = self.rng.choice(correlation_modes, self.config.batch_size)
+            if self.config.correlation_modes is None:
+                correlation_modes = [
+                    "cholesky",
+                    "banded",
+                    "diagonal",
+                    "low_rank",
+                    None,
+                ]
+                weights = None
+            else:
+                correlation_modes = list(self.config.correlation_modes)
+                weights = self.config.correlation_mode_weights
+                if weights is not None and len(weights) != len(correlation_modes):
+                    raise ValueError(
+                        "correlation_mode_weights length must match correlation_modes"
+                    )
+            modes_batch = self.rng.choice(
+                correlation_modes,
+                size=int(self.config.batch_size),
+                p=weights,
+            )
         else:
             modes_batch = [self.config.correlation_mode] * self.config.batch_size
 
