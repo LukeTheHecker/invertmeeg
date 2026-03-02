@@ -42,7 +42,7 @@ class SolverMUSIC(BaseSolver):
         alpha="auto",
         noise_cov: mne.Covariance | None = None,
         n="enhanced",
-        stop_crit=0.95,
+        stop_crit=0.8,
         verbose=0,
         **kwargs,
     ):
@@ -122,12 +122,14 @@ class SolverMUSIC(BaseSolver):
         Us = U[:, :n_comp]
         Ps = Us @ Us.T
 
-        mu = np.zeros(n_dipoles)
+        mu = np.zeros(n_dipoles, dtype=float)
         for p in range(n_dipoles):
             l = leadfield[:, p][:, np.newaxis]
             norm_1 = np.linalg.norm(Ps @ l)
             norm_2 = np.linalg.norm(l)
-            mu[p] = norm_1 / norm_2 if norm_2 > 0 else 0.0
+            mu[p] = norm_1 / norm_2 if norm_2 > 1e-30 else 0.0
+        mu[~np.isfinite(mu)] = 0.0
+        mu = np.clip(mu, 0.0, 1.0)
         mu[mu < stop_crit] = 0
 
         dipole_idc = np.where(mu != 0)[0]

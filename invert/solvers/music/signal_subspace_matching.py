@@ -182,23 +182,38 @@ class SolverSignalSubspaceMatching(BaseSolver):
             n_comp = deepcopy(n)
         # print("n_comp: ", n_comp)
 
+        # Scale per channel type only when metadata matches Y row count.
+        # After whitening/projection, Y may have n_eff rows and no longer be
+        # index-compatible with forward info channel ordering.
+        Y_work = deepcopy(Y)
         channel_types = self.forward["info"].get_channel_types()
-        for ch_type in set(channel_types):
-            selection = np.where(np.array(channel_types) == ch_type)[0]
-            C = Y[selection, :] @ Y[selection, :].T
-            scaler = np.sqrt(np.trace(C)) / C.shape[0]
-            # scaler = np.std(Y[selection, :])
-            Y[selection, :] /= scaler
+        if len(channel_types) == Y_work.shape[0]:
+            channel_types = np.asarray(channel_types)
+            for ch_type in set(channel_types):
+                selection = np.where(channel_types == ch_type)[0]
+                if selection.size == 0:
+                    continue
+                C = Y_work[selection, :] @ Y_work[selection, :].T
+                scaler = np.sqrt(np.trace(C)) / C.shape[0]
+                if np.isfinite(scaler) and scaler > 0:
+                    Y_work[selection, :] /= scaler
+        else:
+            logger.debug(
+                "SignalSubspaceMatching: skipping channel-type scaling because "
+                "channel metadata length (%d) != data rows (%d).",
+                len(channel_types),
+                Y_work.shape[0],
+            )
 
         # SSM projection: Y @ inv(Y'Y + reg) @ Y' approximates the signal subspace projector.
         # Eigenvectors of the Gram matrix are scale-invariant; the reg term sets the effective rank.
-        M_Y = Y.T @ Y
+        M_Y = Y_work.T @ Y_work
         if adaptive_reg:
             YY = M_Y + lambda_reg1 * (50 / n_time) * np.trace(M_Y) * np.eye(n_time)
         else:
             YY = M_Y + lambda_reg1 * np.trace(M_Y) * np.eye(n_time)
             # print("reg_trace = ", np.trace(M_Y) )
-        P_Y = (Y @ np.linalg.inv(YY)) @ Y.T
+        P_Y = (Y_work @ np.linalg.inv(YY)) @ Y_work.T
         C = P_Y.T @ P_Y
 
         P_A = np.zeros((n_chans, n_chans))

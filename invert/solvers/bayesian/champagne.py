@@ -146,25 +146,15 @@ class SolverChampagne(BaseSolver):
         """
         super().make_inverse_operator(forward, mne_obj, *args, alpha=alpha, **kwargs)
 
-        n_chans = self.leadfield.shape[0]
-        if noise_cov is None:
-            noise_cov = self.make_identity_noise_cov(list(self.forward.ch_names))
-        noise_cov, noise_cov_ch_names = self.coerce_noise_cov(noise_cov)
-        forward_ch_names = list(self.forward.ch_names)
-        if noise_cov_ch_names != forward_ch_names:
-            noise_cov = self.reorder_covariance_to_channels(
-                noise_cov, noise_cov_ch_names, forward_ch_names
-            )
-        if noise_cov.shape != (n_chans, n_chans):
-            msg = (
-                f"noise_cov has shape {noise_cov.shape}, expected {(n_chans, n_chans)}"
-            )
-            raise ValueError(msg)
-        noise_cov = 0.5 * (noise_cov + noise_cov.T)
-
-        # SSP projection via standard pipeline (no whitening — Champagne
-        # handles noise_cov internally in its EM updates).
-        wf = self.prepare_whitened_forward(None)
+        # Use the standard whitening/projection pipeline.
+        #
+        # Many real MEG datasets (including MNE somato) have low effective rank
+        # after SSS/SSP. Passing a rank-deficient noise covariance directly into
+        # Champagne's internal updates can lead to numerical issues and
+        # degenerate (near-zero) solutions. Whitening projects the problem to
+        # the effective sensor subspace and makes the noise approximately
+        # identity, which is the common formulation for SBL solvers.
+        wf = self.prepare_whitened_forward(noise_cov)
         self._sensor_projector = wf.projector
 
         self.max_iter = max_iter
@@ -174,21 +164,15 @@ class SolverChampagne(BaseSolver):
         self.alpha_scaler = 1.0
 
         data = self.unpack_data_obj(mne_obj)
-        data_projected = wf.sensor_transform @ np.asarray(data, dtype=float)
-        noise_cov_projected = wf.projector @ noise_cov @ wf.projector.T
-        noise_cov_projected = 0.5 * (noise_cov_projected + noise_cov_projected.T)
-        # Use a normalized shape matrix so alpha controls the noise scale.
-        # This keeps noise_cov = alpha * shape_cov dimensionally coherent when
-        # alpha is scaled from data covariance.
-        noise_eigs = np.linalg.svd(noise_cov_projected, compute_uv=False)
-        noise_scale = float(np.max(noise_eigs)) if noise_eigs.size else 1.0
-        if not np.isfinite(noise_scale) or noise_scale <= self.eps:
-            noise_scale = 1.0
-        self.noise_cov_scale = noise_scale
-        self.noise_cov_raw = noise_cov_projected
-        self.noise_cov = noise_cov_projected / noise_scale
+        data_white = wf.sensor_transform @ np.asarray(data, dtype=float)
 
-        data_cov = self.data_covariance(data_projected, center=True, ddof=1)
+        # In whitened space, the noise covariance is approximately identity.
+        n_eff = int(wf.n_eff)
+        self.noise_cov_scale = 1.0
+        self.noise_cov_raw = np.eye(n_eff, dtype=float)
+        self.noise_cov = np.eye(n_eff, dtype=float)
+
+        data_cov = self.data_covariance(data_white, center=True, ddof=1)
         # Noise-learning variants with Convexity-style updates converge to
         # the same fixed point regardless of the initial noise level (alpha),
         # because the update rule doesn't depend on the previous gammas and
@@ -196,24 +180,17 @@ class SolverChampagne(BaseSolver):
         # of alphas just wastes compute and triggers spurious edge-of-grid
         # warnings from GCV.  Use a single well-scaled initial noise level.
         if self.noise_learning == "learn" and self.alpha == "auto":
-            self.alphas = [float(noise_scale)]
+            self.alphas = [1.0]
         else:
             self.get_alphas(reference=data_cov)
         inverse_operators = []
-        original_leadfield = self.leadfield
-        self.leadfield = wf.G_white
-        try:
-            for alpha in self.alphas:
-                inverse_operator_projected = self.make_champagne(
-                    data_projected,
-                    float(alpha) * float(self.alpha_scaler),
-                    pruning_thresh=pruning_thresh,
-                )
-                inverse_operators.append(
-                    inverse_operator_projected @ wf.sensor_transform
-                )
-        finally:
-            self.leadfield = original_leadfield
+        for alpha in self.alphas:
+            inverse_operator_white = self.make_champagne(
+                data_white,
+                float(alpha) * float(self.alpha_scaler),
+                pruning_thresh=pruning_thresh,
+            )
+            inverse_operators.append(inverse_operator_white @ wf.sensor_transform)
 
         self.inverse_operators = [
             InverseOperator(inverse_operator, self.name)

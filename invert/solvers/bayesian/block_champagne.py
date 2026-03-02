@@ -173,13 +173,32 @@ class SolverBlockChampagne(BaseSolver):
         data_proj = data_proj - data_proj.mean(axis=1, keepdims=True)
 
         data_cov = self.data_covariance(data_proj, center=True, ddof=1)
+        # Numerical stability / unit invariance:
+        # Block-Champagne operates in *projected* (not whitened) sensor space and
+        # explicitly learns diagonal noise (beta). A global rescaling of sensor
+        # units (e.g. T -> fT) therefore rescales both the data and the forward.
+        #
+        # In exact arithmetic, the solution is homogeneous under that scaling, but
+        # floating-point effects (matrix inversion, eps floors) can make results
+        # scale-dependent. We fix this by renormalizing (B, L) by a single sensor
+        # scale so that typical magnitudes stay O(1). The resulting operator is
+        # unscaled before returning so that applying it to the original data is
+        # mathematically equivalent.
+        n_chans = int(data_proj.shape[0])
+        sensor_scale = float(np.sqrt(np.trace(data_cov) / max(n_chans, 1)))
+        if not np.isfinite(sensor_scale) or sensor_scale <= 0:
+            sensor_scale = float(np.mean(np.abs(data_proj)))
+        sensor_scale = float(max(sensor_scale, self.eps))
+
+        data_proj = data_proj / sensor_scale
+        leadfield_proj = leadfield_proj / sensor_scale
+        data_cov = self.data_covariance(data_proj, center=True, ddof=1)
         # Block-Champagne learns diagonal noise (beta) internally via
         # Convexity/sqrt updates, converging to the same solution regardless
         # of the initial noise level.  A single alpha avoids a wasted grid
         # search and spurious edge-of-grid GCV warnings.
         if self.alpha == "auto":
-            n_chans = data_proj.shape[0]
-            self.alphas = [float(np.trace(data_cov) / n_chans)]
+            self.alphas = [float(np.trace(data_cov) / max(n_chans, 1))]
         else:
             self.get_alphas(reference=data_cov)
 
@@ -197,7 +216,9 @@ class SolverBlockChampagne(BaseSolver):
                 geom=geom,
                 alpha=float(a),
             )
-            inverse_operators.append(W_proj @ wf.sensor_transform)
+            # W_proj maps *scaled* projected sensors -> sources. Convert back to
+            # original projected sensor units by dividing by sensor_scale.
+            inverse_operators.append((W_proj / sensor_scale) @ wf.sensor_transform)
 
         self.inverse_operators = [
             InverseOperator(op, self.name) for op in inverse_operators

@@ -10,6 +10,20 @@ from invert.util import build_source_adjacency
 from ..base import BaseSolver, InverseOperator, SolverMeta
 
 
+def _stable_argmax_2d(arr: np.ndarray, *, tol: float = 1e-12) -> tuple[int, int]:
+    """Deterministic argmax with tie handling for near-equal values."""
+    a = np.asarray(arr, dtype=float)
+    max_val = float(np.max(a))
+    if not np.isfinite(max_val):
+        return 0, 0
+    near = np.argwhere(a >= (max_val - float(tol)))
+    if near.size == 0:
+        return tuple(np.unravel_index(int(np.argmax(a)), a.shape))
+    # Deterministic lexicographic tie-break (order, dipole).
+    idx = near[np.lexsort((near[:, 1], near[:, 0]))][0]
+    return int(idx[0]), int(idx[1])
+
+
 class SolverFLEXMUSIC(BaseSolver):
     """Class for the RAP Multiple Signal Classification with flexible extent
         estimation (FLEX-MUSIC, [1]).
@@ -195,6 +209,8 @@ class SolverFLEXMUSIC(BaseSolver):
         # Compute Data Covariance (unnormalized Gram matrix)
         # Subspace methods are scale-invariant: eigvecs(C) == eigvecs(k*C).
         C = y @ y.T
+        c_scale = max(float(np.trace(C)) / max(int(C.shape[0]), 1), 1e-30)
+        C = C / c_scale
 
         I = np.identity(n_chans)
         Q = np.identity(n_chans)
@@ -221,13 +237,16 @@ class SolverFLEXMUSIC(BaseSolver):
                 norm_2 = np.linalg.norm(Q @ leadfields[nn], axis=0)
                 # norm_1 = np.diag(leadfields[nn].T @ PsQ @ leadfields[nn])
                 # norm_2 = np.diag(leadfields[nn].T @ Q @ leadfields[nn])
-                mu[nn, :] = norm_1 / norm_2
+                mu[nn, :] = norm_1 / np.maximum(norm_2, 1e-30)
 
             self.mu = mu
+            self.mu[~np.isfinite(self.mu)] = 0.0
             # Find the dipole/ patch with highest correlation with the residual
-            best_order, best_dipole = np.unravel_index(np.argmax(mu), mu.shape)
+            mu_max = float(np.max(mu))
+            mu_tol = max(1e-12, 1e-9 * abs(mu_max))
+            best_order, best_dipole = _stable_argmax_2d(mu, tol=mu_tol)
 
-            if i > 0 and np.max(mu) < stop_crit:
+            if i > 0 and mu_max < (stop_crit - mu_tol):
                 # print(f"\t break because mu is ", np.max(mu))
                 break
             S_AP.append([best_order, best_dipole])
@@ -284,11 +303,12 @@ class SolverFLEXMUSIC(BaseSolver):
                         lower = np.diag(L.T @ Q @ L)
                         # upper = np.linalg.norm(Ps @ Q @ L, axis=0)
                         # lower = np.linalg.norm(Q @ L, axis=0)
-                        ap_val2[nn] = upper / lower
+                        ap_val2[nn] = upper / np.maximum(lower, 1e-30)
+                    ap_val2[~np.isfinite(ap_val2)] = 0.0
 
-                    best_order, best_dipole = np.unravel_index(
-                        np.argmax(ap_val2), ap_val2.shape
-                    )
+                    ap_max = float(np.max(ap_val2))
+                    ap_tol = max(1e-12, 1e-9 * abs(ap_max))
+                    best_order, best_dipole = _stable_argmax_2d(ap_val2, tol=ap_tol)
                     # best_val = ap_val2.max()
                     S_AP_2[q] = [best_order, best_dipole]
                     # print(f"refinement: adding new value {best_val} at idx {best_dipole}, best_order {best_order}")
@@ -405,10 +425,8 @@ class SolverFLEXMUSIC(BaseSolver):
             # self.gradients[i] = self.gradients[i].toarray() / self.gradients[i].toarray().max(axis=0)
             # row_max = self.gradients[i].max(axis=1).toarray().ravel()
             # scaling_factors = 1 / row_max
-            row_sums = (
-                self.gradients[i].sum(axis=1).ravel()
-            )  # Compute the sum of each row
-            scaling_factors = 1 / row_sums
+            row_sums = self.gradients[i].sum(axis=1).ravel()
+            scaling_factors = 1.0 / np.maximum(np.abs(np.asarray(row_sums)).ravel(), 1e-12)
             self.gradients[i] = csr_matrix(
                 self.gradients[i].multiply(scaling_factors.reshape(-1, 1))
             )

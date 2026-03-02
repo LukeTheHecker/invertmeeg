@@ -193,14 +193,28 @@ class SolverSubspaceSBL(BaseSolver):
         else:
             n_comp = deepcopy(n)
 
-        # Scale per channel type
+        # Scale per channel type when channel metadata still matches rows in Y.
+        # After whitening/projection, Y can live in an effective sensor basis
+        # (n_eff) that no longer maps 1:1 to forward info channels.
         Y_work = deepcopy(Y)
         channel_types = self.forward["info"].get_channel_types()
-        for ch_type in set(channel_types):
-            sel = np.where(np.array(channel_types) == ch_type)[0]
-            C_ch = Y_work[sel] @ Y_work[sel].T
-            scaler = np.sqrt(np.trace(C_ch)) / C_ch.shape[0]
-            Y_work[sel] /= scaler
+        if len(channel_types) == Y_work.shape[0]:
+            channel_types = np.asarray(channel_types)
+            for ch_type in set(channel_types):
+                sel = np.where(channel_types == ch_type)[0]
+                if sel.size == 0:
+                    continue
+                C_ch = Y_work[sel] @ Y_work[sel].T
+                scaler = np.sqrt(np.trace(C_ch)) / C_ch.shape[0]
+                if np.isfinite(scaler) and scaler > 0:
+                    Y_work[sel] /= scaler
+        else:
+            logger.debug(
+                "SubspaceSBL: skipping channel-type scaling because channel metadata "
+                "length (%d) != data rows (%d).",
+                len(channel_types),
+                Y_work.shape[0],
+            )
 
         # SSM data projection matrix
         M_Y = Y_work.T @ Y_work
@@ -287,91 +301,39 @@ class SolverSubspaceSBL(BaseSolver):
     # Stage 2: NLChampagne amplitude refinement
     # ================================================================
 
-    def _nlc_refine(
-        self, Y, candidates, max_iter=500, pruning_thresh=1e-3, conv_crit=1e-8
-    ):
-        """Run NLChampagne on detected sources to refine amplitudes.
+    def _nlc_refine_operator(
+        self,
+        Y: np.ndarray,
+        candidates: list[tuple[int, int]],
+        *,
+        max_iter: int = 500,
+        pruning_thresh: float = 1e-3,
+        conv_crit: float = 1e-8,
+    ) -> np.ndarray:
+        """Run NL-Champagne on the detected support and return a (k, n_chans) kernel.
 
-        Parameters
-        ----------
-        Y : array (n_chans, n_times)
-        candidates : list of (order, dipole) tuples from SSM
-
-        Returns
-        -------
-        gamma_refined : array of per-source variances
-        llambda : array of per-channel noise variances
+        This delegates to the library's NL-Champagne implementation to avoid
+        duplicated (and historically unstable) math here.
         """
-        n_chans = Y.shape[0]
-        n_times = Y.shape[1]
-        k = len(candidates)
-
         # Build low-rank leadfield from detected sources
         L_sel = np.stack(
-            [self.leadfields[order][:, dipole] for order, dipole in candidates], axis=1
+            [self.leadfields[int(order)][:, int(dipole)] for order, dipole in candidates],
+            axis=1,
         )  # (n_chans, k)
 
-        # Scale data
-        Y_scaled = deepcopy(Y)
-        Y_scaled /= abs(Y_scaled).mean() + 1e-12
+        # Local import avoids a module-level dependency cycle.
+        from .nl_champagne import SolverNLChampagne
 
-        # Initialize
-        alpha = np.ones(k)
-        C_y = self.data_covariance(Y_scaled, center=True, ddof=1)
-        llambda = np.ones(n_chans) * float(np.trace(C_y) / (n_chans * 100))
-
-        loss_list = []
-        for _ in range(max_iter):
-            prev_alpha = deepcopy(alpha)
-
-            Sigma_y = (L_sel * alpha) @ L_sel.T + np.diag(llambda)
-            Sigma_y = 0.5 * (Sigma_y + Sigma_y.T)
-            try:
-                Sigma_y_inv = np.linalg.inv(Sigma_y)
-            except np.linalg.LinAlgError:
-                Sigma_y_inv = np.linalg.pinv(Sigma_y)
-
-            # Alpha update (Convexity/MM)
-            s_bar = (L_sel.T @ Sigma_y_inv @ Y_scaled) * alpha[:, None]
-            z_hat = np.sum(L_sel * (Sigma_y_inv @ L_sel), axis=0)
-            C_s_bar = np.sum(s_bar**2, axis=1) / n_times
-            alpha = np.sqrt(C_s_bar / (z_hat + 1e-20))
-            alpha[~np.isfinite(alpha)] = 0.0
-            alpha = np.maximum(alpha, 0.0)
-
-            # Lambda update (Convex Bound)
-            Y_hat = L_sel @ s_bar
-            residual_sq = np.sum((Y_scaled - Y_hat) ** 2, axis=1) / n_times
-            diag_inv = np.diag(Sigma_y_inv)
-            llambda = np.sqrt(residual_sq / (diag_inv + 1e-20))
-            llambda = np.maximum(llambda, 1e-10)
-
-            # Convergence
-            with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
-                sign, log_det = np.linalg.slogdet(Sigma_y)
-            if sign <= 0 or not np.isfinite(log_det):
-                log_det = np.finfo(float).max / 2
-            summation = (
-                np.sum(np.einsum("ti,ij,tj->t", Y_scaled.T, Sigma_y_inv, Y_scaled.T))
-                / n_times
-            )
-            loss = float(log_det + summation)
-            loss_list.append(loss)
-
-            if (
-                loss == float("-inf")
-                or loss == float("inf")
-                or np.linalg.norm(alpha) == 0
-            ):
-                alpha = prev_alpha
-                break
-
-            if len(loss_list) > 1:
-                change = abs(1 - loss_list[-1] / (loss_list[-2] + 1e-20))
-                if change < conv_crit:
-                    break
-
-        return alpha, llambda
+        refiner = SolverNLChampagne(verbose=getattr(self, "verbose", 0))
+        refiner.leadfield = np.asarray(L_sel, dtype=float)
+        return refiner.nl_champagne(
+            np.asarray(Y, dtype=float),
+            alpha=0.01,
+            max_iter=int(max_iter),
+            prune=True,
+            pruning_thresh=float(pruning_thresh),
+            convergence_criterion=float(conv_crit),
+        )
 
     # ================================================================
     # Combined pipeline
@@ -402,7 +364,7 @@ class SolverSubspaceSBL(BaseSolver):
         )
 
         # Stage 2: NLChampagne refinement
-        gamma, llambda = self._nlc_refine(
+        K_low = self._nlc_refine_operator(
             Y,
             candidates,
             max_iter=max_iter_nlc,
@@ -411,24 +373,13 @@ class SolverSubspaceSBL(BaseSolver):
         )
 
         # Build final inverse operator
-        L_sel = np.stack(
-            [self.leadfields[order][:, dipole] for order, dipole in candidates], axis=1
-        )
         gradients = np.stack(
             [self.gradients[order][dipole].toarray() for order, dipole in candidates],
             axis=1,
         )[0]
-
-        # Use SBL-refined source covariance instead of identity
-        Gamma = np.diag(gamma)
-        Sigma_y = np.diag(llambda) + (L_sel * gamma) @ L_sel.T
-        Sigma_y = 0.5 * (Sigma_y + Sigma_y.T)
-        try:
-            Sigma_y_inv = np.linalg.inv(Sigma_y)
-        except np.linalg.LinAlgError:
-            Sigma_y_inv = np.linalg.pinv(Sigma_y)
-
-        inverse_operator = gradients.T @ Gamma @ L_sel.T @ Sigma_y_inv
+        # Expand the k-support kernel to the full dictionary using the
+        # diffusion gradients (patch extents).
+        inverse_operator = gradients.T @ K_low
 
         return inverse_operator
 
@@ -527,45 +478,21 @@ class SolverSubspaceSBLPlus(SolverSubspaceSBL):
         if len(candidates) == 0:
             return np.zeros((n_dipoles, n_chans))
 
-        # Stage 2: NLChampagne refinement
-        gamma, llambda = self._nlc_refine(
+        # Stage 2: NL-Champagne refinement on the expanded support.
+        # We use the same robust NL-Champagne implementation as SubspaceSBL.
+        K_low = self._nlc_refine_operator(
             Y,
             candidates,
             max_iter=max_iter_nlc,
             pruning_thresh=pruning_thresh,
             conv_crit=conv_crit,
-        )
+        )  # (k, n_chans)
 
-        gamma = np.asarray(gamma, dtype=float)
-        llambda = np.asarray(llambda, dtype=float)
-
-        # Prune weak atoms after refinement for a cleaner inverse operator
-        if gamma.size == 0 or not np.isfinite(gamma).any():
-            return np.zeros((n_dipoles, n_chans))
-
-        thresh = float(pruning_thresh) * float(np.nanmax(gamma))
-        keep = np.where(gamma > thresh)[0]
-        if keep.size == 0:
-            keep = np.array([int(np.nanargmax(gamma))])
-
-        candidates = [candidates[i] for i in keep.tolist()]
-        gamma = gamma[keep]
-
-        # Build final inverse operator
-        L_sel = np.stack(
-            [self.leadfields[order][:, dipole] for order, dipole in candidates], axis=1
-        )
         gradients = np.stack(
             [self.gradients[order][dipole].toarray() for order, dipole in candidates],
             axis=1,
         )[0]
-
-        Gamma = np.diag(gamma)
-        Sigma_y = np.diag(llambda) + (L_sel * gamma) @ L_sel.T
-        Sigma_y = 0.5 * (Sigma_y + Sigma_y.T)
-        Sigma_y_inv = self._robust_inv(Sigma_y)
-
-        inverse_operator = gradients.T @ Gamma @ L_sel.T @ Sigma_y_inv
+        inverse_operator = gradients.T @ K_low
         return inverse_operator
 
     # ------------------------------------------------------------------

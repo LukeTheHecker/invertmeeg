@@ -117,7 +117,19 @@ class SolverChimera(BaseSolver):
         Y = Y.copy()
         Y = self._sensor_transform @ Y
 
-        is_single_focal = self._is_single_focal(Y)
+        # The decision rule is theoretically scale-invariant, but numerically
+        # it can flip near thresholds when sensor magnitudes change (e.g. when
+        # data are expressed in different units). Normalize Y to a stable scale
+        # for the *decision only* to reduce floating-point sensitivity.
+        denom = float(np.std(Y))
+        if not np.isfinite(denom) or denom <= 0:
+            denom = float(np.linalg.norm(Y) / np.sqrt(max(Y.size, 1)))
+        if np.isfinite(denom) and denom > 0:
+            Y_decision = Y / denom
+        else:
+            Y_decision = Y
+
+        is_single_focal = self._is_single_focal(Y_decision)
         if is_single_focal:
             solver = SolverFlexESMV(
                 verbose=self.verbose,
@@ -190,16 +202,22 @@ class SolverChimera(BaseSolver):
 
     def _ssm_smooth_ratio(self, Y: np.ndarray) -> float:
         """Compute max score(order>0) / max score(order==0) with P_A=0."""
-        # Mirror SSM's per-channel-type scaling for stability
+        # Mirror SSM's per-channel-type scaling for stability.
+        #
+        # Note: some pipelines whiten/project sensor data down to an effective
+        # rank (n_eff). In that case, forward['info'] still reports original
+        # channel types (len == n_chans), and indexing would be invalid.
         channel_types = self.forward["info"].get_channel_types()
-        for ch_type in set(channel_types):
-            selection = np.where(np.array(channel_types) == ch_type)[0]
-            if selection.size == 0:
-                continue
-            C = Y[selection, :] @ Y[selection, :].T
-            scaler = float(np.sqrt(np.trace(C)) / C.shape[0])
-            if scaler > 0:
-                Y[selection, :] /= scaler
+        if len(channel_types) == Y.shape[0]:
+            channel_types = np.asarray(channel_types)
+            for ch_type in set(channel_types):
+                selection = np.where(channel_types == ch_type)[0]
+                if selection.size == 0:
+                    continue
+                C = Y[selection, :] @ Y[selection, :].T
+                scaler = float(np.sqrt(np.trace(C)) / C.shape[0])
+                if scaler > 0:
+                    Y[selection, :] /= scaler
 
         n_time = Y.shape[1]
         M_Y = Y.T @ Y

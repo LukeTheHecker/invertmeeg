@@ -77,20 +77,19 @@ class SolverNLChampagne(BaseSolver):
 
         """
         super().make_inverse_operator(forward, mne_obj, *args, alpha=alpha, **kwargs)
-        if noise_cov is not None:
-            self.coerce_noise_cov(noise_cov)
         data = self.unpack_data_obj(mne_obj)
 
-        # SSP projection via standard pipeline (no whitening — NL-Champagne
-        # learns its own noise parameters internally).
-        wf = self.prepare_whitened_forward(None)
-        data_projected = wf.sensor_transform @ np.asarray(data, dtype=float)
+        # Use the standard whitening/projection pipeline if noise_cov is given.
+        # On real MEG, the effective sensor rank can be far below n_channels;
+        # projecting/whitening stabilizes NL-Champagne's noise learning.
+        wf = self.prepare_whitened_forward(noise_cov)
+        data_white = wf.sensor_transform @ np.asarray(data, dtype=float)
 
         original_leadfield = self.leadfield
         self.leadfield = wf.G_white
         try:
-            inverse_operator_projected = self.nl_champagne(
-                data_projected,
+            inverse_operator_white = self.nl_champagne(
+                data_white,
                 alpha=0.01,
                 max_iter=max_iter,
                 prune=prune,
@@ -100,7 +99,7 @@ class SolverNLChampagne(BaseSolver):
         finally:
             self.leadfield = original_leadfield
 
-        inverse_operator = inverse_operator_projected @ wf.sensor_transform
+        inverse_operator = inverse_operator_white @ wf.sensor_transform
         self.inverse_operators = [InverseOperator(inverse_operator, self.name)]
         return self
 
@@ -144,40 +143,56 @@ class SolverNLChampagne(BaseSolver):
         # Scaling of the data (necessary for convergence criterion and pruning
         # threshold)
         Y_scaled = Y.copy()
-        Y_scaled /= abs(Y_scaled).mean()
+        Y_scaled /= abs(Y_scaled).mean() + 1e-12
 
-        alpha = np.random.rand(n_dipoles)
-        llambda = np.random.rand(n_chans)
+        # Deterministic initialization improves stability on real data.
+        gammas = np.ones(n_dipoles, dtype=float) * float(alpha)
+        C_y = (Y_scaled @ Y_scaled.T) / max(float(n_times), 1.0)
+        llambda = np.ones(n_chans, dtype=float) * float(np.trace(C_y) / (n_chans * 100))
+        llambda = np.maximum(llambda, 1e-10)
 
         loss_list = []
 
         for i in range(max_iter):
-            previous_alpha = alpha.copy()
+            previous_gammas = gammas.copy()
 
             # Sigma_y = L @ diag(alpha) @ L.T + diag(llambda)
             # Using broadcasting: (L * alpha) @ L.T avoids d×d matrix
-            Sigma_y = (L * alpha) @ L.T + np.diag(llambda)
-            Sigma_y_inv = np.linalg.inv(Sigma_y)
+            Sigma_y = (L * gammas) @ L.T + np.diag(llambda)
+            Sigma_y = 0.5 * (Sigma_y + Sigma_y.T)
+            try:
+                Sigma_y_inv = np.linalg.inv(Sigma_y)
+            except np.linalg.LinAlgError:
+                Sigma_y_inv = np.linalg.pinv(Sigma_y)
+            Sigma_y_inv = np.asarray(Sigma_y_inv, dtype=float)
+            Sigma_y_inv[~np.isfinite(Sigma_y_inv)] = 0.0
 
             # 1) Alpha update
             # s_bar = diag(alpha) @ L.T @ Sigma_y_inv @ Y_scaled
             SiL = Sigma_y_inv @ L  # (m, d), compute once
             SiY = Sigma_y_inv @ Y_scaled  # (m, t)
-            s_bar = alpha[:, None] * (L.T @ SiY)  # (d, t)
+            s_bar = gammas[:, None] * (L.T @ SiY)  # (d, t)
 
             # z_hat = diag(L.T @ Sigma_y_inv @ L) via column-wise dot
             z_hat = np.sum(L * SiL, axis=0)  # (d,)
             C_s_bar = np.sum(s_bar**2, axis=1)  # (d,)
 
-            alpha = np.sqrt(C_s_bar / (z_hat + 1e-20))
+            z_hat = np.maximum(z_hat, 1e-20)
+            C_s_bar = np.maximum(C_s_bar, 0.0)
+            gammas = np.sqrt(C_s_bar / z_hat)
+            gammas[~np.isfinite(gammas)] = 0.0
+            gammas = np.maximum(gammas, 0.0)
 
             # 2) LLambda update
             Y_hat = L @ s_bar
 
             # Convex Bound update
-            llambda = np.sqrt(
-                np.sum((Y_scaled - Y_hat) ** 2, axis=1) / (np.diag(Sigma_y_inv) + 1e-20)
-            )
+            resid = np.sum((Y_scaled - Y_hat) ** 2, axis=1)
+            resid = np.maximum(resid, 0.0)
+            denom = np.maximum(np.diag(Sigma_y_inv), 1e-20)
+            llambda = np.sqrt(resid / denom)
+            llambda[~np.isfinite(llambda)] = 1.0
+            llambda = np.maximum(llambda, 1e-10)
 
             # 3) Check convergence
             with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
@@ -197,9 +212,9 @@ class SolverNLChampagne(BaseSolver):
             if (
                 loss == float("-inf")
                 or loss == float("inf")
-                or np.linalg.norm(alpha) == 0
+                or np.linalg.norm(gammas) == 0
             ):
-                alpha = previous_alpha
+                gammas = previous_gammas
                 break
 
             # Check convergence only after first iteration
@@ -211,12 +226,16 @@ class SolverNLChampagne(BaseSolver):
                     break
 
             if prune:
-                prune_candidates = alpha < (pruning_thresh * alpha.max())
-                alpha[prune_candidates] = 0
+                prune_candidates = gammas < (pruning_thresh * gammas.max())
+                gammas[prune_candidates] = 0
 
         # Final inverse: diag(alpha) @ L.T @ Sigma_y_inv
-        Sigma_y = (L * alpha) @ L.T + np.diag(llambda)
-        Sigma_y_inv = np.linalg.inv(Sigma_y)
-        inverse_operator = alpha[:, None] * (L.T @ Sigma_y_inv)
+        Sigma_y = (L * gammas) @ L.T + np.diag(llambda)
+        Sigma_y = 0.5 * (Sigma_y + Sigma_y.T)
+        try:
+            Sigma_y_inv = np.linalg.inv(Sigma_y)
+        except np.linalg.LinAlgError:
+            Sigma_y_inv = np.linalg.pinv(Sigma_y)
+        inverse_operator = gammas[:, None] * (L.T @ Sigma_y_inv)
 
         return inverse_operator
