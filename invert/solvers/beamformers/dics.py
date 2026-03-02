@@ -156,7 +156,12 @@ class SolverDICS(BaseBeamformer):
 
             upper = csd_inv @ leadfield
             denom = np.sum(np.conjugate(leadfield) * upper, axis=0)
-            denom = np.where(np.abs(denom) < 1e-15, 1e-15, denom)
+            denom = np.asarray(denom)
+            denom_floor = max(
+                1e-15 * float(np.max(np.abs(denom))),
+                float(np.finfo(float).tiny),
+            )
+            denom = np.where(np.abs(denom) < denom_floor, denom_floor, denom)
             W = upper / denom
 
             power = np.real(np.sum(np.conjugate(W) * (self.csd @ W), axis=0))

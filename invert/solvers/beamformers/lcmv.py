@@ -256,7 +256,13 @@ class SolverLCMV(BaseBeamformer):
 
                     num = np.einsum("mni,ni->mn", CiL, q, optimize=True)  # (m,n)
                     den = np.einsum("ni,nij,nj->n", q, G, q, optimize=True)
-                    den = np.maximum(den, self.eps)
+                    # Relative floor for scale invariance (unit changes).
+                    den = np.asarray(den, dtype=float)
+                    den_floor = max(
+                        float(self.eps) * float(np.max(np.abs(den))),
+                        float(np.finfo(float).tiny),
+                    )
+                    den = np.maximum(den, den_floor)
                     W_eff = num / den[np.newaxis, :]
                 else:
                     # Invert 3x3 blocks robustly.
@@ -277,7 +283,12 @@ class SolverLCMV(BaseBeamformer):
                 upper = C_inv @ leadfield_eff
                 lower = np.einsum("ij,jk,ki->i", leadfield_eff.T, C_inv, leadfield_eff)
                 W_eff = np.zeros_like(upper)
-                valid = np.abs(lower) > self.eps
+                lower = np.asarray(lower, dtype=float)
+                lower_floor = max(
+                    float(self.eps) * float(np.max(np.abs(lower))),
+                    float(np.finfo(float).tiny),
+                )
+                valid = np.abs(lower) > lower_floor
                 if np.any(valid):
                     W_eff[:, valid] = upper[:, valid] / lower[valid]
 
@@ -291,7 +302,12 @@ class SolverLCMV(BaseBeamformer):
                 if sensor_transform is not None:
                     # In whitened coordinates the sensor-noise covariance is I.
                     noise_power = np.sum(W_eff * W_eff, axis=0)
-                    W_eff = W_eff / np.sqrt(np.maximum(noise_power, self.eps))
+                    noise_power = np.asarray(noise_power, dtype=float)
+                    pow_floor = max(
+                        float(self.eps) * float(np.max(noise_power)),
+                        float(np.finfo(float).tiny),
+                    )
+                    W_eff = W_eff / np.sqrt(np.maximum(noise_power, pow_floor))
                     W_raw = sensor_transform.T @ W_eff
                 else:
                     W_raw = W_eff
@@ -302,7 +318,12 @@ class SolverLCMV(BaseBeamformer):
                         )
                     else:
                         noise_power = np.sum(W_raw * W_raw, axis=0)
-                    W_raw = W_raw / np.sqrt(np.maximum(noise_power, self.eps))
+                    noise_power = np.asarray(noise_power, dtype=float)
+                    pow_floor = max(
+                        float(self.eps) * float(np.max(noise_power)),
+                        float(np.finfo(float).tiny),
+                    )
+                    W_raw = W_raw / np.sqrt(np.maximum(noise_power, pow_floor))
             elif sensor_transform is None:
                 W_raw = W_eff
             else:

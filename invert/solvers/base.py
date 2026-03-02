@@ -77,6 +77,7 @@ class WhitenedForward:
 
     # Populated when precompute_svd=True
     svd: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None
+    channel_scaler: np.ndarray | None = None
 
 
 @dataclass
@@ -204,6 +205,12 @@ class BaseSolver:
     r1gcv_gamma : float
         Mixing parameter γ ∈ (0, 1) for R1GCV. ``V_R1GCV = [γ + (1-γ)·μ₁₂] · V_GCV``
         where μ₁₂ = -dμ₁/dα penalises solution variance amplification. Default 0.5.
+    sensor_scaling : str
+        Optional sensor scaling mode used only when noise covariance is not provided.
+        ``"none"`` disables scaling, ``"leadfield_per_type"`` balances channel-type
+        leadfield RMS before inversion.
+    sensor_scaling_eps : float
+        Numerical floor used by sensor scaling.
 
     """
 
@@ -231,6 +238,8 @@ class BaseSolver:
         mgcv_gamma: float = 1.05,
         rgcv_gamma: float = 0.5,
         r1gcv_gamma: float = 0.5,
+        sensor_scaling: str = "none",
+        sensor_scaling_eps: float = 1e-15,
         orientation: str = "auto",
         orientation_pca_reg: float = 0.01,
         orientation_pca_deterministic_sign: bool = True,
@@ -261,6 +270,19 @@ class BaseSolver:
         self.mgcv_gamma = mgcv_gamma
         self.rgcv_gamma = rgcv_gamma
         self.r1gcv_gamma = r1gcv_gamma
+        sensor_scaling = str(sensor_scaling).lower()
+        if sensor_scaling not in {"none", "leadfield_per_type"}:
+            raise ValueError(
+                "sensor_scaling must be one of {'none','leadfield_per_type'}, "
+                f"got {sensor_scaling!r}"
+            )
+        self.sensor_scaling = sensor_scaling
+        self.sensor_scaling_eps = float(sensor_scaling_eps)
+        if not np.isfinite(self.sensor_scaling_eps) or self.sensor_scaling_eps <= 0:
+            raise ValueError(
+                "sensor_scaling_eps must be a finite positive float, "
+                f"got {sensor_scaling_eps!r}"
+            )
         orientation = str(orientation).lower()
         if orientation not in {"auto", "fixed", "pca", "free"}:
             raise ValueError(
@@ -1214,6 +1236,42 @@ class BaseSolver:
         return W, "failed"
 
     @staticmethod
+    def compute_channel_type_scaler_from_leadfield(
+        leadfield: np.ndarray, channel_types: list[str], *, eps: float = 1e-15
+    ) -> np.ndarray:
+        """Compute per-channel gains that equalize leadfield RMS across channel types."""
+        leadfield = np.asarray(leadfield, dtype=float)
+        if leadfield.ndim != 2:
+            raise ValueError(f"leadfield must be 2D, got ndim={leadfield.ndim}")
+        n_chans = int(leadfield.shape[0])
+        if len(channel_types) != n_chans:
+            msg = (
+                f"channel_types has length {len(channel_types)}, expected {n_chans} "
+                "to match leadfield rows."
+            )
+            raise ValueError(msg)
+
+        channel_types_arr = np.asarray([str(ct) for ct in channel_types], dtype=object)
+        gains = np.ones(n_chans, dtype=float)
+        type_gains: list[float] = []
+        floor = max(float(eps), float(np.finfo(float).tiny))
+        for channel_type in set(channel_types_arr):
+            selection = np.where(channel_types_arr == channel_type)[0]
+            if selection.size == 0:
+                continue
+            block = leadfield[selection, :]
+            rms = float(np.sqrt(np.mean(block * block))) if block.size else 0.0
+            gain = 1.0 / max(rms, floor)
+            gains[selection] = gain
+            type_gains.append(gain)
+
+        if type_gains:
+            gmean = float(np.exp(np.mean(np.log(np.maximum(type_gains, floor)))))
+            gains = gains / gmean
+
+        return gains
+
+    @staticmethod
     def compute_depth_prior_whitened(
         G_white: np.ndarray,
         *,
@@ -1281,7 +1339,13 @@ class BaseSolver:
             s = np.asarray(s, dtype=float)
             Vt = np.asarray(Vt, dtype=float)
 
-        denom = np.maximum(s * s + float(lambda2), eps)
+        # Use a *relative* floor to preserve scale-invariance:
+        # scaling A -> cA and lambda2 -> c^2 lambda2 should not change the
+        # shrinkage factors gamma = s / (s^2 + lambda2) beyond rounding.
+        denom_raw = s * s + float(lambda2)
+        max_denom = float(np.max(denom_raw)) if denom_raw.size else 0.0
+        floor = max(float(eps) * max_denom, float(np.finfo(float).tiny))
+        denom = np.maximum(denom_raw, floor)
         gamma = s / denom
         kernel = (Vt.T * gamma[np.newaxis, :]) @ U.T
 
@@ -1319,7 +1383,11 @@ class BaseSolver:
             raise ValueError(msg)
 
         noise_var = np.sum(K_white * K_white, axis=1)
-        noise_std = np.sqrt(np.maximum(noise_var, eps))
+        # Use a relative floor for unit/scale invariance: if K_white is scaled
+        # by a constant factor, the noise std estimate should scale likewise.
+        max_var = float(np.max(noise_var)) if noise_var.size else 0.0
+        floor = max(float(eps) * max_var, float(np.finfo(float).tiny))
+        noise_std = np.sqrt(np.maximum(noise_var, floor))
         return K_full / noise_std[:, np.newaxis], noise_std
 
     def prepare_whitened_forward(
@@ -1374,6 +1442,7 @@ class BaseSolver:
         forward_ch_names = list(self.forward.ch_names)
         n_sources = int(G.shape[1])
         noise_cov_mat: np.ndarray | None = None
+        channel_scaler: np.ndarray | None = None
 
         if noise_cov is not None:
             noise_cov_mat, noise_cov_ch_names = self.coerce_noise_cov(noise_cov)
@@ -1432,6 +1501,35 @@ class BaseSolver:
                 n_chans=n_chans,
             )
 
+        # --- Optional sensor scaling (no noise_cov path only) ---
+        if noise_cov_mat is None and self.sensor_scaling != "none":
+            channel_types = list(self.forward["info"].get_channel_types())
+            if len(channel_types) != n_chans:
+                logger.warning(
+                    "Skipping sensor_scaling=%s because channel type metadata "
+                    "length (%d) != number of leadfield rows (%d).",
+                    self.sensor_scaling,
+                    len(channel_types),
+                    n_chans,
+                )
+            elif self.sensor_scaling == "leadfield_per_type":
+                channel_scaler = self.compute_channel_type_scaler_from_leadfield(
+                    G,
+                    channel_types,
+                    eps=self.sensor_scaling_eps,
+                )
+            else:
+                raise ValueError(
+                    "Invalid sensor_scaling mode encountered at runtime: "
+                    f"{self.sensor_scaling!r}"
+                )
+
+        S = (
+            np.diag(np.asarray(channel_scaler, dtype=float))
+            if channel_scaler is not None
+            else np.eye(n_chans, dtype=float)
+        )
+
         # --- Sensor whitening ---
         if noise_cov_mat is not None:
             noise_cov_mat = np.asarray(noise_cov_mat, dtype=float)
@@ -1459,8 +1557,10 @@ class BaseSolver:
             G_white = sensor_transform @ G  # (n_eff, n_sources)
             n_eff = int(W.shape[0])
         else:
-            sensor_transform = P  # (n_chans, n_chans)
+            sensor_transform = S @ P  # (n_chans, n_chans)
             G_white = P @ G  # (n_chans, n_sources)
+            if channel_scaler is not None:
+                G_white = S @ G_white
             n_eff = n_chans
             whitener_mode = "none"
 
@@ -1516,6 +1616,7 @@ class BaseSolver:
             A=A,
             trace_scale=trace_scale,
             svd=svd,
+            channel_scaler=channel_scaler,
         )
 
     def regularise_lcurve(self, M, plot=False):
@@ -1782,6 +1883,11 @@ class BaseSolver:
             # Trace with original G (correct by cyclic property of trace)
             W = inverse_operator.data[0]  # Get the actual matrix
             trace_H = float(np.sum(L_orig * W.T))
+            # Numerical guard: tr(H) is an effective DoF and should lie in
+            # [0, n_eff]. Tiny violations from ill-conditioned operators can
+            # otherwise collapse GCV into all-Inf scores.
+            if np.isfinite(trace_H):
+                trace_H = float(np.clip(trace_H, 0.0, float(n_eff)))
 
             # Residual in whitened space
             M_hat = L_resid @ x
@@ -2403,7 +2509,9 @@ class BaseSolver:
         cond_threshold : float
             Condition number threshold above which regularization is applied
         regularization : float
-            Regularization parameter for ill-conditioned matrices
+            Diagonal loading strength, interpreted *relative* to the typical
+            scale of the matrix (trace / n). This makes the inversion invariant
+            to arbitrary global rescalings of ``matrix`` (unit changes).
 
         Return
         ------
@@ -2413,12 +2521,22 @@ class BaseSolver:
         if matrix.shape[0] == 0 or matrix.shape[1] == 0:
             return np.zeros_like(matrix.T)
 
+        matrix = np.asarray(matrix)
         # Check condition number for numerical stability
         cond_num = np.linalg.cond(matrix)
 
+        n = int(matrix.shape[0])
+        tr = np.trace(matrix) if n else 0.0
+        scale = float(np.real(tr)) / float(max(n, 1))
+        if not np.isfinite(scale) or scale <= 0:
+            scale = float(np.mean(np.abs(np.diag(matrix)))) if n else 0.0
+        if not np.isfinite(scale) or scale <= 0:
+            scale = 1.0
+        lam = float(regularization) * float(scale)
+
         if cond_num > cond_threshold:
             # Use regularized inversion for ill-conditioned matrices
-            reg_matrix = regularization * np.eye(matrix.shape[0])
+            reg_matrix = lam * np.eye(matrix.shape[0], dtype=matrix.dtype)
             matrix_inv = np.linalg.inv(matrix + reg_matrix)
         else:
             # Use standard inversion for well-conditioned matrices
@@ -2426,7 +2544,7 @@ class BaseSolver:
                 matrix_inv = np.linalg.inv(matrix)
             except np.linalg.LinAlgError:
                 # Fall back to regularized inversion if standard inversion fails
-                reg_matrix = regularization * np.eye(matrix.shape[0])
+                reg_matrix = lam * np.eye(matrix.shape[0], dtype=matrix.dtype)
                 matrix_inv = np.linalg.inv(matrix + reg_matrix)
 
         return matrix_inv
