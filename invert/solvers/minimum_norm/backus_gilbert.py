@@ -59,7 +59,10 @@ class SolverBackusGilbert(BaseSolver):
         pos = pos_from_forward(forward, verbose=self.verbose)
         n_sources = len(pos)
         n_orient = n_dipoles // n_sources  # 1 for fixed, 3 for free
-        dist = cdist(pos, pos)
+        # pos_from_forward returns meters; convert to mm for the distance
+        # weighting in E_gamma so the ratio between distance and leadfield
+        # terms stays in a numerically stable range.
+        dist = cdist(pos * 1e3, pos * 1e3)
 
         F = leadfield @ leadfield.T
         L = leadfield @ np.ones((n_dipoles, 1))

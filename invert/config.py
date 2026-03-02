@@ -10,7 +10,6 @@ all_solvers = [
     "MNE",
     "wMNE",
     "dSPM",
-    "dSPM-MNE",
     "FISTA",
     "L1L2",
     "MxNE-BCD",
@@ -77,13 +76,13 @@ all_solvers = [
     "SubSMP",
     "EPIFOCUS",
     "APSE",
-    "Adaptive-AP",
-    "Flex-MUSIC-2",
+    "Chimera",
     "Generalized-Iterative",
     "ECD",
     "SESAME",
     "TV",
     "VB-SBL",
+    "MEM",
     "Random-Noise",
 ]
 

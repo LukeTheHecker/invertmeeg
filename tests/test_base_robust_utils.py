@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from invert.solvers.base import BaseSolver, InverseOperator
-from invert.solvers.minimum_norm.dspm_mne import SolverDSPMMNE
+from invert.solvers.minimum_norm.dspm import SolverDSPM
 
 
 def _as_mne_cov(cov: np.ndarray, ch_names: list[str], nfree: int = 1) -> mne.Covariance:
@@ -204,31 +204,6 @@ def test_noise_normalize_rows_returns_finite_unit_norm_rows():
     assert np.all(np.isfinite(K_norm))
 
 
-def test_dspm_mne_uses_base_tikhonov_solver(monkeypatch, forward_model):
-    calls = {"n": 0}
-    original = BaseSolver.solve_tikhonov_svd
-
-    def _wrapped(*args, **kwargs):
-        calls["n"] += 1
-        return original(*args, **kwargs)
-
-    monkeypatch.setattr(SolverDSPMMNE, "solve_tikhonov_svd", staticmethod(_wrapped))
-
-    solver = SolverDSPMMNE(n_reg_params=3)
-    solver.r_values = np.asarray([1e-3, 1e-2, 1e-1], dtype=float)
-    n_chans = int(forward_model["sol"]["data"].shape[0])
-    noise_cov = _as_mne_cov(np.eye(n_chans, dtype=float), forward_model.ch_names)
-    solver.make_inverse_operator(
-        forward_model,
-        alpha="auto",
-        noise_cov=noise_cov,
-    )
-
-    assert calls["n"] == len(solver.alphas)
-    kernel = solver.inverse_operators[0].data[0]
-    assert kernel.shape == (solver.leadfield.shape[1], solver.leadfield.shape[0])
-    assert np.all(np.isfinite(kernel))
-
 
 # ---------------------------------------------------------------------------
 # Regression: relative epsilon in condition_number_loaded_covariance
@@ -393,7 +368,7 @@ def test_unpack_data_obj_logs_dropped_extra_data_channels(
 def test_apply_raises_clear_error_when_data_channels_missing(
     forward_model, simulated_evoked
 ):
-    solver = SolverDSPMMNE(n_reg_params=1)
+    solver = SolverDSPM(n_reg_params=1)
     n_chans = int(forward_model["sol"]["data"].shape[0])
     noise_cov = _as_mne_cov(np.eye(n_chans, dtype=float), forward_model.ch_names)
     solver.make_inverse_operator(
@@ -414,7 +389,7 @@ def test_apply_raises_clear_error_when_data_channels_missing(
 def test_apply_drops_extra_data_channels_with_log(
     forward_model, simulated_evoked, caplog
 ):
-    solver = SolverDSPMMNE(n_reg_params=1)
+    solver = SolverDSPM(n_reg_params=1)
     n_chans = int(forward_model["sol"]["data"].shape[0])
     noise_cov = _as_mne_cov(np.eye(n_chans, dtype=float), forward_model.ch_names)
     solver.make_inverse_operator(

@@ -6,7 +6,6 @@ from invert.solvers.bayesian.champagne import SolverChampagne
 from invert.solvers.beamformers.esmv import SolverESMV
 from invert.solvers.beamformers.lcmv import SolverLCMV
 from invert.solvers.minimum_norm.dspm import SolverDSPM
-from invert.solvers.minimum_norm.dspm_mne import SolverDSPMMNE
 from invert.solvers.minimum_norm.eloreta import SolverELORETA
 from invert.solvers.minimum_norm.laura import SolverLAURA
 from invert.solvers.minimum_norm.loreta import SolverLORETA
@@ -365,7 +364,7 @@ def test_projected_alpha_scaling_uses_transformed_leadfield(
         (SolverLORETA, {}),
         (SolverSMAP, {}),
         (SolverLAURA, {}),
-        (SolverDSPMMNE, {}),
+        (SolverDSPM, {}),
     ],
 )
 def test_minimum_norm_robust_whitener_handles_zero_noise_cov(
