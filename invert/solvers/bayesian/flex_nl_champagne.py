@@ -46,6 +46,17 @@ class SolverFlexNLChampagne(BaseSolver):
         diffusion_parameter=0.1,
         adjacency_type="spatial",
         adjacency_distance=3e-3,
+        noise_init_mode="trace",
+        noise_diag_shrinkage=0.0,
+        refined_noise_mode="scalar",
+        order_pooling="argmax",
+        min_active_dipoles=0,
+        scale_min_active_with_channels=False,
+        min_active_ref_channels=32,
+        min_active_max_fraction=0.1,
+        min_active_scale_power=0.25,
+        min_active_scale_min=0.5,
+        min_active_scale_max=1.5,
         **kwargs,
     ):
         self.name = name
@@ -53,6 +64,17 @@ class SolverFlexNLChampagne(BaseSolver):
         self.diffusion_parameter = diffusion_parameter
         self.adjacency_type = adjacency_type
         self.adjacency_distance = adjacency_distance
+        self.noise_init_mode = noise_init_mode
+        self.noise_diag_shrinkage = float(noise_diag_shrinkage)
+        self.refined_noise_mode = refined_noise_mode
+        self.order_pooling = order_pooling
+        self.min_active_dipoles = int(min_active_dipoles)
+        self.scale_min_active_with_channels = bool(scale_min_active_with_channels)
+        self.min_active_ref_channels = int(max(min_active_ref_channels, 1))
+        self.min_active_max_fraction = float(np.clip(min_active_max_fraction, 0.0, 1.0))
+        self.min_active_scale_power = float(min_active_scale_power)
+        self.min_active_scale_min = float(min_active_scale_min)
+        self.min_active_scale_max = float(max(min_active_scale_max, min_active_scale_min))
         self.is_prepared = False
         super().__init__(**kwargs)
 
@@ -212,8 +234,12 @@ class SolverFlexNLChampagne(BaseSolver):
 
         # Noise estimate from data covariance
         C_y = self.data_covariance(Y, center=True, ddof=1)
-        alpha_noise = float(np.trace(C_y) / n_chans)
-        noise_cov = alpha_noise * np.identity(n_chans)
+        noise_cov = self._build_noise_cov(
+            C_y,
+            n_chans,
+            mode=self.noise_init_mode,
+            diag_shrinkage=self.noise_diag_shrinkage,
+        )
 
         Y_scaled = Y
 
@@ -241,9 +267,9 @@ class SolverFlexNLChampagne(BaseSolver):
         Sigma_y_1_inv = self._robust_inv(Sigma_y_1)
         mu_x_1 = (L_refined.T @ Sigma_y_1_inv @ Y_scaled) * gammas_1[:, None]
         residuals = Y_scaled - L_refined @ mu_x_1
-        refined_noise = float(np.trace(residuals @ residuals.T) / (n_chans * n_times))
-        refined_noise = max(refined_noise, 1e-10)
-        noise_cov_2 = refined_noise * np.identity(n_chans)
+        noise_cov_2 = self._build_refined_noise_cov(
+            residuals, n_chans, n_times, mode=self.refined_noise_mode
+        )
 
         # Run second pass with MacKay, warm-started from pass 1 gammas
         active_set_2, gammas_2 = self._run_sbl(
@@ -267,9 +293,19 @@ class SolverFlexNLChampagne(BaseSolver):
 
         gammas_per_order = gammas_full.reshape(n_orders, n_dipoles)
         best_order = np.argmax(gammas_per_order, axis=0)
-        best_gamma = np.max(gammas_per_order, axis=0)
+        if self.order_pooling == "sum":
+            best_gamma = np.sum(gammas_per_order, axis=0)
+        else:
+            best_gamma = np.max(gammas_per_order, axis=0)
 
-        active_dipoles = np.where(best_gamma > pruning_thresh * best_gamma.max())[0]
+        active_dipoles = self._select_active_dipoles(
+            best_gamma,
+            pruning_thresh,
+            n_chans,
+            n_dipoles,
+            min_active_dipoles=self.min_active_dipoles,
+            scale_min_active_with_channels=self.scale_min_active_with_channels,
+        )
 
         if len(active_dipoles) == 0:
             return np.zeros((n_dipoles, n_chans))
@@ -291,6 +327,83 @@ class SolverFlexNLChampagne(BaseSolver):
         inv_op = G @ np.diag(gamma_reduced) @ L_reduced.T @ Sigma_y_r_inv
 
         return inv_op
+
+    def _build_noise_cov(
+        self,
+        C_y: np.ndarray,
+        n_chans: int,
+        *,
+        mode: str | None = None,
+        diag_shrinkage: float | None = None,
+    ) -> np.ndarray:
+        mode = str(self.noise_init_mode if mode is None else mode).lower()
+        if mode == "diag":
+            diag = np.maximum(np.diag(C_y), 1e-12)
+            shrink_base = self.noise_diag_shrinkage if diag_shrinkage is None else diag_shrinkage
+            shrink = float(np.clip(shrink_base, 0.0, 1.0))
+            mean_diag = float(np.mean(diag))
+            diag = (1.0 - shrink) * diag + shrink * mean_diag
+            return np.diag(diag)
+        alpha_noise = float(np.trace(C_y) / n_chans)
+        return alpha_noise * np.identity(n_chans)
+
+    def _build_refined_noise_cov(
+        self,
+        residuals: np.ndarray,
+        n_chans: int,
+        n_times: int,
+        *,
+        mode: str | None = None,
+    ) -> np.ndarray:
+        mode = str(self.refined_noise_mode if mode is None else mode).lower()
+        if mode == "diag":
+            diag = np.sum(residuals**2, axis=1) / max(n_times, 1)
+            diag = np.maximum(diag, 1e-10)
+            return np.diag(diag)
+        refined_noise = float(np.trace(residuals @ residuals.T) / (n_chans * n_times))
+        refined_noise = max(refined_noise, 1e-10)
+        return refined_noise * np.identity(n_chans)
+
+    def _select_active_dipoles(
+        self,
+        best_gamma: np.ndarray,
+        pruning_thresh: float,
+        n_chans: int,
+        n_dipoles: int,
+        *,
+        min_active_dipoles: int | None = None,
+        scale_min_active_with_channels: bool | None = None,
+    ) -> np.ndarray:
+        if best_gamma.size == 0:
+            return np.array([], dtype=int)
+        max_gamma = float(np.max(best_gamma))
+        if max_gamma <= 0:
+            return np.array([], dtype=int)
+        active = np.where(best_gamma > pruning_thresh * max_gamma)[0]
+        min_active = (
+            self.min_active_dipoles
+            if min_active_dipoles is None
+            else int(min_active_dipoles)
+        )
+        scale_with_channels = (
+            self.scale_min_active_with_channels
+            if scale_min_active_with_channels is None
+            else bool(scale_min_active_with_channels)
+        )
+        if min_active > 0 and scale_with_channels:
+            ratio = max(float(n_chans), 1.0) / float(self.min_active_ref_channels)
+            scale = ratio**self.min_active_scale_power
+            scale = float(np.clip(scale, self.min_active_scale_min, self.min_active_scale_max))
+            min_active = int(np.ceil(min_active * scale))
+        if self.min_active_max_fraction > 0:
+            max_allowed = int(np.ceil(self.min_active_max_fraction * max(int(n_dipoles), 1)))
+            if max_allowed > 0:
+                min_active = min(min_active, max_allowed)
+
+        if min_active > 0 and len(active) < min_active:
+            k = min(min_active, best_gamma.size)
+            active = np.argsort(best_gamma)[-k:]
+        return np.asarray(np.sort(active), dtype=int)
 
     @staticmethod
     def _robust_inv(M):
