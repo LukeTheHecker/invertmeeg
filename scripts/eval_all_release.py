@@ -58,7 +58,7 @@ if __name__ == "__main__":
     )
     runner.run()
 
-    out_path = Path("results/release/leaderboard-test.json")
+    out_path = Path("results/release/leaderboard-new.json")
     out_path.parent.mkdir(parents=True, exist_ok=True)
     runner.save(
         out_path,
