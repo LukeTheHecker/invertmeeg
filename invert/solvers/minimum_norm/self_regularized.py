@@ -40,7 +40,6 @@ class SolverSelfRegularizedELORETA(BaseSolver):
         ),
         references=[
             "Pascual-Marqui, R. D. (2007). Discrete, 3D distributed, linear imaging methods of electric neuronal activity. Part 1: exact, zero error localization. arXiv:0710.3341.",
-            "tbd",
         ],
         internal=True,
     )

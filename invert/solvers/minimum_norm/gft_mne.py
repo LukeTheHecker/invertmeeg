@@ -18,14 +18,14 @@ class SolverGFTMNE(BaseSolver):
 
     References
     ----------
-    [1] Pascual-Marqui, R. D. (1999). Review of methods for solving the EEG
-    inverse problem. International journal of bioelectromagnetism, 1(1), 75-86.
+    [1] Hämäläinen, M. S., & Ilmoniemi, R. J. (1994). Interpreting magnetic 
+    fields of the brain: minimum norm estimates. Medical & Biological 
+    Engineering & Computing, 32(1), 35–42.
 
-    [2] Grech, R., Cassar, T., Muscat, J., Camilleri, K. P., Fabri, S. G.,
-    Zervakis, M., ... & Vanrumste, B. (2008). Review on solving the inverse
-    problem in EEG source analysis. Journal of neuroengineering and
-    rehabilitation, 5(1), 1-33.
-
+    [2] Yang, S., Jiao, M., Xiang, J., Fotedar, N., Sun, H., & Liu, F. (2024). 
+    Rejuvenating classical brain electrophysiology source localization methods 
+    with spatial graph Fourier filters for source extents estimation. 
+    Brain Informatics, 11(1), 8.
     """
 
     meta = SolverMeta(
@@ -39,7 +39,7 @@ class SolverGFTMNE(BaseSolver):
         ),
         references=[
             "Hämäläinen, M. S., & Ilmoniemi, R. J. (1994). Interpreting magnetic fields of the brain: minimum norm estimates. Medical & Biological Engineering & Computing, 32(1), 35–42.",
-            "Shuman, D. I., Narang, S. K., Frossard, P., Ortega, A., & Vandergheynst, P. (2013). The emerging field of signal processing on graphs: Extending high-dimensional data analysis to networks and other irregular domains. IEEE Signal Processing Magazine, 30(3), 83–98.",
+            "Yang, S., Jiao, M., Xiang, J., Fotedar, N., Sun, H., & Liu, F. (2024). Rejuvenating classical brain electrophysiology source localization methods with spatial graph Fourier filters for source extents estimation. Brain Informatics, 11(1), 8."
         ],
         internal=True,
     )

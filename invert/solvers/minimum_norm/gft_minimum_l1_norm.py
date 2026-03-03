@@ -18,7 +18,12 @@ class SolverGFTMinimumL1Norm(BaseSolver):
 
     References
     ----------
-    [1] Beck, A., & Teboulle, M. (2009). A fast iterative shrinkage-thresholding
+    [1] Yang, S., Jiao, M., Xiang, J., Fotedar, N., Sun, H., & Liu, F. (2024). 
+    Rejuvenating classical brain electrophysiology source localization methods 
+    with spatial graph Fourier filters for source extents estimation. 
+    Brain Informatics, 11(1), 8.
+
+    [2] Beck, A., & Teboulle, M. (2009). A fast iterative shrinkage-thresholding
     algorithm for linear inverse problems. SIAM journal on imaging sciences,
     2(1), 183-202.
     """
@@ -32,9 +37,8 @@ class SolverGFTMinimumL1Norm(BaseSolver):
             "basis to encourage smoothness on the source-space graph."
         ),
         references=[
-            "Uutela, K., Hämäläinen, M., & Somersalo, E. (1999). Visualization of magnetoencephalographic data using minimum current estimates. NeuroImage, 10(2), 173–180.",
-            "Beck, A., & Teboulle, M. (2009). A fast iterative shrinkage-thresholding algorithm for linear inverse problems. SIAM Journal on Imaging Sciences, 2(1), 183–202.",
-            "Shuman, D. I., Narang, S. K., Frossard, P., Ortega, A., & Vandergheynst, P. (2013). The emerging field of signal processing on graphs: Extending high-dimensional data analysis to networks and other irregular domains. IEEE Signal Processing Magazine, 30(3), 83–98.",
+            "Yang, S., Jiao, M., Xiang, J., Fotedar, N., Sun, H., & Liu, F. (2024). Rejuvenating classical brain electrophysiology source localization methods with spatial graph Fourier filters for source extents estimation. Brain Informatics, 11(1), 8.",
+            "Beck, A., & Teboulle, M. (2009). A fast iterative shrinkage-thresholding algorithm for linear inverse problems. SIAM journal on imaging sciences, 2(1), 183-202.",
         ],
         internal=True,
     )

@@ -14,7 +14,9 @@ class SolverMinimumL1L2Norm(BaseSolver):
 
     References
     ----------
-    [!] Missing reference - please contact developers if you have it!
+    [1] Gramfort, A., Kowalski, M., & Hämäläinen, M. (2012). Mixed-norm 
+    estimates for the M/EEG inverse problem using accelerated gradient 
+    methods. Physics in Medicine and Biology, 57(7), 1937–1961.
 
     """
 
