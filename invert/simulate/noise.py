@@ -187,10 +187,27 @@ def make_sensor_noise_covariance(
         low_rank = (basis @ basis.T) / max(latent_rank, 1)
         low_rank = low_rank / max(np.trace(low_rank) / n_chans, eps)
         cov = (1.0 - coeff) * np.eye(n_chans) + coeff * low_rank
+    elif mode == "realistic":
+        # C = A @ A.T + alpha * C_banded + sigma^2 * I
+        # Low-rank artifact components
+        latent_rank = int(np.clip(low_rank_dim, 1, max(1, n_chans - 1)))
+        basis = rng.standard_normal((n_chans, latent_rank))
+        lr = (basis @ basis.T) / max(latent_rank, 1)
+        lr = lr / max(np.trace(lr) / n_chans, eps)
+        # Banded spatial correlation
+        idx = np.arange(n_chans)
+        dist = np.abs(idx[:, None] - idx[None, :])
+        banded = coeff ** dist
+        np.fill_diagonal(banded, 1.0)
+        banded = banded / max(np.trace(banded) / n_chans, eps)
+        # Combine: low_rank + alpha * banded + sigma^2 * I
+        alpha = 0.3
+        sigma2 = 0.1
+        cov = lr + alpha * banded + sigma2 * np.eye(n_chans)
     else:
         msg = (
             "mode must be one of None, 'cholesky', 'banded', 'diagonal', "
-            f"'low_rank', but got {mode!r}"
+            f"'low_rank', 'realistic', but got {mode!r}"
         )
         raise ValueError(msg)
 

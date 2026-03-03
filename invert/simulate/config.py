@@ -76,10 +76,11 @@ class SimulationConfig(BaseModel):
     diffusion_smoothing: bool = Field(default=True)
     diffusion_parameter: float = Field(default=0.1, ge=0.0)
     correlation_mode: (
-        Literal["auto", "cholesky", "banded", "diagonal", "low_rank"] | None
+        Literal["auto", "cholesky", "banded", "diagonal", "low_rank", "realistic"]
+        | None
     ) = Field(default=None)
     correlation_modes: (
-        list[Literal["cholesky", "banded", "diagonal", "low_rank"]] | None
+        list[Literal["cholesky", "banded", "diagonal", "low_rank", "realistic"]] | None
     ) = Field(
         default=None,
         description=(

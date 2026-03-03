@@ -20,9 +20,12 @@ class DatasetConfig(BaseModel):
     amplitude_range: tuple[float, float] | None = None
     amplitude_distribution: Literal["uniform", "log_uniform"] | None = None
     correlation_mode: (
-        Literal["auto", "banded", "diagonal", "low_rank", "cholesky"] | None
+        Literal["auto", "banded", "diagonal", "low_rank", "cholesky", "realistic"]
+        | None
     ) = None
-    correlation_modes: list[Literal["banded", "diagonal", "low_rank"]] | None = None
+    correlation_modes: (
+        list[Literal["banded", "diagonal", "low_rank", "realistic"]] | None
+    ) = None
     correlation_mode_weights: list[float] | None = None
     noise_temporal_beta: float | tuple[float, float] | None = None
     noise_low_rank_dim: int | tuple[int, int] | None = None
@@ -38,6 +41,8 @@ BENCHMARK_DATASETS: dict[str, DatasetConfig] = {
         n_orders=0,
         snr_range=(3.0, 5.0),
         n_timepoints=50,
+        correlation_mode="realistic",
+        noise_low_rank_dim=(2, 8),
     ),
     "multi_source": DatasetConfig(
         name="Multi Source",
@@ -46,6 +51,8 @@ BENCHMARK_DATASETS: dict[str, DatasetConfig] = {
         n_orders=0,
         snr_range=(1.0, 3.0),
         n_timepoints=50,
+        correlation_mode="realistic",
+        noise_low_rank_dim=(2, 8),
     ),
     "extended_source": DatasetConfig(
         name="Extended Source",
@@ -56,6 +63,8 @@ BENCHMARK_DATASETS: dict[str, DatasetConfig] = {
         source_spatial_model="contiguous_gaussian",
         patch_rank=(1, 2),
         n_timepoints=50,
+        correlation_mode="realistic",
+        noise_low_rank_dim=(2, 8),
     ),
     "noisy": DatasetConfig(
         name="Noisy",
@@ -64,6 +73,8 @@ BENCHMARK_DATASETS: dict[str, DatasetConfig] = {
         n_orders=(0, 2),
         snr_range=(-5.0, 0.0),
         n_timepoints=50,
+        correlation_mode="realistic",
+        noise_low_rank_dim=(2, 8),
     ),
     "ongoing_mixture": DatasetConfig(
         name="Ongoing Mixture",
@@ -83,9 +94,7 @@ BENCHMARK_DATASETS: dict[str, DatasetConfig] = {
         background_mixture_alpha=(0.5, 0.8),
         amplitude_range=(0.05, 1.0),
         amplitude_distribution="log_uniform",
-        correlation_mode="auto",
-        correlation_modes=["low_rank", "banded", "diagonal"],
-        correlation_mode_weights=[1 / 3, 1 / 3, 1 / 3],
+        correlation_mode="realistic",
         noise_temporal_beta=(0.5, 2.0),
         noise_low_rank_dim=(2, 8),
     ),
