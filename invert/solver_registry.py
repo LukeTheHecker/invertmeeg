@@ -157,6 +157,17 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         class_name="SolverTotalVariation",
         aliases=("total-variation", "graph-tv"),
     ),
+    SolverSpec(
+        solver_id="sissy",
+        module_path="invert.solvers.minimum_norm.sissy",
+        class_name="SolverSISSY",
+    ),
+    SolverSpec(
+        solver_id="apesissy",
+        module_path="invert.solvers.minimum_norm.apesissy",
+        class_name="SolverAPESISSY",
+        aliases=("ape-sissy",),
+    ),
     # -- Bayesian / Champagne ----------------------------------------------
     SolverSpec(
         solver_id="champagne-mackay",

@@ -81,6 +81,8 @@ all_solvers = [
     "ECD",
     "SESAME",
     "TV",
+    "SISSY",
+    "APESISSY",
     "VB-SBL",
     "MEM",
     "Random-Noise",

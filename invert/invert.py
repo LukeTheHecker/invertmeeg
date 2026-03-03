@@ -205,6 +205,8 @@ def _build_registry() -> dict[str, Any]:
 
     # -- Structured sparsity / edge-preserving -----------------------------
     _add(["tv", "total-variation", "graph-tv"], solvers.SolverTotalVariation)
+    _add(["sissy"], solvers.SolverSISSY)
+    _add(["apesissy", "ape-sissy"], solvers.SolverAPESISSY)
 
     # -- Artificial Neural Networks (optional torch) ------------------------
     try:

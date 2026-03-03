@@ -1,3 +1,4 @@
+from .apesissy import SolverAPESISSY
 from .backus_gilbert import SolverBackusGilbert
 from .basis_functions import SolverBasisFunctions
 from .dspm import SolverDSPM
@@ -12,6 +13,7 @@ from .minimum_l1_norm import SolverMinimumL1Norm
 from .minimum_l1_norm_gpt import SolverMinimumL1NormGPT
 from .mne import SolverMNE
 from .mxne import SolverMxNEBCD
+from .sissy import SolverSISSY
 from .self_regularized import SolverSelfRegularizedELORETA
 from .sloreta import SolverSLORETA
 from .smap import SolverSMAP
@@ -25,6 +27,8 @@ __all__ = [
     "SolverGFTMNE",
     "SolverWMNE",
     "SolverDSPM",
+    "SolverSISSY",
+    "SolverAPESISSY",
     "SolverMinimumL1Norm",
     "SolverGFTMinimumL1Norm",
     "SolverMinimumL1NormGPT",
