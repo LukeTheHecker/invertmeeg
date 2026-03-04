@@ -224,14 +224,14 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         aliases=("lowsnrchampagne", "low-snr-champagne", "lowsnr-champagne", "lsc"),
         display_name="Low-SNR-Champagne",
     ),
-    SolverSpec(
-        solver_id="champagne-adaptive",
-        module_path="invert.solvers.bayesian.champagne",
-        class_name="SolverChampagne",
-        default_kwargs={"update_rule": "Adaptive"},
-        aliases=("adaptivechampagne", "adaptive-champagne", "ac"),
-        display_name="Adaptive-Champagne",
-    ),
+    # SolverSpec(
+    #     solver_id="champagne-adaptive",
+    #     module_path="invert.solvers.bayesian.champagne",
+    #     class_name="SolverChampagne",
+    #     default_kwargs={"update_rule": "Adaptive"},
+    #     aliases=("adaptivechampagne", "adaptive-champagne", "ac"),
+    #     display_name="Adaptive-Champagne",
+    # ),
     # -- Champagne + noise learning (MacKay) --------------------------------
     SolverSpec(
         solver_id="champagne-mackay-nl-homoscedastic",
