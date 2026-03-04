@@ -32,7 +32,13 @@ class SolverSpec:
     class_name: str  # The name of the solver class
     default_kwargs: Mapping[str, Any] = field(
         default_factory=dict
-    )  # Default keyword arguments for the solver
+    )  # Default keyword arguments for the solver __init__
+    default_make_kwargs: Mapping[str, Any] = field(
+        default_factory=dict
+    )  # Default keyword arguments for make_inverse_operator
+    default_apply_kwargs: Mapping[str, Any] = field(
+        default_factory=dict
+    )  # Default keyword arguments for apply_inverse_operator
     aliases: tuple[str, ...] = ()  # Aliases for the solver
     display_name: str | None = None  # The display name of the solver
     requires: tuple[str, ...] = ()  # Optional requirements for the solver
@@ -645,9 +651,25 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         class_name="SolverOMP",
     ),
     SolverSpec(
+        solver_id="flex-omp",
+        module_path="invert.solvers.matching_pursuit.omp",
+        class_name="SolverOMP",
+        default_apply_kwargs={"include_patches": True, "include_singletons": True},
+        aliases=("flexomp",),
+        display_name="FLEX-OMP",
+    ),
+    SolverSpec(
         solver_id="cosamp",
         module_path="invert.solvers.matching_pursuit.cosamp",
         class_name="SolverCOSAMP",
+    ),
+    SolverSpec(
+        solver_id="flex-cosamp",
+        module_path="invert.solvers.matching_pursuit.cosamp",
+        class_name="SolverCOSAMP",
+        default_apply_kwargs={"include_patches": True, "include_singletons": True},
+        aliases=("flexcosamp",),
+        display_name="FLEX-CoSaMP",
     ),
     SolverSpec(
         solver_id="rembo",
@@ -655,9 +677,25 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         class_name="SolverREMBO",
     ),
     SolverSpec(
+        solver_id="flex-rembo",
+        module_path="invert.solvers.matching_pursuit.rembo",
+        class_name="SolverREMBO",
+        default_apply_kwargs={"include_patches": True, "include_singletons": True},
+        aliases=("flexrembo",),
+        display_name="FLEX-ReMBo",
+    ),
+    SolverSpec(
         solver_id="sp",
         module_path="invert.solvers.matching_pursuit.sp",
         class_name="SolverSP",
+    ),
+    SolverSpec(
+        solver_id="flex-sp",
+        module_path="invert.solvers.matching_pursuit.sp",
+        class_name="SolverSP",
+        default_apply_kwargs={"include_patches": True, "include_singletons": True},
+        aliases=("flexsp",),
+        display_name="FLEX-SP",
     ),
     SolverSpec(
         solver_id="subsmp",
@@ -685,6 +723,7 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         module_path="invert.solvers.music.flex_music",
         class_name="SolverFLEXMUSIC",
         default_kwargs={"name": "RAP-MUSIC"},
+        default_make_kwargs={"n_orders": 0},
         aliases=("rap",),
         display_name="RAP-MUSIC",
     ),
@@ -693,6 +732,7 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         module_path="invert.solvers.music.flex_music",
         class_name="SolverFLEXMUSIC",
         default_kwargs={"name": "TRAP-MUSIC"},
+        default_make_kwargs={"n_orders": 0, "truncate": True},
         aliases=("trap",),
         display_name="TRAP-MUSIC",
     ),
@@ -700,14 +740,25 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         solver_id="flex-music",
         module_path="invert.solvers.music.flex_music",
         class_name="SolverFLEXMUSIC",
+        default_make_kwargs={"n_orders": 3},
         aliases=("flex-rap-music", "flex"),
         display_name="FLEX-MUSIC",
+    ),
+    SolverSpec(
+        solver_id="flex-trap-music",
+        module_path="invert.solvers.music.flex_music",
+        class_name="SolverFLEXMUSIC",
+        default_kwargs={"name": "FLEX-TRAP-MUSIC"},
+        default_make_kwargs={"n_orders": 3, "truncate": True},
+        aliases=("flextrap",),
+        display_name="FLEX-TRAP-MUSIC",
     ),
     SolverSpec(
         solver_id="flex-ssm",
         module_path="invert.solvers.music.signal_subspace_matching",
         class_name="SolverSignalSubspaceMatching",
         default_kwargs={"name": "Flexible Signal Subspace Matching"},
+        default_make_kwargs={"n_orders": 3},
         display_name="FLEX-SSM",
     ),
     SolverSpec(
@@ -715,6 +766,7 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         module_path="invert.solvers.music.signal_subspace_matching",
         class_name="SolverSignalSubspaceMatching",
         default_kwargs={"name": "Signal Subspace Matching"},
+        default_make_kwargs={"n_orders": 0},
         display_name="SSM",
     ),
     SolverSpec(
@@ -722,6 +774,7 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         module_path="invert.solvers.music.alternating_projections",
         class_name="SolverAlternatingProjections",
         default_kwargs={"name": "Flexible Alternating Projections"},
+        default_make_kwargs={"n_orders": 3},
         aliases=("altproj",),
         display_name="FLEX-AP",
     ),
@@ -730,14 +783,25 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         module_path="invert.solvers.music.alternating_projections",
         class_name="SolverAlternatingProjections",
         default_kwargs={"name": "Alternating Projections"},
+        default_make_kwargs={"n_orders": 0},
         display_name="AP",
     ),
-    SolverSpec(
-        solver_id="generalized-iterative",
-        module_path="invert.solvers.music.generalized_iterative",
-        class_name="SolverGeneralizedIterative",
-        aliases=("gi", "geniterative"),
-    ),
+    # Commented since it duplicates SSM
+    # SolverSpec(
+    #     solver_id="generalized-iterative",
+    #     module_path="invert.solvers.music.generalized_iterative",
+    #     class_name="SolverGeneralizedIterative",
+    #     default_make_kwargs={"n_orders": 0},
+    #     aliases=("gi", "geniterative"),
+    # ),
+    # SolverSpec(
+    #     solver_id="flex-generalized-iterative",
+    #     module_path="invert.solvers.music.generalized_iterative",
+    #     class_name="SolverGeneralizedIterative",
+    #     default_make_kwargs={"n_orders": 3},
+    #     aliases=("flex-gi", "flexgi", "flex-geniterative"),
+    #     display_name="FLEX-GI",
+    # ),
     # -- Basis Functions ----------------------------------------------------
     SolverSpec(
         solver_id="gbf",

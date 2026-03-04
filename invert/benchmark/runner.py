@@ -268,6 +268,18 @@ def _split_solver_params(
     return init_params, make_params, apply_params
 
 
+def _patch_solver_data_cov(solver: BaseSolver, pooled_cov: np.ndarray) -> None:
+    """Override solver.data_covariance to return pre-computed pooled covariance."""
+
+    def _patched(Y=None, *, center=True, ddof=1):
+        W = getattr(solver, "_sensor_transform", None)
+        if W is not None:
+            return W @ pooled_cov @ W.T
+        return pooled_cov.copy()
+
+    solver.data_covariance = _patched  # type: ignore[assignment]
+
+
 def _compute_and_apply_worker(
     idx: int,
     solver_module: str,
@@ -281,6 +293,7 @@ def _compute_and_apply_worker(
     require_data: bool,
     noise_cov: mne.Covariance | None = None,
     solver_params: dict[str, Any] | None = None,
+    pooled_data_cov: np.ndarray | None = None,
 ) -> tuple[int, dict]:
     """Worker for computing fresh inverse operator per sample.
 
@@ -292,6 +305,9 @@ def _compute_and_apply_worker(
     solver_cls = getattr(mod, solver_class)
     init_params, make_params, apply_params = _split_solver_params(solver_params)
     solver = solver_cls(**init_params)
+
+    if pooled_data_cov is not None:
+        _patch_solver_data_cov(solver, pooled_data_cov)
 
     evoked = mne.EvokedArray(x_sample, info, tmin=0.0, verbose=0)
     _make_inverse_operator_with_covariance(
@@ -518,6 +534,12 @@ class BenchmarkRunner:
                 ]
                 noise_cov = noise_covs[0]
 
+                # Pooled data covariance from all samples (centered per-sample)
+                x_centered = x_batch - x_batch.mean(axis=2, keepdims=True)
+                n_total = x_batch.shape[0] * x_batch.shape[2]
+                X_flat = x_centered.transpose(1, 0, 2).reshape(x_batch.shape[1], -1)
+                pooled_data_cov = (X_flat @ X_flat.T) / max(n_total - 1, 1)
+
                 for solver_name in self.solvers:
                     logger.info("  Solver: %s", solver_name)
                     spec = get_solver_spec(solver_name)
@@ -526,6 +548,8 @@ class BenchmarkRunner:
                         self.solver_params.get(solver_name, {})
                     )
                     merged_init = {**spec.default_kwargs, **init_params}
+                    make_params = {**spec.default_make_kwargs, **make_params}
+                    apply_params = {**spec.default_apply_kwargs, **apply_params}
                     solver = solver_cls(**merged_init)
 
                     # Best-effort determinism for fair comparisons when a seed is provided.
@@ -591,6 +615,7 @@ class BenchmarkRunner:
                     # Parallelize based on require_recompute
                     elif not solver.require_recompute:
                         # Compute inverse operator once, then parallelize application
+                        _patch_solver_data_cov(solver, pooled_data_cov)
                         evoked = None
                         if solver.require_data:
                             evoked = mne.EvokedArray(
@@ -707,6 +732,10 @@ class BenchmarkRunner:
                         merged_params = {
                             f"init__{k}": v for k, v in spec.default_kwargs.items()
                         }
+                        for k, v in spec.default_make_kwargs.items():
+                            merged_params[f"make__{k}"] = v
+                        for k, v in spec.default_apply_kwargs.items():
+                            merged_params[f"apply__{k}"] = v
                         merged_params.update(self.solver_params.get(solver_name, {}))
 
                         sample_metrics = self._run_parallel_compute(
@@ -723,6 +752,7 @@ class BenchmarkRunner:
                             solver_name,
                             noise_covs,
                             merged_params,
+                            pooled_data_cov,
                         )
                         total_seconds = time.perf_counter() - t_solver_start
                         timing_info = TimingInfo(total_seconds=total_seconds)
@@ -817,6 +847,7 @@ class BenchmarkRunner:
         solver_name: str,
         noise_covs: list[mne.Covariance] | None = None,
         solver_params: dict[str, Any] | None = None,
+        pooled_data_cov: np.ndarray | None = None,
     ) -> list[SampleMetrics]:
         """Parallelize full computation (require_recompute=True)."""
         if self.n_jobs == 1:
@@ -841,6 +872,7 @@ class BenchmarkRunner:
                     require_data,
                     nc,
                     solver_params,
+                    pooled_data_cov,
                 )
                 sample_metrics.append(self._metrics_from_dict(metrics))
             return sample_metrics
@@ -862,6 +894,7 @@ class BenchmarkRunner:
                     require_data,
                     noise_covs[i] if noise_covs else None,
                     solver_params,
+                    pooled_data_cov,
                 ): i
                 for i in range(self.n_samples)
             }
