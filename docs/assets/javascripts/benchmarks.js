@@ -1,11 +1,14 @@
 (() => {
   const METRIC_LABELS = {
-    mean_localization_error: "MLE (m)",
-    emd: "EMD",
+    mean_localization_error: "MLE (mm)",
+    emd: "EMD (mm)",
     spatial_dispersion: "Spatial Disp.",
     average_precision: "Avg Precision",
     correlation: "Correlation",
   };
+
+  // Metrics stored in meters that should be displayed in millimeters.
+  const M_TO_MM = new Set(["mean_localization_error", "emd"]);
 
   const HIGHER_BETTER = new Set(["average_precision", "correlation"]);
 
@@ -374,7 +377,7 @@
       const value = stat[field];
       if (value === null || value === undefined) return null;
       if (typeof value !== "number" || Number.isNaN(value)) return null;
-      return value;
+      return M_TO_MM.has(state.metric) ? value * 1000 : value;
     }
 
     function compareText(a, b, sortMode) {
