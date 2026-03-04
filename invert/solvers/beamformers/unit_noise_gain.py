@@ -35,7 +35,7 @@ class SolverUnitNoiseGain(BaseBeamformer):
         forward,
         mne_obj=None,
         *args,
-        weight_norm=True,
+        weight_norm=False,
         noise_cov: mne.Covariance | None = None,
         alpha="auto",
         cov_reg: str = "oas",

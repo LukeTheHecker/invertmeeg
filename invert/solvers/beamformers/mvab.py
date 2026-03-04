@@ -55,7 +55,7 @@ class SolverMVAB(BaseBeamformer):
         cov_reg: str = "oas",
         cov_reg_beta: float = 0.05,
         cov_reg_cond_target: float = 1e4,
-        weight_norm=True,
+        weight_norm=False,
         **kwargs,
     ):
         """Calculate inverse operator.

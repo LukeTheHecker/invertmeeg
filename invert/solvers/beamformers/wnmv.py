@@ -41,7 +41,7 @@ class SolverWNMV(BaseBeamformer):
         forward,
         mne_obj=None,
         *args,
-        weight_norm=True,
+        weight_norm=False,
         alpha="auto",
         noise_cov: mne.Covariance | None = None,
         cov_reg: str = "oas",
