@@ -31,14 +31,9 @@ if __name__ == "__main__":
             "other",
         ],
         exclude_solvers=[
-            "SESAME",
-            "EBB",
-            "ReciPSIICOS-Plain",
             "ReciPSIICOS-Whitened",
             "champagne-ar-em",
             "champagne-tem",
-            "exhaustive-ml",
-            "cmem",  # scipy.optimize.minimize L-BFGS-B crashes with ThreadPoolExecutor
         ],
         # solvers=[
         #     "CovCNN",

@@ -144,7 +144,7 @@ class SolverEBB(BaseBeamformer):
                     )
                     break
             else:
-                logger.warning(
+                logger.info(
                     "EBB reached max iterations (%d), max change: %.2e",
                     max_iter,
                     max_change,
