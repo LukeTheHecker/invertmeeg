@@ -320,7 +320,7 @@ def _cmem(
     # For smooth/patch-like sources (e.g. SimulationGenerator order>=1), parcels of
     # ~10 vertices tend to fragment true sources, hurting accuracy and increasing
     # the number of parcel terms in the MEM dual. Prefer larger parcels by default.
-    min_vertices_per_parcel = 60
+    min_vertices_per_parcel = 15
     num_parcels = min(num_parcels, max(5, n // min_vertices_per_parcel))
     num_parcels = max(num_parcels, 1)
 
@@ -386,10 +386,6 @@ def _cmem(
         time_power = np.sum(Y * Y, axis=0)
         ref_idx = np.argsort(time_power)[-n_ref:]
     Y_ref = np.asarray(Y[:, ref_idx], dtype=float, order="F")
-    # Scale out amplitude: Sigma calibration should reflect geometry, not the
-    # absolute momentary signal/noise magnitude at a particular time sample.
-    y_norm = np.linalg.norm(Y_ref, axis=0, keepdims=True)
-    Y_ref = Y_ref / np.maximum(y_norm, 1e-30)
     Xi_ref = L.T @ Y_ref  # (n_sources, n_ref)
 
     precomputed = []
@@ -449,11 +445,11 @@ def _cmem(
     noise_s = float(np.median(svals)) if svals.size else 0.0
     snr_proxy = float(svals[0] / max(noise_s, 1e-30)) if svals.size else 1.0
     if snr_proxy < 2.0:
-        target_E = 3.0
+        target_E = 1.5
     elif snr_proxy < 4.0:
-        target_E = 6.0
+        target_E = 2.5
     else:
-        target_E = 10.0
+        target_E = 3.5
     # Use a high percentile rather than max to reduce sensitivity to outliers.
     E_scale = float(np.percentile(E_refs, 95)) if len(E_refs) else 0.0
     if E_scale > 1e-30:
