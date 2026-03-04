@@ -170,7 +170,6 @@ print(f"{'Solver':<20} {'Run1':>8} {'Run2':>8} {'Run3':>8} {'Run4':>8} {'Mean':>
 print(f"{'=' * 70}")
 
 results = []
-USE_EPOCHS_FOR_COV = {"LCMV", "ESMV"}
 for solver_name in SOLVERS:
     errors = []
     failed = False
@@ -178,8 +177,8 @@ for solver_name in SOLVERS:
         r = runs[rid]
         try:
             solver = Solver(solver_name, plot_reg=True)
-            cov_obj = r["epochs"] if solver_name in USE_EPOCHS_FOR_COV else r["evoked"]
-            solver.make_inverse_operator(r["fwd"], cov_obj)  # , noise_cov=r["cov"])
+            cov_obj = r["epochs"] if getattr(solver, "_is_beamformer", False) else r["evoked"]
+            solver.make_inverse_operator(r["fwd"], cov_obj, noise_cov=r["cov"])
             stc = solver.apply_inverse_operator(
                 r["evoked"].copy().crop(PEAK_TIME, PEAK_TIME)
             )

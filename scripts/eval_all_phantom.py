@@ -47,7 +47,6 @@ BAD_CHANNELS = ["A173", "A213", "A232"]
 PEAK_TIME = 0.07
 PEAK_WINDOW = 0.02
 MODE_NAMES = {"no_whitening": "phantom-no-whitening", "whitening": "phantom-whitening"}
-USE_EPOCHS_FOR_COV = {"lcmv", "esmv"}
 DEFAULT_EXCLUDE = ["champagne-tem", "champagne-ar-em"]
 
 ACTUAL_POS = (
@@ -274,7 +273,7 @@ def _evaluate_solver_mode(
             if orientation is not None:
                 solver_kwargs["orientation"] = orientation
             solver = solver_cls(**solver_kwargs)
-            mne_obj = run.epochs if solver_id in USE_EPOCHS_FOR_COV else run.evoked
+            mne_obj = run.epochs if getattr(solver, "_is_beamformer", False) else run.evoked
             try:
                 if per_run_timeout and per_run_timeout > 0:
                     old_handler = signal.getsignal(signal.SIGALRM)
@@ -295,7 +294,7 @@ def _evaluate_solver_mode(
                         run.forward,
                         mne_obj,
                         alpha="auto",
-                        noise_cov=run.cov if whitening else None,
+                        noise_cov=run.cov,
                     )
                     make_seconds += time.perf_counter() - t_make
 
@@ -306,9 +305,11 @@ def _evaluate_solver_mode(
                     apply_seconds += time.perf_counter() - t_apply
 
                     source_mat = _collapse_orientation(stc.data, run.pos.shape[0])
+                    # Collapse time to single column (max abs) for evaluation
+                    source_power = np.max(np.abs(source_mat), axis=1, keepdims=True)
                     metrics = evaluate_all(
                         run.y_true,
-                        source_mat,
+                        source_power,
                         run.adjacency,
                         run.adjacency,
                         run.pos,
