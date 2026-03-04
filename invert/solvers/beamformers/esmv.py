@@ -136,7 +136,8 @@ class SolverESMV(BaseBeamformer):
         # Recompute regularization based on the max eigenvalue of the Covariance
         # Matrix (opposed to that of the leadfield)
         y_eff -= y_eff.mean(axis=1, keepdims=True)
-        C = self.data_covariance(y_eff, center=False, ddof=1)
+        n_times = y_eff.shape[1]
+        C = (y_eff @ y_eff.T) / max(n_times - 1, 1)
         eigvals, eigvecs = np.linalg.eigh(C)
         order = np.argsort(eigvals)[::-1]
         eigvecs = eigvecs[:, order]

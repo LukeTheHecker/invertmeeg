@@ -169,7 +169,8 @@ class SolverAdaptFlexESMV(BaseBeamformer):
         y = wf.sensor_transform @ data
         I = np.identity(n_chans)
         y -= y.mean(axis=1, keepdims=True)
-        C = self.data_covariance(y, center=False, ddof=1)
+        n_times = y.shape[1]
+        C = (y @ y.T) / max(n_times - 1, 1)
         cov_mats, self.alphas, cov_meta = build_covariance_candidates(
             C=C,
             I=I,
