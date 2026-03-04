@@ -7,6 +7,7 @@ from .graph_wiener_smooth_sparse_adaptive import SolverGraphWienerSmoothSparseAd
 from .graph_wiener_smooth_sparse_adaptive_robust import (
     SolverGraphWienerSmoothSparseAdaptiveRobustEB,
 )
+from .hydra import SolverHydra
 
 __all__ = [
     "SolverAPSE",
@@ -16,4 +17,5 @@ __all__ = [
     "SolverGraphWienerSmoothSparseEB",
     "SolverGraphWienerSmoothSparseAdaptiveEB",
     "SolverGraphWienerSmoothSparseAdaptiveRobustEB",
+    "SolverHydra",
 ]

@@ -114,6 +114,7 @@ __all__ = [
     "SolverGraphWienerSmoothSparseEB",
     "SolverGraphWienerSmoothSparseAdaptiveEB",
     "SolverGraphWienerSmoothSparseAdaptiveRobustEB",
+    "SolverHydra",
     # ANN (optional)
     "SolverCNN",
     "SolverCovCNN",

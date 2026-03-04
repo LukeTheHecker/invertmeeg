@@ -867,6 +867,12 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         class_name="SolverChimera",
     ),
     SolverSpec(
+        solver_id="hydra",
+        module_path="invert.solvers.hybrids.hydra",
+        class_name="SolverHydra",
+        display_name="Hydra",
+    ),
+    SolverSpec(
         solver_id="exso-music",
         module_path="invert.solvers.music.exso_music",
         class_name="SolverExSoMUSIC",

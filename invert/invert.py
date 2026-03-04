@@ -277,6 +277,7 @@ def _build_registry() -> dict[str, Any]:
     _add("epifocus", solvers.SolverEPIFOCUS)
     _add("apse", solvers.hybrids.SolverAPSE)
     _add("chimera", solvers.hybrids.SolverChimera)
+    _add("hydra", solvers.hybrids.SolverHydra)
     _add(
         ["graph-wiener-mixture", "gw-mix", "gwmix", "graph-wiener"],
         solvers.hybrids.SolverGraphWienerMixture,
