@@ -25,7 +25,7 @@ assert _spec.loader is not None
 _eval_mod = _ilu.module_from_spec(_spec)
 _spec.loader.exec_module(_eval_mod)
 evaluate_all = _eval_mod.evaluate_all
-from invert.simulate import SimulationConfig, SimulationGenerator  # noqa: E402
+from invert.simulate import NMMSimulator, SimulationBatch, SimulationConfig, SimulationGenerator  # noqa: E402
 from invert.solver_registry import (  # noqa: E402
     get_solver_class,
     get_solver_spec,
@@ -42,6 +42,22 @@ from .depth_tuning import (  # noqa: E402
 )
 
 logger = logging.getLogger(__name__)
+
+_RANK_EXCLUDED_METRICS = frozenset({"spatial_dispersion"})
+
+
+def _ranked_metric_names(metric_names: set[str]) -> list[str]:
+    """Return the metrics that should contribute to leaderboard ranking."""
+    return sorted(name for name in metric_names if name not in _RANK_EXCLUDED_METRICS)
+
+
+def _evaluation_protocol_metadata() -> dict[str, Any]:
+    return {
+        "time_sampling": {"kind": "equidistant", "n_time_samples": 5},
+        "localization_signal": "magnitude",
+        "correlation_signal": "unsigned",
+        "excluded_from_ranking": sorted(_RANK_EXCLUDED_METRICS),
+    }
 
 
 def _expects_simulation_config(solver_cls: type[BaseSolver]) -> bool:
@@ -82,17 +98,16 @@ def _default_nn_batch_size(forward: mne.Forward) -> int:
 def _generate_solver_categories() -> dict[str, list[str]]:
     """Automatically generate solver categories from solver_registry.
 
-    Categories are determined by the solver's module path:
-    - beamformers/ -> beamformer
-    - bayesian/ -> bayesian
-    - minimum_norm/ -> loreta (if solver_id contains "loreta") or minimum_norm
-    - music/ -> music
-    - matching_pursuit/ -> matching_pursuit
-    - hybrids/ -> other
-    - neural_networks/ -> neural_networks
-    - dipoles/ -> other
-    - random_noise -> other
+    Categories are determined by the solver's module path. The directory
+    name is used directly as the category, except for a few renames
+    (beamformers -> beamformer) and minimum_norm which splits out loreta.
+    Top-level solver files (e.g. random_noise.py) go to "other".
     """
+    # directory name -> category name (identity if not listed)
+    _DIR_TO_CATEGORY = {
+        "beamformers": "beamformer",
+    }
+
     categories: dict[str, list[str]] = {}
 
     for spec in iter_solver_specs(include_internal=False, include_unavailable=True):
@@ -102,29 +117,18 @@ def _generate_solver_categories() -> dict[str, list[str]]:
         # Extract directory from module path
         # e.g., "invert.solvers.beamformers.esmv" -> "beamformers"
         parts = module_path.split(".")
-        if len(parts) < 3 or parts[0] != "invert" or parts[1] != "solvers":
+        if len(parts) < 4 or parts[0] != "invert" or parts[1] != "solvers":
+            # Top-level solver files (random_noise.py, etc.)
             categories.setdefault("other", []).append(solver_id)
             continue
 
         directory = parts[2]
 
-        if directory == "beamformers":
-            category = "beamformer"
-        elif directory == "bayesian":
-            category = "bayesian"
-        elif directory == "minimum_norm":
-            if "loreta" in solver_id:
-                category = "loreta"
-            else:
-                category = "minimum_norm"
-        elif directory == "music":
-            category = "music"
-        elif directory == "matching_pursuit":
-            category = "matching_pursuit"
-        elif directory == "neural_networks":
-            category = "neural_networks"
+        # Special split: loreta variants out of minimum_norm
+        if directory == "minimum_norm" and "loreta" in solver_id:
+            category = "loreta"
         else:
-            category = "other"
+            category = _DIR_TO_CATEGORY.get(directory, directory)
 
         categories.setdefault(category, []).append(solver_id)
 
@@ -467,6 +471,72 @@ class BenchmarkRunner:
 
         self._results: list[BenchmarkResult] = []
 
+    def _generate_default_batch(self, ds_config: DatasetConfig):
+        """Generate a batch using the default SimulationGenerator."""
+        sim_kwargs: dict[str, Any] = dict(
+            batch_size=self.n_samples,
+            n_sources=ds_config.n_sources,
+            n_orders=ds_config.n_orders,
+            snr_range=ds_config.snr_range,
+            n_timepoints=ds_config.n_timepoints,
+            source_spatial_model=ds_config.source_spatial_model,
+            patch_rank=ds_config.patch_rank,
+            simulation_mode=getattr(ds_config, "simulation_mode", "patches"),
+            random_seed=self.random_seed,
+            estimate_noise_cov=True,
+            return_noise_cov=True,
+        )
+        if getattr(ds_config, "background_beta", None) is not None:
+            sim_kwargs["background_beta"] = ds_config.background_beta
+        if getattr(ds_config, "background_mixture_alpha", None) is not None:
+            sim_kwargs["background_mixture_alpha"] = ds_config.background_mixture_alpha
+        if getattr(ds_config, "amplitude_range", None) is not None:
+            sim_kwargs["amplitude_range"] = ds_config.amplitude_range
+        if getattr(ds_config, "amplitude_distribution", None) is not None:
+            sim_kwargs["amplitude_distribution"] = ds_config.amplitude_distribution
+        if getattr(ds_config, "correlation_mode", None) is not None:
+            sim_kwargs["correlation_mode"] = ds_config.correlation_mode
+        if getattr(ds_config, "correlation_modes", None) is not None:
+            sim_kwargs["correlation_modes"] = ds_config.correlation_modes
+        if getattr(ds_config, "correlation_mode_weights", None) is not None:
+            sim_kwargs["correlation_mode_weights"] = ds_config.correlation_mode_weights
+        if getattr(ds_config, "noise_temporal_beta", None) is not None:
+            sim_kwargs["noise_temporal_beta"] = ds_config.noise_temporal_beta
+        if getattr(ds_config, "noise_low_rank_dim", None) is not None:
+            sim_kwargs["noise_low_rank_dim"] = ds_config.noise_low_rank_dim
+        if getattr(ds_config, "source_extent", None) is not None:
+            sim_kwargs["source_extent"] = ds_config.source_extent
+
+        sim_config = SimulationConfig(**sim_kwargs)
+        gen = SimulationGenerator(self.forward, config=sim_config)
+        return next(gen.generate())
+
+    def _generate_nmm_batch(self, ds_config: DatasetConfig):
+        """Generate a batch using the NMMSimulator."""
+        nmm_kwargs: dict[str, Any] = dict(
+            batch_size=self.n_samples,
+            n_sources=ds_config.n_sources,
+            snr_range=ds_config.snr_range,
+            duration_s=ds_config.duration_s,
+            sfreq=ds_config.sfreq,
+            spike_mode=ds_config.spike_mode,
+            coupling_strength=ds_config.coupling_strength,
+            n_pool=ds_config.n_pool,
+            correlation_mode=ds_config.correlation_mode or "realistic",
+            estimate_noise_cov=True,
+            return_noise_cov=True,
+            random_seed=self.random_seed,
+        )
+        if getattr(ds_config, "source_extent", None) is not None:
+            nmm_kwargs["source_extent"] = ds_config.source_extent
+        if getattr(ds_config, "noise_temporal_beta", None) is not None:
+            nmm_kwargs["noise_temporal_beta"] = ds_config.noise_temporal_beta
+        if getattr(ds_config, "noise_low_rank_dim", None) is not None:
+            nmm_kwargs["noise_low_rank_dim"] = ds_config.noise_low_rank_dim
+
+        gen = NMMSimulator(self.forward, **nmm_kwargs)
+        return next(gen.generate())
+
     def run(self) -> list[BenchmarkResult]:
         pos = pos_from_forward(self.forward)
         adjacency = mne.spatial_src_adjacency(self.forward["src"], verbose=0)
@@ -482,43 +552,16 @@ class BenchmarkRunner:
                 logger.info("Dataset: %s", ds_name)
 
                 # Generate all samples for this dataset once
-                sim_kwargs: dict[str, Any] = dict(
-                    batch_size=self.n_samples,
-                    n_sources=ds_config.n_sources,
-                    n_orders=ds_config.n_orders,
-                    snr_range=ds_config.snr_range,
-                    n_timepoints=ds_config.n_timepoints,
-                    source_spatial_model=ds_config.source_spatial_model,
-                    patch_rank=ds_config.patch_rank,
-                    simulation_mode=getattr(ds_config, "simulation_mode", "patches"),
-                    random_seed=self.random_seed,
-                    estimate_noise_cov=True,
-                    return_noise_cov=True,
+                if getattr(ds_config, "simulator_type", "default") == "nmm":
+                    batch = self._generate_nmm_batch(ds_config)
+                else:
+                    batch = self._generate_default_batch(ds_config)
+                x_batch, y_batch, sim_info = batch.x, batch.y, batch.info
+                # For evaluation: use patch-only sources when available
+                # (mixture mode), otherwise use full source activity.
+                y_eval_batch = (
+                    batch.y_patches if batch.y_patches is not None else y_batch
                 )
-                if getattr(ds_config, "background_beta", None) is not None:
-                    sim_kwargs["background_beta"] = ds_config.background_beta
-                if getattr(ds_config, "background_mixture_alpha", None) is not None:
-                    sim_kwargs["background_mixture_alpha"] = ds_config.background_mixture_alpha
-                if getattr(ds_config, "amplitude_range", None) is not None:
-                    sim_kwargs["amplitude_range"] = ds_config.amplitude_range
-                if getattr(ds_config, "amplitude_distribution", None) is not None:
-                    sim_kwargs["amplitude_distribution"] = ds_config.amplitude_distribution
-                if getattr(ds_config, "correlation_mode", None) is not None:
-                    sim_kwargs["correlation_mode"] = ds_config.correlation_mode
-                if getattr(ds_config, "correlation_modes", None) is not None:
-                    sim_kwargs["correlation_modes"] = ds_config.correlation_modes
-                if getattr(ds_config, "correlation_mode_weights", None) is not None:
-                    sim_kwargs["correlation_mode_weights"] = ds_config.correlation_mode_weights
-                if getattr(ds_config, "noise_temporal_beta", None) is not None:
-                    sim_kwargs["noise_temporal_beta"] = ds_config.noise_temporal_beta
-                if getattr(ds_config, "noise_low_rank_dim", None) is not None:
-                    sim_kwargs["noise_low_rank_dim"] = ds_config.noise_low_rank_dim
-                if getattr(ds_config, "source_extent", None) is not None:
-                    sim_kwargs["source_extent"] = ds_config.source_extent
-
-                sim_config = SimulationConfig(**sim_kwargs)
-                gen = SimulationGenerator(self.forward, config=sim_config)
-                x_batch, y_batch, sim_info = next(gen.generate())
                 # Per-sample noise covariance (scaled to match the actual
                 # noise level in each sample).  Solvers that recompute per
                 # sample receive the matching covariance; non-recompute
@@ -601,7 +644,7 @@ class BenchmarkRunner:
                             stc = solver.apply_inverse_operator(evoked, **apply_params)
                             y_pred = stc.data
                             metrics = evaluate_all(
-                                y_batch[i], y_pred, adjacency, adjacency, pos, pos
+                                y_eval_batch[i], y_pred, adjacency, adjacency, pos, pos
                             )
                             sample_metrics.append(self._metrics_from_dict(metrics))
                         apply_seconds = time.perf_counter() - t_apply
@@ -650,7 +693,7 @@ class BenchmarkRunner:
                                 )
                                 y_pred = stc.data
                                 metrics = evaluate_all(
-                                    y_batch[i], y_pred, adjacency, adjacency, pos, pos
+                                    y_eval_batch[i], y_pred, adjacency, adjacency, pos, pos
                                 )
                                 sample_metrics.append(self._metrics_from_dict(metrics))
                         else:
@@ -712,7 +755,7 @@ class BenchmarkRunner:
                             sample_metrics = self._run_parallel_apply(
                                 inv_op_matrix,
                                 x_batch,
-                                y_batch,
+                                y_eval_batch,
                                 adjacency,
                                 pos,
                                 ds_name,
@@ -744,7 +787,7 @@ class BenchmarkRunner:
                             self.forward,
                             self.info,
                             x_batch,
-                            y_batch,
+                            y_eval_batch,
                             adjacency,
                             pos,
                             solver.require_data,
@@ -986,11 +1029,12 @@ class BenchmarkRunner:
         all_metrics: set[str] = set()
         for r in self._results:
             all_metrics.update(r.metrics.keys())
+        ranked_metrics = _ranked_metric_names(all_metrics)
 
         best_solvers: dict[str, Any] = {}
         for dataset in datasets:
             best_solvers[dataset] = {}
-            for metric in all_metrics:
+            for metric in ranked_metrics:
                 # Find all results for this dataset
                 dataset_results = [
                     r for r in self._results if r.dataset_name == dataset
@@ -1012,14 +1056,7 @@ class BenchmarkRunner:
                     continue
 
                 # Determine best based on metric type
-                if metric == "spatial_dispersion":
-                    def _sd_err(v: float) -> float:
-                        if v is None or np.isnan(v) or v <= 0:
-                            return float("inf")
-                        return float(abs(np.log(v)))
-
-                    best_solver = min(solver_values.items(), key=lambda x: _sd_err(x[1]))
-                elif metric in lower_is_better:
+                if metric in lower_is_better:
                     best_solver = min(solver_values.items(), key=lambda x: x[1])
                 elif metric in higher_is_better:
                     best_solver = max(solver_values.items(), key=lambda x: x[1])
@@ -1056,6 +1093,7 @@ class BenchmarkRunner:
         all_metrics: set[str] = set()
         for r in self._results:
             all_metrics.update(r.metrics.keys())
+        ranked_metrics = _ranked_metric_names(all_metrics)
 
         # Collect ranks per dataset: dataset -> solver_name -> list of ranks
         dataset_solver_ranks: dict[str, dict[str, list[float]]] = {}
@@ -1063,7 +1101,7 @@ class BenchmarkRunner:
         for dataset in datasets:
             dataset_results = [r for r in self._results if r.dataset_name == dataset]
             dataset_solver_ranks[dataset] = {}
-            for metric in all_metrics:
+            for metric in ranked_metrics:
                 # Gather (solver, value) pairs, skip NaN
                 solver_values = []
                 for r in dataset_results:
@@ -1077,13 +1115,6 @@ class BenchmarkRunner:
 
                 if metric in higher_is_better:
                     solver_values.sort(key=lambda x: x[1], reverse=True)
-                elif metric == "spatial_dispersion":
-                    def _sd_err(v: float) -> float:
-                        if v is None or np.isnan(v) or v <= 0:
-                            return float("inf")
-                        return float(abs(np.log(v)))
-
-                    solver_values.sort(key=lambda x: _sd_err(x[1]), reverse=False)
                 else:
                     solver_values.sort(key=lambda x: x[1], reverse=False)
 
@@ -1209,12 +1240,7 @@ class BenchmarkRunner:
                     "pos_units": "m",
                     "pos_coord_frame": pos_coord_frame,
                     "pos_original_units": pos_original_units,
-                    "evaluation_protocol": {
-                        "time_sampling": {"kind": "equidistant", "n_time_samples": 5},
-                        "localization_signal": "magnitude",
-                        "correlation_signal": "signed",
-                        "spatial_dispersion_ranking": "abs_log_error",
-                    },
+                    "evaluation_protocol": _evaluation_protocol_metadata(),
                 },
                 "datasets": datasets_payload,
                 "results": [
@@ -1273,12 +1299,7 @@ class BenchmarkRunner:
                 "pos_units": "m",
                 "pos_coord_frame": pos_coord_frame,
                 "pos_original_units": pos_original_units,
-                "evaluation_protocol": {
-                    "time_sampling": {"kind": "equidistant", "n_time_samples": 5},
-                    "localization_signal": "magnitude",
-                    "correlation_signal": "signed",
-                    "spatial_dispersion_ranking": "abs_log_error",
-                },
+                "evaluation_protocol": _evaluation_protocol_metadata(),
             },
             "datasets": datasets_payload,
             "results": [r.model_dump() for r in self._results],
@@ -1347,6 +1368,9 @@ class BenchmarkRunner:
         data["best_solvers"] = best_solvers
         data["ranks"] = per_dataset_ranks
         data["global_ranks"] = global_ranks
+        metadata = data.get("metadata")
+        if isinstance(metadata, dict):
+            metadata["evaluation_protocol"] = _evaluation_protocol_metadata()
 
         # Write back
         path.write_text(json.dumps(data, indent=2))

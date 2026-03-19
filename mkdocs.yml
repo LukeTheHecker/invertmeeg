@@ -92,6 +92,7 @@ nav:
     - Visualization: modules/viz.md
     - Forward Modeling: modules/forward.md
     - Benchmarking: modules/benchmark.md
+  - Benchmark Datasets: datasets.md
   - Leaderboard: benchmarks.md
   - API Reference: api.md
   - License: license.md

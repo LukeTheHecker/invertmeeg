@@ -276,6 +276,16 @@ commercial license.
 
 If you use this package and publish results, please cite as:
 
+Preprint:
+
+```
+invertmeeg: A Benchmark and Unified Python Library for EEG Inverse Solvers
+bioRxiv (2026)
+https://www.biorxiv.org/content/10.64898/2026.03.06.710103v2
+```
+
+Repository:
+
 ```
 @Misc{invertmeeg2022,
   author =   {{Lukas Hecker}},

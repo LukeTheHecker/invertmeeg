@@ -6,6 +6,7 @@ variants.  Saves compact results to results/release/leaderboard.json.
 
 from pathlib import Path
 
+import invert.benchmark.runner as runner_mod
 from invert.benchmark import (
     RECOMMENDED_DEPTH_BY_CATEGORY,
     RECOMMENDED_DEPTH_BY_SOLVER,
@@ -13,38 +14,42 @@ from invert.benchmark import (
 )
 from invert.forward import create_forward_model, get_info
 
+# ANN training batch size (default would be 12*n_dipoles which is very large)
+runner_mod._default_nn_batch_size = lambda fwd: 2048
+
 if __name__ == "__main__":
     info = get_info(kind="biosemi32")
-    fwd = create_forward_model(sampling="ico3", info=info)
+    fwd = create_forward_model(sampling="ico2", info=info)
 
     runner = BenchmarkRunner(
         fwd,
         info,
-        n_samples=50,  # should be 50 for the full leaderboard
+        n_samples=20,  # should be 100 for the full leaderboard
         categories=[
-            "beamformer",
             "bayesian",
+            "beamformer",
+            "dipoles",
+            "hybrids",
+            "matching_pursuit",
             "minimum_norm",
             "loreta",
             "music",
-            "matching_pursuit",
             "other",
         ],
+        # solvers=[
+        #     "CovCNN",
+        #     "CovCNN-KL",
+        #     "FC",
+        # ],
         exclude_solvers=[
             "ReciPSIICOS-Whitened",
             "champagne-ar-em",
             "champagne-tem",
         ],
-        # solvers=[
-        #     "CovCNN",
-        #     "CovCNN-KL",
-        #     "CovCNN-KL-FLEXOMP",
-        # ],
         # solver_params={
-        #     # Script-level ANN speedup: keep global solver defaults unchanged.
-        #     "CovCNN": {"epochs": 120, "patience": 40},
-        #     "CovCNN-KL": {"epochs": 250, "patience": 80},
-        #     "CovCNN-KL-FLEXOMP": {"epochs": 250, "patience": 80},
+        #     "CovCNN": {"epochs": 200, "patience": 60, "n_dense_units": 24},
+        #     "CovCNN-KL": {"epochs": 200, "patience": 60, "n_dense_units": 24},
+        #     "FC": {"epochs": 200, "patience": 60, "n_dense_units": 600, "train_n_timepoints": 20},
         # },
         depth_by_category=RECOMMENDED_DEPTH_BY_CATEGORY,
         depth_by_solver=RECOMMENDED_DEPTH_BY_SOLVER,

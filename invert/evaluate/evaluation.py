@@ -263,7 +263,8 @@ class Evaluation:
         )
 
         # Get one batch
-        x_batch, y_batch, info_batch = next(sim_gen.generate())
+        batch = next(sim_gen.generate())
+        x_batch, y_batch, info_batch = batch.x, batch.y, batch.info
 
         if self.verbose >= 2:
             logger.debug(

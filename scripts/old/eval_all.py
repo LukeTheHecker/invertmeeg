@@ -71,7 +71,8 @@ sim_config = SimulationConfig(
 )
 
 gen = SimulationGenerator(fwd, config=sim_config)
-x_test, y_test, sim_info = next(gen.generate())
+batch = next(gen.generate())
+x_test, y_test, sim_info = batch.x, batch.y, batch.info
 
 # solver_names = config.all_solvers
 solver_names = ["MNE", "eLORETA", "Champagne", "LCMV", "APSE"]

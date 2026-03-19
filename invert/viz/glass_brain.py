@@ -49,6 +49,11 @@ def plot_glass_brain(
     true_source_color="green",
     true_source_size=None,
     true_source_alpha=1.0,
+    show_colorbar=True,
+    show_view_titles=True,
+    show_direction_labels=True,
+    direction_label_fontsize=10,
+    direction_label_pad=0.05,
 ):
     """Plot a glass-brain projection of a SourceEstimate.
 
@@ -239,33 +244,35 @@ def plot_glass_brain(
         ax_i.set_aspect("equal")
         ax_i.axis("off")
 
-        # Add anatomical labels
-        xlim = ax_i.get_xlim()
-        ylim = ax_i.get_ylim()
-        pad_x = (xlim[1] - xlim[0]) * 0.05
-        pad_y = (ylim[1] - ylim[0]) * 0.05
+        if show_direction_labels:
+            # Anatomical direction labels placed in axes-relative coords
+            # so they stay inside each panel and don't bleed into neighbours.
+            # Top labels (S/A) are omitted — the view titles already convey
+            # the orientation.
+            fs = direction_label_fontsize
+            kw = dict(fontsize=fs, fontweight="bold", color="0.35",
+                      transform=ax_i.transAxes, clip_on=False)
 
-        if label == "Sagittal":  # Y, Z
-            ax_i.text(xlim[1] + pad_x, (ylim[0] + ylim[1]) / 2, "A", va="center")
-            ax_i.text(xlim[0] - pad_x, (ylim[0] + ylim[1]) / 2, "P", va="center")
-            ax_i.text((xlim[0] + xlim[1]) / 2, ylim[1] + pad_y, "S", ha="center")
-        elif label == "Coronal":  # X, Z
-            ax_i.text(xlim[1] + pad_x, (ylim[0] + ylim[1]) / 2, "R", va="center")
-            ax_i.text(xlim[0] - pad_x, (ylim[0] + ylim[1]) / 2, "L", va="center")
-            ax_i.text((xlim[0] + xlim[1]) / 2, ylim[1] + pad_y, "S", ha="center")
-        elif label == "Axial":  # X, Y
-            ax_i.text(xlim[1] + pad_x, (ylim[0] + ylim[1]) / 2, "R", va="center")
-            ax_i.text(xlim[0] - pad_x, (ylim[0] + ylim[1]) / 2, "L", va="center")
-            ax_i.text((xlim[0] + xlim[1]) / 2, ylim[1] + pad_y, "A", ha="center")
+            if label == "Sagittal":  # Y, Z — left=P, right=A
+                ax_i.text(-0.03, 0.50, "P", va="center", ha="right", **kw)
+                ax_i.text(1.03, 0.50, "A", va="center", ha="left", **kw)
+            elif label == "Coronal":  # X, Z — left=L, right=R
+                ax_i.text(-0.02, 0.50, "L", va="center", ha="right", **kw)
+                ax_i.text(1.02, 0.50, "R", va="center", ha="left", **kw)
+            elif label == "Axial":  # X, Y — left=L, right=R
+                ax_i.text(-0.02, 0.50, "L", va="center", ha="right", **kw)
+                ax_i.text(1.02, 0.50, "R", va="center", ha="left", **kw)
 
-        ax_i.set_title(label, fontweight="bold", pad=15)
+        if show_view_titles:
+            ax_i.set_title(label, fontweight="bold", pad=8)
 
-    # Single colorbar for all subplots
-    cbar = fig.colorbar(
-        sc, ax=axes, orientation="vertical", fraction=0.02, pad=0.04, aspect=30
-    )
-    cbar.set_label("Activation", fontweight="bold")
-    cbar.outline.set_visible(False)
+    if show_colorbar:
+        # Single colorbar for all subplots
+        cbar = fig.colorbar(
+            sc, ax=axes, orientation="vertical", fraction=0.02, pad=0.04, aspect=30
+        )
+        cbar.set_label("Activation", fontweight="bold")
+        cbar.outline.set_visible(False)
 
     if title is not None:
         fig.suptitle(title, fontsize=16, fontweight="bold")

@@ -1,0 +1,4823 @@
+{
+  "ranks": {
+    "nmm": {
+      "hydra": 7.0,
+      "flex-greedy-ml": 8.0,
+      "msp": 12.6,
+      "adapt-flex-esmv": 14.0,
+      "flex-nl-champagne": 15.8,
+      "flex-nl-champagne-omix": 16.4,
+      "source-map-msp": 19.4,
+      "safe-flex-esmv": 20.0,
+      "flex-champagne-omix": 20.4,
+      "flex-esmv": 20.8,
+      "sharp-flex-esmv": 21.2,
+      "source-map": 21.2,
+      "flex-champagne": 22.0,
+      "gamma-map-msp": 22.4,
+      "ir-esmv": 24.6,
+      "deblur-flex-esmv": 24.8,
+      "ssp-ir-esmv": 28.4,
+      "gft-mne": 28.8,
+      "self-regularized-eloreta": 29.8,
+      "esmv": 31.4,
+      "omni-champagne": 34.0,
+      "nl-champagne": 34.6,
+      "flex-ssm": 35.0,
+      "subspace-sbl": 35.2,
+      "apesissy": 36.0,
+      "subspace-sbl-plus": 37.2,
+      "sloreta": 37.2,
+      "chimera": 38.6,
+      "vb-sbl": 39.2,
+      "greedy-ml": 39.2,
+      "epifocus": 41.4,
+      "recipsiicos": 41.4,
+      "champagne-mackay-nl-homoscedastic": 41.4,
+      "gamma-map": 41.8,
+      "wmne": 42.0,
+      "laura": 42.4,
+      "exhaustive-ml": 42.4,
+      "champagne-mackay-nl-diag": 43.0,
+      "champagne-low-snr": 43.4,
+      "champagne-mackay-nl-prec": 43.4,
+      "flex-music": 43.6,
+      "flex-trap-music": 43.6,
+      "gft-l1": 44.2,
+      "champagne-convexity-nl-homoscedastic": 44.2,
+      "bcs": 44.4,
+      "ssp-esmv": 45.2,
+      "gbf": 45.8,
+      "champagne-convexity-nl-diag": 46.8,
+      "champagne-convexity-nl-prec": 47.2,
+      "music": 47.6,
+      "flex-ap": 47.8,
+      "mxne-bcd": 47.8,
+      "champagne-convexity": 49.6,
+      "champagne-mackay": 49.6,
+      "mce": 52.8,
+      "flex-sp": 56.0,
+      "apse": 56.8,
+      "ebb": 58.0,
+      "cmem": 58.2,
+      "l1l2": 59.6,
+      "smv": 60.4,
+      "flex-omp": 61.0,
+      "unit-noise-gain": 61.4,
+      "wnmv": 61.4,
+      "loreta": 61.6,
+      "mvab": 61.6,
+      "hocmcmv": 61.8,
+      "hocmv": 61.8,
+      "s-map": 62.0,
+      "sslofo": 62.2,
+      "champagne-mackay-nl-full": 64.8,
+      "isubsmp": 65.8,
+      "block-champagne": 66.0,
+      "sam": 66.0,
+      "champagne-convexity-nl-full": 66.0,
+      "dspm": 66.6,
+      "subsmp": 69.2,
+      "flex-esmv-mvpure": 69.2,
+      "sp": 70.4,
+      "exso-music": 71.0,
+      "cosamp": 72.2,
+      "rembo": 74.4,
+      "lcmv": 76.2,
+      "flex-cosamp": 76.4,
+      "mcmv": 76.4,
+      "tv": 76.6,
+      "lcmv-mvpure": 78.8,
+      "mne": 79.0,
+      "dics": 79.2,
+      "eloreta": 79.4,
+      "omp": 79.6,
+      "sissy": 80.0,
+      "esmv-mvpure": 80.6,
+      "ssm": 81.2,
+      "random-noise": 83.6,
+      "mem": 84.8,
+      "backus-gilbert": 85.2,
+      "rap-music": 86.2,
+      "trap-music": 86.2,
+      "flex-rembo": 87.2,
+      "ap": 88.0,
+      "sesame": 90.4,
+      "ecd": 91.8
+    }
+  },
+  "global_ranks": {
+    "hydra": 7.0,
+    "flex-greedy-ml": 8.0,
+    "msp": 12.6,
+    "adapt-flex-esmv": 14.0,
+    "flex-nl-champagne": 15.8,
+    "flex-nl-champagne-omix": 16.4,
+    "source-map-msp": 19.4,
+    "safe-flex-esmv": 20.0,
+    "flex-champagne-omix": 20.4,
+    "flex-esmv": 20.8,
+    "sharp-flex-esmv": 21.2,
+    "source-map": 21.2,
+    "flex-champagne": 22.0,
+    "gamma-map-msp": 22.4,
+    "ir-esmv": 24.6,
+    "deblur-flex-esmv": 24.8,
+    "ssp-ir-esmv": 28.4,
+    "gft-mne": 28.8,
+    "self-regularized-eloreta": 29.8,
+    "esmv": 31.4,
+    "omni-champagne": 34.0,
+    "nl-champagne": 34.6,
+    "flex-ssm": 35.0,
+    "subspace-sbl": 35.2,
+    "apesissy": 36.0,
+    "subspace-sbl-plus": 37.2,
+    "sloreta": 37.2,
+    "chimera": 38.6,
+    "vb-sbl": 39.2,
+    "greedy-ml": 39.2,
+    "epifocus": 41.4,
+    "recipsiicos": 41.4,
+    "champagne-mackay-nl-homoscedastic": 41.4,
+    "gamma-map": 41.8,
+    "wmne": 42.0,
+    "laura": 42.4,
+    "exhaustive-ml": 42.4,
+    "champagne-mackay-nl-diag": 43.0,
+    "champagne-low-snr": 43.4,
+    "champagne-mackay-nl-prec": 43.4,
+    "flex-music": 43.6,
+    "flex-trap-music": 43.6,
+    "gft-l1": 44.2,
+    "champagne-convexity-nl-homoscedastic": 44.2,
+    "bcs": 44.4,
+    "ssp-esmv": 45.2,
+    "gbf": 45.8,
+    "champagne-convexity-nl-diag": 46.8,
+    "champagne-convexity-nl-prec": 47.2,
+    "music": 47.6,
+    "flex-ap": 47.8,
+    "mxne-bcd": 47.8,
+    "champagne-convexity": 49.6,
+    "champagne-mackay": 49.6,
+    "mce": 52.8,
+    "flex-sp": 56.0,
+    "apse": 56.8,
+    "ebb": 58.0,
+    "cmem": 58.2,
+    "l1l2": 59.6,
+    "smv": 60.4,
+    "flex-omp": 61.0,
+    "unit-noise-gain": 61.4,
+    "wnmv": 61.4,
+    "loreta": 61.6,
+    "mvab": 61.6,
+    "hocmcmv": 61.8,
+    "hocmv": 61.8,
+    "s-map": 62.0,
+    "sslofo": 62.2,
+    "champagne-mackay-nl-full": 64.8,
+    "isubsmp": 65.8,
+    "block-champagne": 66.0,
+    "sam": 66.0,
+    "champagne-convexity-nl-full": 66.0,
+    "dspm": 66.6,
+    "subsmp": 69.2,
+    "flex-esmv-mvpure": 69.2,
+    "sp": 70.4,
+    "exso-music": 71.0,
+    "cosamp": 72.2,
+    "rembo": 74.4,
+    "lcmv": 76.2,
+    "flex-cosamp": 76.4,
+    "mcmv": 76.4,
+    "tv": 76.6,
+    "lcmv-mvpure": 78.8,
+    "mne": 79.0,
+    "dics": 79.2,
+    "eloreta": 79.4,
+    "omp": 79.6,
+    "sissy": 80.0,
+    "esmv-mvpure": 80.6,
+    "ssm": 81.2,
+    "random-noise": 83.6,
+    "mem": 84.8,
+    "backus-gilbert": 85.2,
+    "rap-music": 86.2,
+    "trap-music": 86.2,
+    "flex-rembo": 87.2,
+    "ap": 88.0,
+    "sesame": 90.4,
+    "ecd": 91.8
+  },
+  "metadata": {
+    "name": null,
+    "description": null,
+    "timestamp": "2026-03-06T18:12:20.117096",
+    "n_samples": 100,
+    "random_seed": 42,
+    "solvers": [
+      "adapt-flex-esmv",
+      "deblur-flex-esmv",
+      "dics",
+      "ebb",
+      "esmv",
+      "esmv-mvpure",
+      "flex-esmv",
+      "flex-esmv-mvpure",
+      "hocmcmv",
+      "hocmv",
+      "ir-esmv",
+      "lcmv",
+      "lcmv-mvpure",
+      "mcmv",
+      "mvab",
+      "recipsiicos",
+      "safe-flex-esmv",
+      "sam",
+      "sharp-flex-esmv",
+      "smv",
+      "ssp-esmv",
+      "ssp-ir-esmv",
+      "unit-noise-gain",
+      "wnmv",
+      "bcs",
+      "block-champagne",
+      "champagne-convexity",
+      "champagne-convexity-nl-diag",
+      "champagne-convexity-nl-full",
+      "champagne-convexity-nl-homoscedastic",
+      "champagne-convexity-nl-prec",
+      "champagne-low-snr",
+      "champagne-mackay",
+      "champagne-mackay-nl-diag",
+      "champagne-mackay-nl-full",
+      "champagne-mackay-nl-homoscedastic",
+      "champagne-mackay-nl-prec",
+      "cmem",
+      "flex-champagne",
+      "flex-champagne-omix",
+      "flex-nl-champagne",
+      "flex-nl-champagne-omix",
+      "gamma-map",
+      "gamma-map-msp",
+      "mem",
+      "msp",
+      "nl-champagne",
+      "omni-champagne",
+      "source-map",
+      "source-map-msp",
+      "subspace-sbl",
+      "subspace-sbl-plus",
+      "vb-sbl",
+      "apesissy",
+      "backus-gilbert",
+      "dspm",
+      "epifocus",
+      "gbf",
+      "gft-l1",
+      "gft-mne",
+      "l1l2",
+      "laura",
+      "mce",
+      "mne",
+      "mxne-bcd",
+      "s-map",
+      "sissy",
+      "sslofo",
+      "tv",
+      "wmne",
+      "eloreta",
+      "loreta",
+      "self-regularized-eloreta",
+      "sloreta",
+      "ap",
+      "exhaustive-ml",
+      "exso-music",
+      "flex-ap",
+      "flex-greedy-ml",
+      "flex-music",
+      "flex-ssm",
+      "flex-trap-music",
+      "greedy-ml",
+      "music",
+      "rap-music",
+      "ssm",
+      "trap-music",
+      "cosamp",
+      "flex-cosamp",
+      "flex-omp",
+      "flex-rembo",
+      "flex-sp",
+      "isubsmp",
+      "omp",
+      "rembo",
+      "sp",
+      "subsmp",
+      "apse",
+      "chimera",
+      "ecd",
+      "hydra",
+      "random-noise",
+      "sesame"
+    ],
+    "m": 32,
+    "n": 1284,
+    "m_electrodes": 32,
+    "n_sources": 1284,
+    "n_leadfield_columns": 1284,
+    "n_orient": 1,
+    "pos_units": "m",
+    "pos_coord_frame": "mni",
+    "pos_original_units": "mm",
+    "evaluation_protocol": {
+      "time_sampling": {
+        "kind": "equidistant",
+        "n_time_samples": 5
+      },
+      "localization_signal": "magnitude",
+      "correlation_signal": "signed",
+      "spatial_dispersion_ranking": "abs_log_error"
+    }
+  },
+  "datasets": {
+    "nmm": {
+      "name": "Neural Mass Model",
+      "description": "Jansen-Rit neural mass model sources with coupled cortical columns, realistic sensor noise, and contiguous spatial patches",
+      "simulator_type": "nmm",
+      "n_sources": [
+        2,
+        4
+      ],
+      "n_orders": 0,
+      "snr_range": [
+        1.0,
+        5.0
+      ],
+      "n_timepoints": 200,
+      "source_spatial_model": "diffusion_basis",
+      "patch_rank": [
+        1,
+        2
+      ],
+      "simulation_mode": "patches",
+      "background_beta": null,
+      "background_mixture_alpha": null,
+      "amplitude_range": null,
+      "amplitude_distribution": null,
+      "correlation_mode": "realistic",
+      "correlation_modes": null,
+      "correlation_mode_weights": null,
+      "noise_temporal_beta": null,
+      "noise_low_rank_dim": [
+        2,
+        8
+      ],
+      "source_extent": [
+        5,
+        30
+      ],
+      "n_samples": 50,
+      "duration_s": 1.0,
+      "sfreq": 256.0,
+      "spike_mode": false,
+      "coupling_strength": [
+        10.0,
+        50.0
+      ],
+      "n_pool": 500
+    }
+  },
+  "results": [
+    {
+      "solver_name": "adapt-flex-esmv",
+      "dataset_name": "nmm",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.030049901390935954,
+          "std": 0.009001788410355557,
+          "median": 0.029299308753985828,
+          "worst_10_pct": 0.04045675842205077
+        },
+        "emd": {
+          "mean": 0.030703485233106703,
+          "std": 0.010759952949651392,
+          "median": 0.02983830517112396,
+          "worst_10_pct": 0.04547847581001135
+        },
+        "spatial_dispersion": {
+          "mean": 0.556673797451228,
+          "std": 0.4037987823888691,
+          "median": 0.45617501477397193,
+          "worst_10_pct": 1.0944248480174608
+        },
+        "average_precision": {
+          "mean": 0.24106450570202637,
+          "std": 0.15496351115435278,
+          "median": 0.20948763034525472,
+          "worst_10_pct": 0.0838413764987774
+        },
+        "correlation": {
+          "mean": 0.308986397906389,
+          "std": 0.11281794523816324,
+          "median": 0.30659901629932396,
+          "worst_10_pct": 0.1731853270911581
+        }
+      },
+      "timing": {
+        "total_seconds": 4.482097791973501,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "deblur-flex-esmv",
+      "dataset_name": "nmm",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.029996306911076492,
+          "std": 0.008944823052059129,
+          "median": 0.028740207559893892,
+          "worst_10_pct": 0.0401574686551586
+        },
+        "emd": {
+          "mean": 0.034029629706952606,
+          "std": 0.011921327831168118,
+          "median": 0.03337452438075732,
+          "worst_10_pct": 0.04995928600890617
+        },
+        "spatial_dispersion": {
+          "mean": 0.32800744576096336,
+          "std": 0.33983014454709665,
+          "median": 0.1834656978422749,
+          "worst_10_pct": 0.8364652095619395
+        },
+        "average_precision": {
+          "mean": 0.1852468523254252,
+          "std": 0.11071141945657417,
+          "median": 0.15144516866149757,
+          "worst_10_pct": 0.07058767403529032
+        },
+        "correlation": {
+          "mean": 0.2620254236511245,
+          "std": 0.11611436629921841,
+          "median": 0.2433796363559209,
+          "worst_10_pct": 0.12352603662438186
+        }
+      },
+      "timing": {
+        "total_seconds": 4.461162333143875,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "dics",
+      "dataset_name": "nmm",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.04700318141610233,
+          "std": 0.01235036368875265,
+          "median": 0.046537317770754774,
+          "worst_10_pct": 0.06487517810433238
+        },
+        "emd": {
+          "mean": 0.04928335893873028,
+          "std": 0.01163900058719884,
+          "median": 0.047686063472376736,
+          "worst_10_pct": 0.06442651278227576
+        },
+        "spatial_dispersion": {
+          "mean": 0.515248176446073,
+          "std": 0.5696302211517607,
+          "median": 0.366416084579812,
+          "worst_10_pct": 1.0349366809134806
+        },
+        "average_precision": {
+          "mean": 0.057127910834651664,
+          "std": 0.03061464348063792,
+          "median": 0.05096260333926922,
+          "worst_10_pct": 0.026158479120830212
+        },
+        "correlation": {
+          "mean": 0.0029756885120678467,
+          "std": 0.044624295528096256,
+          "median": 0.004180607418564158,
+          "worst_10_pct": -0.05203191622493507
+        }
+      },
+      "timing": {
+        "total_seconds": 3.780204457929358,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "ebb",
+      "dataset_name": "nmm",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.026702742325258256,
+          "std": 0.009530349499791755,
+          "median": 0.02631189942698186,
+          "worst_10_pct": 0.0389651856811236
+        },
+        "emd": {
+          "mean": 0.0393974922481278,
+          "std": 0.013898607833956652,
+          "median": 0.03826581744687994,
+          "worst_10_pct": 0.05901098783914393
+        },
+        "spatial_dispersion": {
+          "mean": 0.05840743591819344,
+          "std": 0.04948099956433586,
+          "median": 0.043407404524376914,
+          "worst_10_pct": 0.10264637906525945
+        },
+        "average_precision": {
+          "mean": 0.08373738993749022,
+          "std": 0.03610358736223454,
+          "median": 0.0797347174885264,
+          "worst_10_pct": 0.04046363832225601
+        },
+        "correlation": {
+          "mean": 0.12900985804269552,
+          "std": 0.09116630343635711,
+          "median": 0.12837356616333834,
+          "worst_10_pct": 0.0044603374334100405
+        }
+      },
+      "timing": {
+        "total_seconds": 10.847614999860525,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "esmv",
+      "dataset_name": "nmm",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.032001086756739204,
+          "std": 0.010084771256937278,
+          "median": 0.0312691055425237,
+          "worst_10_pct": 0.04270857670626704
+        },
+        "emd": {
+          "mean": 0.0341162006214579,
+          "std": 0.010233072839102915,
+          "median": 0.03232889983331201,
+          "worst_10_pct": 0.04879514776699462
+        },
+        "spatial_dispersion": {
+          "mean": 0.7235066816196923,
+          "std": 0.7516376574867687,
+          "median": 0.48731817751129647,
+          "worst_10_pct": 1.484785012592699
+        },
+        "average_precision": {
+          "mean": 0.11596378910983819,
+          "std": 0.06322574357732783,
+          "median": 0.10047763608984611,
+          "worst_10_pct": 0.05082139602384669
+        },
+        "correlation": {
+          "mean": 0.16428804217457071,
+          "std": 0.06961943385652088,
+          "median": 0.15439888904243587,
+          "worst_10_pct": 0.08485366049354647
+        }
+      },
+      "timing": {
+        "total_seconds": 4.237024249974638,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "esmv-mvpure",
+      "dataset_name": "nmm",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.036041737711868284,
+          "std": 0.011382740469239741,
+          "median": 0.03552467415528737,
+          "worst_10_pct": 0.04723034867101153
+        },
+        "emd": {
+          "mean": 0.046957435968731,
+          "std": 0.016256947605269807,
+          "median": 0.04409691497673189,
+          "worst_10_pct": 0.06816864510009275
+        },
+        "spatial_dispersion": {
+          "mean": 0.0895530814892846,
+          "std": 0.07886734349852907,
+          "median": 0.07507409740706425,
+          "worst_10_pct": 0.14785387245892925
+        },
+        "average_precision": {
+          "mean": 0.07045384961521652,
+          "std": 0.03813432219136728,
+          "median": 0.06555193730058292,
+          "worst_10_pct": 0.0247133602858174
+        },
+        "correlation": {
+          "mean": 0.029100122621247546,
+          "std": 0.05907658414730319,
+          "median": 0.005427611800657683,
+          "worst_10_pct": -0.011019628999650402
+        }
+      },
+      "timing": {
+        "total_seconds": 2.0215746250469238,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "flex-esmv",
+      "dataset_name": "nmm",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.029907207457154833,
+          "std": 0.009022645925681355,
+          "median": 0.028866486151451983,
+          "worst_10_pct": 0.0401574686551586
+        },
+        "emd": {
+          "mean": 0.03380774542106181,
+          "std": 0.012028082213942679,
+          "median": 0.033195045972306464,
+          "worst_10_pct": 0.049782741578695645
+        },
+        "spatial_dispersion": {
+          "mean": 0.34775861213381304,
+          "std": 0.34526948637286253,
+          "median": 0.20502700584782046,
+          "worst_10_pct": 0.8517520106139086
+        },
+        "average_precision": {
+          "mean": 0.21933586430015928,
+          "std": 0.14116495565263457,
+          "median": 0.17938573152915926,
+          "worst_10_pct": 0.0765180360097942
+        },
+        "correlation": {
+          "mean": 0.28757805874594683,
+          "std": 0.12564060131024005,
+          "median": 0.2629169018822367,
+          "worst_10_pct": 0.14514825615369664
+        }
+      },
+      "timing": {
+        "total_seconds": 4.287613790947944,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "flex-esmv-mvpure",
+      "dataset_name": "nmm",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.031220779807934553,
+          "std": 0.010938660880337014,
+          "median": 0.03061702436663473,
+          "worst_10_pct": 0.04508786385963825
+        },
+        "emd": {
+          "mean": 0.041903543686231656,
+          "std": 0.01596014467068855,
+          "median": 0.04046495601960509,
+          "worst_10_pct": 0.06452154556029553
+        },
+        "spatial_dispersion": {
+          "mean": 0.062192599955228085,
+          "std": 0.05143777229402757,
+          "median": 0.047311416082036685,
+          "worst_10_pct": 0.11474022669515019
+        },
+        "average_precision": {
+          "mean": 0.08352910892700942,
+          "std": 0.04306031457391352,
+          "median": 0.07613090256844066,
+          "worst_10_pct": 0.043344382954136375
+        },
+        "correlation": {
+          "mean": 0.07229364256502588,
+          "std": 0.08344580119107885,
+          "median": 0.05422853731481338,
+          "worst_10_pct": -0.005558922220101902
+        }
+      },
+      "timing": {
+        "total_seconds": 2.3075279998593032,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "hocmcmv",
+      "dataset_name": "nmm",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.03472979408971134,
+          "std": 0.009123789888667957,
+          "median": 0.03424177166009427,
+          "worst_10_pct": 0.047565099189833385
+        },
+        "emd": {
+          "mean": 0.0445426304206353,
+          "std": 0.0071738274196144845,
+          "median": 0.0440909470640456,
+          "worst_10_pct": 0.054259041532424154
+        },
+        "spatial_dispersion": {
+          "mean": 14.280432280641167,
+          "std": 12.091188740118874,
+          "median": 11.432977422154838,
+          "worst_10_pct": 24.63186669350391
+        },
+        "average_precision": {
+          "mean": 0.10286121735122734,
+          "std": 0.05195137919324897,
+          "median": 0.0933548612399634,
+          "worst_10_pct": 0.04936735561988542
+        },
+        "correlation": {
+          "mean": 0.1356283481600754,
+          "std": 0.03899811150558352,
+          "median": 0.13609504510513754,
+          "worst_10_pct": 0.08122981620254018
+        }
+      },
+      "timing": {
+        "total_seconds": 10.415692458860576,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "hocmv",
+      "dataset_name": "nmm",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.03472979408971134,
+          "std": 0.009123789888667957,
+          "median": 0.03424177166009427,
+          "worst_10_pct": 0.047565099189833385
+        },
+        "emd": {
+          "mean": 0.0445426304206353,
+          "std": 0.007173827419614483,
+          "median": 0.0440909470640456,
+          "worst_10_pct": 0.05425904153242414
+        },
+        "spatial_dispersion": {
+          "mean": 14.280432280641167,
+          "std": 12.091188740118874,
+          "median": 11.432977422154838,
+          "worst_10_pct": 24.63186669350391
+        },
+        "average_precision": {
+          "mean": 0.10286121735122734,
+          "std": 0.05195137919324897,
+          "median": 0.0933548612399634,
+          "worst_10_pct": 0.04936735561988542
+        },
+        "correlation": {
+          "mean": 0.1356283481600754,
+          "std": 0.038998111505583515,
+          "median": 0.13609504510513754,
+          "worst_10_pct": 0.08122981620254015
+        }
+      },
+      "timing": {
+        "total_seconds": 10.627514457795769,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "ir-esmv",
+      "dataset_name": "nmm",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.030165107371423062,
+          "std": 0.00960073820148574,
+          "median": 0.02991771512784417,
+          "worst_10_pct": 0.039993437401946164
+        },
+        "emd": {
+          "mean": 0.03206332069474397,
+          "std": 0.010203637072089019,
+          "median": 0.031201743984781146,
+          "worst_10_pct": 0.04763987007303603
+        },
+        "spatial_dispersion": {
+          "mean": 0.5134565730065278,
+          "std": 0.5793527329274417,
+          "median": 0.3203515521646587,
+          "worst_10_pct": 1.4189037220726348
+        },
+        "average_precision": {
+          "mean": 0.13228858040636773,
+          "std": 0.0666432965672431,
+          "median": 0.11489173184769289,
+          "worst_10_pct": 0.06340726795139241
+        },
+        "correlation": {
+          "mean": 0.1924044660818845,
+          "std": 0.07208057305812723,
+          "median": 0.1809473615595126,
+          "worst_10_pct": 0.11024179682826421
+        }
+      },
+      "timing": {
+        "total_seconds": 3.8567064579110593,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "lcmv",
+      "dataset_name": "nmm",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.04033892552684492,
+          "std": 0.011859484515487725,
+          "median": 0.038752391287944464,
+          "worst_10_pct": 0.05526091998435329
+        },
+        "emd": {
+          "mean": 0.045823185074799024,
+          "std": 0.007735156492756095,
+          "median": 0.04504319560508846,
+          "worst_10_pct": 0.05553732279710501
+        },
+        "spatial_dispersion": {
+          "mean": 14.604634865956372,
+          "std": 11.354697235295733,
+          "median": 12.010031686497477,
+          "worst_10_pct": 24.435418857259748
+        },
+        "average_precision": {
+          "mean": 0.08429762622662591,
+          "std": 0.039610964438831324,
+          "median": 0.07578681333696582,
+          "worst_10_pct": 0.039911774220087896
+        },
+        "correlation": {
+          "mean": 0.12344709201074194,
+          "std": 0.03618899812413683,
+          "median": 0.12335023925907324,
+          "worst_10_pct": 0.06951780501209293
+        }
+      },
+      "timing": {
+        "total_seconds": 10.464421417098492,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "lcmv-mvpure",
+      "dataset_name": "nmm",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.03560376306010256,
+          "std": 0.011253793608425584,
+          "median": 0.03506420437445263,
+          "worst_10_pct": 0.0481321483331714
+        },
+        "emd": {
+          "mean": 0.04620023040332131,
+          "std": 0.01664403652579105,
+          "median": 0.04410262931055749,
+          "worst_10_pct": 0.06812066992517149
+        },
+        "spatial_dispersion": {
+          "mean": 0.08348005187423281,
+          "std": 0.08029042449214945,
+          "median": 0.06391555902834223,
+          "worst_10_pct": 0.13285495649740037
+        },
+        "average_precision": {
+          "mean": 0.0719944532927157,
+          "std": 0.03819881652429429,
+          "median": 0.06566652137197773,
+          "worst_10_pct": 0.0247133602858174
+        },
+        "correlation": {
+          "mean": 0.04303966784046976,
+          "std": 0.06988885181334549,
+          "median": 0.007450533019561457,
+          "worst_10_pct": -0.008431985352712784
+        }
+      },
+      "timing": {
+        "total_seconds": 1.8905329999979585,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "mcmv",
+      "dataset_name": "nmm",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.03571952088502576,
+          "std": 0.00896971330061697,
+          "median": 0.03521330005837959,
+          "worst_10_pct": 0.04524873865091746
+        },
+        "emd": {
+          "mean": 0.04573597116317521,
+          "std": 0.007416909029141185,
+          "median": 0.044492379846420946,
+          "worst_10_pct": 0.05492708673220915
+        },
+        "spatial_dispersion": {
+          "mean": 11.46088366153479,
+          "std": 10.085364990207355,
+          "median": 8.867612485914645,
+          "worst_10_pct": 18.221821025668046
+        },
+        "average_precision": {
+          "mean": 0.06595983060794987,
+          "std": 0.02922847531301284,
+          "median": 0.062023511573893755,
+          "worst_10_pct": 0.03107773619648086
+        },
+        "correlation": {
+          "mean": 0.07887959035270561,
+          "std": 0.042138115343047754,
+          "median": 0.07613265678408508,
+          "worst_10_pct": 0.02680565244758421
+        }
+      },
+      "timing": {
+        "total_seconds": 13.12354795797728,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "mvab",
+      "dataset_name": "nmm",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.03338128251413485,
+          "std": 0.009160744897336618,
+          "median": 0.032853800097029144,
+          "worst_10_pct": 0.04414989330327253
+        },
+        "emd": {
+          "mean": 0.04464393057514089,
+          "std": 0.007149294821995132,
+          "median": 0.0439576124530483,
+          "worst_10_pct": 0.05391733488512041
+        },
+        "spatial_dispersion": {
+          "mean": 15.210359476391645,
+          "std": 12.403568717877219,
+          "median": 12.522626944038144,
+          "worst_10_pct": 24.80618285770351
+        },
+        "average_precision": {
+          "mean": 0.10982859037005457,
+          "std": 0.056876619879922014,
+          "median": 0.0943431772582339,
+          "worst_10_pct": 0.048236504015271076
+        },
+        "correlation": {
+          "mean": 0.13622618890391702,
+          "std": 0.038953012975758754,
+          "median": 0.13583690893249584,
+          "worst_10_pct": 0.0815142593765869
+        }
+      },
+      "timing": {
+        "total_seconds": 10.933557499898598,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "recipsiicos",
+      "dataset_name": "nmm",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.030917895898904247,
+          "std": 0.00834168011406301,
+          "median": 0.03096087181497418,
+          "worst_10_pct": 0.04050695895059114
+        },
+        "emd": {
+          "mean": 0.03881454936192751,
+          "std": 0.007970680015816821,
+          "median": 0.03741872720300787,
+          "worst_10_pct": 0.04847762565925525
+        },
+        "spatial_dispersion": {
+          "mean": 1.6410754335653366,
+          "std": 1.7898055564478583,
+          "median": 0.9666741713417351,
+          "worst_10_pct": 3.0807305219460477
+        },
+        "average_precision": {
+          "mean": 0.10083177107231871,
+          "std": 0.05267852109351558,
+          "median": 0.0930362171643992,
+          "worst_10_pct": 0.044256528274947964
+        },
+        "correlation": {
+          "mean": 0.10979714925505019,
+          "std": 0.06335299911104457,
+          "median": 0.1096700489972558,
+          "worst_10_pct": 0.02747604494917049
+        }
+      },
+      "timing": {
+        "total_seconds": 13.696930499980226,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "safe-flex-esmv",
+      "dataset_name": "nmm",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.030025575846880228,
+          "std": 0.008913141268440646,
+          "median": 0.028996084072522906,
+          "worst_10_pct": 0.0401574686551586
+        },
+        "emd": {
+          "mean": 0.03286462997829665,
+          "std": 0.011804307623824412,
+          "median": 0.031968293083576585,
+          "worst_10_pct": 0.04808678386401854
+        },
+        "spatial_dispersion": {
+          "mean": 0.37839663838646176,
+          "std": 0.3508804892123253,
+          "median": 0.24444140253761573,
+          "worst_10_pct": 0.9197393579302855
+        },
+        "average_precision": {
+          "mean": 0.21901081426973307,
+          "std": 0.14087550036735744,
+          "median": 0.17928420432415348,
+          "worst_10_pct": 0.07657527251366467
+        },
+        "correlation": {
+          "mean": 0.2983249997868845,
+          "std": 0.12712265383456137,
+          "median": 0.27058471979579807,
+          "worst_10_pct": 0.1472460129053445
+        }
+      },
+      "timing": {
+        "total_seconds": 4.020034833112732,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "sam",
+      "dataset_name": "nmm",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.04820100100004009,
+          "std": 0.01277547772550491,
+          "median": 0.04629949980041213,
+          "worst_10_pct": 0.0666202745240047
+        },
+        "emd": {
+          "mean": 0.04365854196386767,
+          "std": 0.007334875596990348,
+          "median": 0.04337518456686015,
+          "worst_10_pct": 0.05406307301557322
+        },
+        "spatial_dispersion": {
+          "mean": 7.6801852532165205,
+          "std": 6.296037989087401,
+          "median": 6.375800900636984,
+          "worst_10_pct": 14.947945919262681
+        },
+        "average_precision": {
+          "mean": 0.07522822413057048,
+          "std": 0.0428591862214376,
+          "median": 0.06423681885521554,
+          "worst_10_pct": 0.032874346341460095
+        },
+        "correlation": {
+          "mean": 0.1292337458972807,
+          "std": 0.0418780075606787,
+          "median": 0.12619924869983118,
+          "worst_10_pct": 0.07597914619074703
+        }
+      },
+      "timing": {
+        "total_seconds": 8.859246958047152,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "sharp-flex-esmv",
+      "dataset_name": "nmm",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.03003487269917311,
+          "std": 0.008827994861749396,
+          "median": 0.028866486151451983,
+          "worst_10_pct": 0.04015746865515861
+        },
+        "emd": {
+          "mean": 0.031079628903324785,
+          "std": 0.010585860414701283,
+          "median": 0.029697244394977076,
+          "worst_10_pct": 0.045281533553102826
+        },
+        "spatial_dispersion": {
+          "mean": 0.23060537254053196,
+          "std": 0.14431108844144647,
+          "median": 0.20180702142108,
+          "worst_10_pct": 0.4344666810176057
+        },
+        "average_precision": {
+          "mean": 0.21780465055891443,
+          "std": 0.13964624049472948,
+          "median": 0.17973816130911752,
+          "worst_10_pct": 0.076769231363542
+        },
+        "correlation": {
+          "mean": 0.282741631018859,
+          "std": 0.103513473634016,
+          "median": 0.27132796816191307,
+          "worst_10_pct": 0.1595685772290495
+        }
+      },
+      "timing": {
+        "total_seconds": 4.588867124868557,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "smv",
+      "dataset_name": "nmm",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.03267506818262781,
+          "std": 0.008966175526658404,
+          "median": 0.033288803979694304,
+          "worst_10_pct": 0.04296837930477497
+        },
+        "emd": {
+          "mean": 0.04469392513544752,
+          "std": 0.0071337956063983726,
+          "median": 0.044126317103594576,
+          "worst_10_pct": 0.05408647754755035
+        },
+        "spatial_dispersion": {
+          "mean": 15.666708228500365,
+          "std": 12.052571734057901,
+          "median": 13.201347746069946,
+          "worst_10_pct": 24.662442436004
+        },
+        "average_precision": {
+          "mean": 0.1137987208101849,
+          "std": 0.06093853621437976,
+          "median": 0.10107508525194837,
+          "worst_10_pct": 0.0483865570842205
+        },
+        "correlation": {
+          "mean": 0.136513188923458,
+          "std": 0.03904920039946693,
+          "median": 0.13654555933396678,
+          "worst_10_pct": 0.08106962237995054
+        }
+      },
+      "timing": {
+        "total_seconds": 11.171271084109321,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "ssp-esmv",
+      "dataset_name": "nmm",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.030718082092457723,
+          "std": 0.009569981414494968,
+          "median": 0.030888607074725842,
+          "worst_10_pct": 0.04082664749526525
+        },
+        "emd": {
+          "mean": 0.037659881842447784,
+          "std": 0.013970703754529036,
+          "median": 0.03542228738145378,
+          "worst_10_pct": 0.05879028342691774
+        },
+        "spatial_dispersion": {
+          "mean": 0.28408173350746735,
+          "std": 0.29509767500078893,
+          "median": 0.20258537718778613,
+          "worst_10_pct": 0.4788486972147064
+        },
+        "average_precision": {
+          "mean": 0.09242623764319617,
+          "std": 0.049718913896972236,
+          "median": 0.08331372844865853,
+          "worst_10_pct": 0.03801425204546775
+        },
+        "correlation": {
+          "mean": 0.11941521038475968,
+          "std": 0.09334417366804602,
+          "median": 0.11377033379018796,
+          "worst_10_pct": 0.010670845844538042
+        }
+      },
+      "timing": {
+        "total_seconds": 1.776705333031714,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "ssp-ir-esmv",
+      "dataset_name": "nmm",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.03069476492553426,
+          "std": 0.009883369397681942,
+          "median": 0.030888607074725842,
+          "worst_10_pct": 0.04082664749526525
+        },
+        "emd": {
+          "mean": 0.032622445511312964,
+          "std": 0.010941083785186765,
+          "median": 0.03209333843233191,
+          "worst_10_pct": 0.048320018315146145
+        },
+        "spatial_dispersion": {
+          "mean": 0.37436694592793107,
+          "std": 0.447737154002176,
+          "median": 0.290432928635582,
+          "worst_10_pct": 0.6215717606919016
+        },
+        "average_precision": {
+          "mean": 0.13086473517985764,
+          "std": 0.06477859854744754,
+          "median": 0.11329171176283165,
+          "worst_10_pct": 0.0621165141141523
+        },
+        "correlation": {
+          "mean": 0.1918677205950886,
+          "std": 0.07394899724500743,
+          "median": 0.17846736509084196,
+          "worst_10_pct": 0.11138748421321165
+        }
+      },
+      "timing": {
+        "total_seconds": 3.348569374997169,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "unit-noise-gain",
+      "dataset_name": "nmm",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.03338965919060327,
+          "std": 0.009078850770594959,
+          "median": 0.03300552518482287,
+          "worst_10_pct": 0.04443462880897681
+        },
+        "emd": {
+          "mean": 0.04463605180729219,
+          "std": 0.007149822694508004,
+          "median": 0.04392897336846843,
+          "worst_10_pct": 0.054004128782076485
+        },
+        "spatial_dispersion": {
+          "mean": 15.224914249325307,
+          "std": 12.282307658059494,
+          "median": 12.224299585819217,
+          "worst_10_pct": 25.04487583056228
+        },
+        "average_precision": {
+          "mean": 0.11116130286066643,
+          "std": 0.058050630181267805,
+          "median": 0.09678636407141503,
+          "worst_10_pct": 0.04761753078455952
+        },
+        "correlation": {
+          "mean": 0.13622428039311862,
+          "std": 0.03900231063412344,
+          "median": 0.13624449654462262,
+          "worst_10_pct": 0.08131310948662769
+        }
+      },
+      "timing": {
+        "total_seconds": 10.485416874988005,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "wnmv",
+      "dataset_name": "nmm",
+      "category": "beamformer",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.03338965919060327,
+          "std": 0.009078850770594959,
+          "median": 0.03300552518482287,
+          "worst_10_pct": 0.04443462880897681
+        },
+        "emd": {
+          "mean": 0.04463605180729219,
+          "std": 0.0071498226945080024,
+          "median": 0.043928973368468446,
+          "worst_10_pct": 0.05400412878207647
+        },
+        "spatial_dispersion": {
+          "mean": 15.224914249325307,
+          "std": 12.282307658059494,
+          "median": 12.224299585819217,
+          "worst_10_pct": 25.04487583056228
+        },
+        "average_precision": {
+          "mean": 0.11116130286066643,
+          "std": 0.058050630181267805,
+          "median": 0.09678636407141503,
+          "worst_10_pct": 0.04761753078455952
+        },
+        "correlation": {
+          "mean": 0.13622428039311862,
+          "std": 0.03900231063412344,
+          "median": 0.1362444965446226,
+          "worst_10_pct": 0.08131310948662769
+        }
+      },
+      "timing": {
+        "total_seconds": 10.431946333963424,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "bcs",
+      "dataset_name": "nmm",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.025802219890879708,
+          "std": 0.007987426718941735,
+          "median": 0.024103227406942818,
+          "worst_10_pct": 0.03737281079468842
+        },
+        "emd": {
+          "mean": 0.03185506413901033,
+          "std": 0.00922400030865682,
+          "median": 0.03145838890395828,
+          "worst_10_pct": 0.04487679128521374
+        },
+        "spatial_dispersion": {
+          "mean": 0.0727856698011472,
+          "std": 0.044458001474158286,
+          "median": 0.06335602484133294,
+          "worst_10_pct": 0.12230050067444422
+        },
+        "average_precision": {
+          "mean": 0.08539743636759574,
+          "std": 0.03669366338269735,
+          "median": 0.08133757095288421,
+          "worst_10_pct": 0.04484463784895758
+        },
+        "correlation": {
+          "mean": 0.12056810351073027,
+          "std": 0.08914464181652504,
+          "median": 0.1127640359020328,
+          "worst_10_pct": 0.01013690888245623
+        }
+      },
+      "timing": {
+        "total_seconds": 86.51555987494066,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "block-champagne",
+      "dataset_name": "nmm",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.046449913081158846,
+          "std": 0.012754719850254304,
+          "median": 0.043465314753254825,
+          "worst_10_pct": 0.06615092484448888
+        },
+        "emd": {
+          "mean": 0.05167436130448007,
+          "std": 0.012194393531239986,
+          "median": 0.050588598590144335,
+          "worst_10_pct": 0.07033521309067352
+        },
+        "spatial_dispersion": {
+          "mean": 0.5414548772049079,
+          "std": 0.4235751757561863,
+          "median": 0.4246722949525643,
+          "worst_10_pct": 0.9995585856205926
+        },
+        "average_precision": {
+          "mean": 0.0927706062155835,
+          "std": 0.07937905792794997,
+          "median": 0.0750648879324611,
+          "worst_10_pct": 0.02573003133756121
+        },
+        "correlation": {
+          "mean": 0.0860338429025418,
+          "std": 0.12330309175755116,
+          "median": 0.03647912327746022,
+          "worst_10_pct": -0.011015924277712271
+        }
+      },
+      "timing": {
+        "total_seconds": 26.871047999942675,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "champagne-convexity",
+      "dataset_name": "nmm",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.02446867451285627,
+          "std": 0.008880676873110649,
+          "median": 0.022531223073509656,
+          "worst_10_pct": 0.0368122934022383
+        },
+        "emd": {
+          "mean": 0.032700523744914035,
+          "std": 0.010746455730840977,
+          "median": 0.031035170244457143,
+          "worst_10_pct": 0.0471232521567562
+        },
+        "spatial_dispersion": {
+          "mean": 0.06780374112418176,
+          "std": 0.049110762288535614,
+          "median": 0.05543106818237315,
+          "worst_10_pct": 0.1274551727462175
+        },
+        "average_precision": {
+          "mean": 0.09215690989796978,
+          "std": 0.040979332858119714,
+          "median": 0.08668434458590638,
+          "worst_10_pct": 0.04564874565442911
+        },
+        "correlation": {
+          "mean": 0.11918015819275565,
+          "std": 0.09181421893439395,
+          "median": 0.11448978740351293,
+          "worst_10_pct": 0.003980777240963097
+        }
+      },
+      "timing": {
+        "total_seconds": 153.6967906667851,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "champagne-convexity-nl-diag",
+      "dataset_name": "nmm",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.026125225968086398,
+          "std": 0.007882328627555219,
+          "median": 0.024412830664550307,
+          "worst_10_pct": 0.036997598274124584
+        },
+        "emd": {
+          "mean": 0.032084586942000254,
+          "std": 0.00962286504540001,
+          "median": 0.030498304245232494,
+          "worst_10_pct": 0.045113433620631825
+        },
+        "spatial_dispersion": {
+          "mean": 0.07051426795580948,
+          "std": 0.05610770088204653,
+          "median": 0.05917664551148644,
+          "worst_10_pct": 0.12037206897915348
+        },
+        "average_precision": {
+          "mean": 0.09263486380306908,
+          "std": 0.04132539710766748,
+          "median": 0.08714754165211183,
+          "worst_10_pct": 0.048375662587413916
+        },
+        "correlation": {
+          "mean": 0.11946893272031262,
+          "std": 0.09290221322434951,
+          "median": 0.110814157271828,
+          "worst_10_pct": 0.002715640601607301
+        }
+      },
+      "timing": {
+        "total_seconds": 13.941056875046343,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "champagne-convexity-nl-full",
+      "dataset_name": "nmm",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.035761156394472554,
+          "std": 0.008059494806915545,
+          "median": 0.035680932998909315,
+          "worst_10_pct": 0.04693896382650128
+        },
+        "emd": {
+          "mean": 0.042041066130177766,
+          "std": 0.007905775940876065,
+          "median": 0.04193007828074536,
+          "worst_10_pct": 0.05203708002513449
+        },
+        "spatial_dispersion": {
+          "mean": 0.11553702395616222,
+          "std": 0.08515299350716027,
+          "median": 0.08941037067022098,
+          "worst_10_pct": 0.2422366460731714
+        },
+        "average_precision": {
+          "mean": 0.0736888634368983,
+          "std": 0.028997970918148486,
+          "median": 0.07119624849016888,
+          "worst_10_pct": 0.04107976418520603
+        },
+        "correlation": {
+          "mean": 0.08716864098567546,
+          "std": 0.06465170871223044,
+          "median": 0.07833642187856492,
+          "worst_10_pct": 0.005410277897605466
+        }
+      },
+      "timing": {
+        "total_seconds": 24.960720082977787,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "champagne-convexity-nl-homoscedastic",
+      "dataset_name": "nmm",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.025381941847330527,
+          "std": 0.008188427740074009,
+          "median": 0.02392864247345082,
+          "worst_10_pct": 0.036119103097846765
+        },
+        "emd": {
+          "mean": 0.031357222793370915,
+          "std": 0.00958485208976499,
+          "median": 0.02924026877333693,
+          "worst_10_pct": 0.04344732801537605
+        },
+        "spatial_dispersion": {
+          "mean": 0.07078706476857743,
+          "std": 0.056000641440335855,
+          "median": 0.06000006014209591,
+          "worst_10_pct": 0.12046431042950788
+        },
+        "average_precision": {
+          "mean": 0.09307935731920221,
+          "std": 0.04153702301832665,
+          "median": 0.08592202136218974,
+          "worst_10_pct": 0.04511901782775366
+        },
+        "correlation": {
+          "mean": 0.11927907548427429,
+          "std": 0.09300184859109054,
+          "median": 0.10980029762431291,
+          "worst_10_pct": 0.0052507188898107526
+        }
+      },
+      "timing": {
+        "total_seconds": 13.967242042068392,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "champagne-convexity-nl-prec",
+      "dataset_name": "nmm",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.026125225968086398,
+          "std": 0.007882328627555219,
+          "median": 0.024412830664550307,
+          "worst_10_pct": 0.036997598274124584
+        },
+        "emd": {
+          "mean": 0.03208458694221003,
+          "std": 0.009622865045021668,
+          "median": 0.030498304244193548,
+          "worst_10_pct": 0.04511343361963441
+        },
+        "spatial_dispersion": {
+          "mean": 0.07051426795580948,
+          "std": 0.05610770088204653,
+          "median": 0.05917664551148644,
+          "worst_10_pct": 0.12037206897915348
+        },
+        "average_precision": {
+          "mean": 0.09263486380306908,
+          "std": 0.04132539710766748,
+          "median": 0.08714754165211183,
+          "worst_10_pct": 0.048375662587413916
+        },
+        "correlation": {
+          "mean": 0.11946893271539269,
+          "std": 0.09290221322365297,
+          "median": 0.11081415726706763,
+          "worst_10_pct": 0.0027156405912981225
+        }
+      },
+      "timing": {
+        "total_seconds": 13.682287374977022,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "champagne-low-snr",
+      "dataset_name": "nmm",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.02394570952488281,
+          "std": 0.008082042045037574,
+          "median": 0.022860630451112127,
+          "worst_10_pct": 0.03430808372412269
+        },
+        "emd": {
+          "mean": 0.03213940980164712,
+          "std": 0.010424337510256804,
+          "median": 0.0306307093694764,
+          "worst_10_pct": 0.046814403472838884
+        },
+        "spatial_dispersion": {
+          "mean": 0.06864118737326481,
+          "std": 0.050767955718151306,
+          "median": 0.0543442471830926,
+          "worst_10_pct": 0.1347873846477214
+        },
+        "average_precision": {
+          "mean": 0.09326895980098972,
+          "std": 0.04131592380285156,
+          "median": 0.08867546824149197,
+          "worst_10_pct": 0.04564874565442911
+        },
+        "correlation": {
+          "mean": 0.12403966661428203,
+          "std": 0.091258667762794,
+          "median": 0.11943498737067995,
+          "worst_10_pct": 0.005278905734481906
+        }
+      },
+      "timing": {
+        "total_seconds": 166.44611654197797,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "champagne-mackay",
+      "dataset_name": "nmm",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.024236136271047416,
+          "std": 0.008577842790761531,
+          "median": 0.02205279377829185,
+          "worst_10_pct": 0.036167910209639914
+        },
+        "emd": {
+          "mean": 0.03270191484168569,
+          "std": 0.010765221906549702,
+          "median": 0.03103967550741265,
+          "worst_10_pct": 0.047122935616581034
+        },
+        "spatial_dispersion": {
+          "mean": 0.06840510968877396,
+          "std": 0.048782838900961176,
+          "median": 0.05543106818237315,
+          "worst_10_pct": 0.1274551727462175
+        },
+        "average_precision": {
+          "mean": 0.0910575693577465,
+          "std": 0.039447431560523764,
+          "median": 0.08668434458590638,
+          "worst_10_pct": 0.04484099257757815
+        },
+        "correlation": {
+          "mean": 0.11912281414087382,
+          "std": 0.09178661800663061,
+          "median": 0.11378514712974362,
+          "worst_10_pct": 0.0038455235216928335
+        }
+      },
+      "timing": {
+        "total_seconds": 93.16507216682658,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "champagne-mackay-nl-diag",
+      "dataset_name": "nmm",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.025867230216046654,
+          "std": 0.00775948048618881,
+          "median": 0.024238064146788002,
+          "worst_10_pct": 0.03629209122909137
+        },
+        "emd": {
+          "mean": 0.03188554081758596,
+          "std": 0.009320554981602213,
+          "median": 0.030057386138870712,
+          "worst_10_pct": 0.04489676548637849
+        },
+        "spatial_dispersion": {
+          "mean": 0.07190703076734305,
+          "std": 0.05708607667043072,
+          "median": 0.060060658140730305,
+          "worst_10_pct": 0.12147032762125472
+        },
+        "average_precision": {
+          "mean": 0.0932623954356687,
+          "std": 0.04183474357705156,
+          "median": 0.08871720437904436,
+          "worst_10_pct": 0.0478209372140223
+        },
+        "correlation": {
+          "mean": 0.12030604397512851,
+          "std": 0.09177254229223882,
+          "median": 0.12194983440337892,
+          "worst_10_pct": 0.0046215129853617466
+        }
+      },
+      "timing": {
+        "total_seconds": 8.230318541871384,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "champagne-mackay-nl-full",
+      "dataset_name": "nmm",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.03499417376998364,
+          "std": 0.00804698312530753,
+          "median": 0.03448218855466151,
+          "worst_10_pct": 0.04579822678675893
+        },
+        "emd": {
+          "mean": 0.04218371192985612,
+          "std": 0.007687683892778967,
+          "median": 0.041107997563171544,
+          "worst_10_pct": 0.05150871084963868
+        },
+        "spatial_dispersion": {
+          "mean": 0.12661903076354883,
+          "std": 0.0966629219456299,
+          "median": 0.10063760728427776,
+          "worst_10_pct": 0.23978828479570324
+        },
+        "average_precision": {
+          "mean": 0.07422696158576342,
+          "std": 0.030486982839207238,
+          "median": 0.07172455445952561,
+          "worst_10_pct": 0.03841536913206671
+        },
+        "correlation": {
+          "mean": 0.0796353228722288,
+          "std": 0.06093141416293957,
+          "median": 0.06964076514206675,
+          "worst_10_pct": 0.0068667004763047264
+        }
+      },
+      "timing": {
+        "total_seconds": 16.00805683294311,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "champagne-mackay-nl-homoscedastic",
+      "dataset_name": "nmm",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.02509421999368902,
+          "std": 0.008168736356387927,
+          "median": 0.02385628378008017,
+          "worst_10_pct": 0.03574967205606468
+        },
+        "emd": {
+          "mean": 0.031188291624698796,
+          "std": 0.009568417538796677,
+          "median": 0.029232396510587025,
+          "worst_10_pct": 0.043443712483363636
+        },
+        "spatial_dispersion": {
+          "mean": 0.07128108990779336,
+          "std": 0.05618451188261382,
+          "median": 0.06000006014209591,
+          "worst_10_pct": 0.12230050067444422
+        },
+        "average_precision": {
+          "mean": 0.09385332490218513,
+          "std": 0.04207102927003866,
+          "median": 0.08571151776995797,
+          "worst_10_pct": 0.04546369067598561
+        },
+        "correlation": {
+          "mean": 0.12032227184528431,
+          "std": 0.0938986546068793,
+          "median": 0.11005740516534479,
+          "worst_10_pct": 0.005290681568733311
+        }
+      },
+      "timing": {
+        "total_seconds": 8.837884125066921,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "champagne-mackay-nl-prec",
+      "dataset_name": "nmm",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.025867230216046654,
+          "std": 0.00775948048618881,
+          "median": 0.024238064146788002,
+          "worst_10_pct": 0.03629209122909137
+        },
+        "emd": {
+          "mean": 0.03188554081773252,
+          "std": 0.009320554981672375,
+          "median": 0.030057386137636505,
+          "worst_10_pct": 0.04489676548565651
+        },
+        "spatial_dispersion": {
+          "mean": 0.07190703076734305,
+          "std": 0.05708607667043072,
+          "median": 0.060060658140730305,
+          "worst_10_pct": 0.12147032762125472
+        },
+        "average_precision": {
+          "mean": 0.0932623954356687,
+          "std": 0.04183474357705156,
+          "median": 0.08871720437904436,
+          "worst_10_pct": 0.0478209372140223
+        },
+        "correlation": {
+          "mean": 0.12030604397089462,
+          "std": 0.09177254229089929,
+          "median": 0.12194983440735496,
+          "worst_10_pct": 0.004621512984980495
+        }
+      },
+      "timing": {
+        "total_seconds": 7.9233379159122705,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "cmem",
+      "dataset_name": "nmm",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.040199867457126254,
+          "std": 0.01090829323382109,
+          "median": 0.039098532179316914,
+          "worst_10_pct": 0.05320058769234218
+        },
+        "emd": {
+          "mean": 0.04984210368663506,
+          "std": 0.011440730754339747,
+          "median": 0.048363189359874485,
+          "worst_10_pct": 0.062307332138232134
+        },
+        "spatial_dispersion": {
+          "mean": 2.570902370378193,
+          "std": 2.7061629361147523,
+          "median": 1.7098174294330946,
+          "worst_10_pct": 5.824923349988512
+        },
+        "average_precision": {
+          "mean": 0.09892391175483806,
+          "std": 0.0751948113009859,
+          "median": 0.07395907788763678,
+          "worst_10_pct": 0.02066781466424985
+        },
+        "correlation": {
+          "mean": 0.15139903069682917,
+          "std": 0.0979862803468648,
+          "median": 0.14427123569931483,
+          "worst_10_pct": 0.03345323827470143
+        }
+      },
+      "timing": {
+        "total_seconds": 42.75315195787698,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "flex-champagne",
+      "dataset_name": "nmm",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.025447273749291566,
+          "std": 0.0130552313274101,
+          "median": 0.02441617460044531,
+          "worst_10_pct": 0.04323101945114842
+        },
+        "emd": {
+          "mean": 0.0354754599682405,
+          "std": 0.01595373538142657,
+          "median": 0.03224809023339508,
+          "worst_10_pct": 0.05612068050086842
+        },
+        "spatial_dispersion": {
+          "mean": 0.10441056080908327,
+          "std": 0.09797311035550857,
+          "median": 0.05979988699992417,
+          "worst_10_pct": 0.24752517526988402
+        },
+        "average_precision": {
+          "mean": 0.35864125748961134,
+          "std": 0.23791696024081527,
+          "median": 0.3282157125516177,
+          "worst_10_pct": 0.05598289579352072
+        },
+        "correlation": {
+          "mean": 0.3169893298328472,
+          "std": 0.235708855119822,
+          "median": 0.26212473973461137,
+          "worst_10_pct": 0.012654610456773968
+        }
+      },
+      "timing": {
+        "total_seconds": 6.41030937503092,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "flex-champagne-omix",
+      "dataset_name": "nmm",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.024288448834175736,
+          "std": 0.011493097738451941,
+          "median": 0.024713053201495194,
+          "worst_10_pct": 0.04085797631571878
+        },
+        "emd": {
+          "mean": 0.034496565280012166,
+          "std": 0.014862743836199108,
+          "median": 0.03161315950253746,
+          "worst_10_pct": 0.05592079156530192
+        },
+        "spatial_dispersion": {
+          "mean": 0.10719632539575369,
+          "std": 0.09641205649734641,
+          "median": 0.06021906609812048,
+          "worst_10_pct": 0.24799580374452518
+        },
+        "average_precision": {
+          "mean": 0.35305563877156293,
+          "std": 0.24586003270228543,
+          "median": 0.31218766653861746,
+          "worst_10_pct": 0.05767022552236611
+        },
+        "correlation": {
+          "mean": 0.3154445271063816,
+          "std": 0.2361710191765856,
+          "median": 0.2749390133926072,
+          "worst_10_pct": 0.013207591107526659
+        }
+      },
+      "timing": {
+        "total_seconds": 6.44371295790188,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "flex-nl-champagne",
+      "dataset_name": "nmm",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.023361297099972974,
+          "std": 0.011136629684056314,
+          "median": 0.023261021864766935,
+          "worst_10_pct": 0.036812122309571316
+        },
+        "emd": {
+          "mean": 0.03335015491329985,
+          "std": 0.015222119389347517,
+          "median": 0.031518012175394884,
+          "worst_10_pct": 0.05309073586875095
+        },
+        "spatial_dispersion": {
+          "mean": 0.12674285316604045,
+          "std": 0.1237442106908516,
+          "median": 0.07188583765269882,
+          "worst_10_pct": 0.32907077390556977
+        },
+        "average_precision": {
+          "mean": 0.3980898691476955,
+          "std": 0.26095214402652894,
+          "median": 0.3399624832268463,
+          "worst_10_pct": 0.06607671204468507
+        },
+        "correlation": {
+          "mean": 0.35018226336520025,
+          "std": 0.24929329055131882,
+          "median": 0.2919753789469502,
+          "worst_10_pct": 0.019887504526076457
+        }
+      },
+      "timing": {
+        "total_seconds": 11.696263374993578,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "flex-nl-champagne-omix",
+      "dataset_name": "nmm",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.022937188582726305,
+          "std": 0.010778166831242192,
+          "median": 0.022219262441561593,
+          "worst_10_pct": 0.03692757641555798
+        },
+        "emd": {
+          "mean": 0.032889362554241484,
+          "std": 0.01447149176048102,
+          "median": 0.03207052034286464,
+          "worst_10_pct": 0.05194793627848858
+        },
+        "spatial_dispersion": {
+          "mean": 0.12295080849167186,
+          "std": 0.11654880863713825,
+          "median": 0.07173704283234622,
+          "worst_10_pct": 0.3234006208228511
+        },
+        "average_precision": {
+          "mean": 0.3898291258959734,
+          "std": 0.25987624179603624,
+          "median": 0.34408132903355676,
+          "worst_10_pct": 0.07673909610277713
+        },
+        "correlation": {
+          "mean": 0.34846778561599,
+          "std": 0.24840964657545472,
+          "median": 0.29241745630034327,
+          "worst_10_pct": 0.01448740439353462
+        }
+      },
+      "timing": {
+        "total_seconds": 12.29870625003241,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "gamma-map",
+      "dataset_name": "nmm",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.024679378495487677,
+          "std": 0.008887702994297142,
+          "median": 0.02349981922041586,
+          "worst_10_pct": 0.03766028423132102
+        },
+        "emd": {
+          "mean": 0.033815609185951334,
+          "std": 0.011639928836442154,
+          "median": 0.0330367522028915,
+          "worst_10_pct": 0.04778752271310172
+        },
+        "spatial_dispersion": {
+          "mean": 0.0706327962246727,
+          "std": 0.050258474474448506,
+          "median": 0.058775069425701945,
+          "worst_10_pct": 0.12151431591086043
+        },
+        "average_precision": {
+          "mean": 0.09940573034726265,
+          "std": 0.04410666036213617,
+          "median": 0.09176110912670132,
+          "worst_10_pct": 0.05475498524449295
+        },
+        "correlation": {
+          "mean": 0.1531104940229359,
+          "std": 0.09294168069385515,
+          "median": 0.1500673073849426,
+          "worst_10_pct": 0.028683346688705
+        }
+      },
+      "timing": {
+        "total_seconds": 22.82239850005135,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "gamma-map-msp",
+      "dataset_name": "nmm",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.024861356937735935,
+          "std": 0.009540602871866333,
+          "median": 0.023631075850372926,
+          "worst_10_pct": 0.0376593296331492
+        },
+        "emd": {
+          "mean": 0.03339074225168703,
+          "std": 0.010404532999816848,
+          "median": 0.03230010467514665,
+          "worst_10_pct": 0.04827970949934528
+        },
+        "spatial_dispersion": {
+          "mean": 0.08796685006079163,
+          "std": 0.11927025604560779,
+          "median": 0.05857451758228936,
+          "worst_10_pct": 0.17114230899288324
+        },
+        "average_precision": {
+          "mean": 0.29105395510362153,
+          "std": 0.13358927190561898,
+          "median": 0.27718782019509164,
+          "worst_10_pct": 0.11706901600707371
+        },
+        "correlation": {
+          "mean": 0.3172273175816426,
+          "std": 0.13073728321377706,
+          "median": 0.310530975357888,
+          "worst_10_pct": 0.1475571433898224
+        }
+      },
+      "timing": {
+        "total_seconds": 27.789695541141555,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "mem",
+      "dataset_name": "nmm",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.057216588568135024,
+          "std": 0.018546789800264623,
+          "median": 0.056659495466178905,
+          "worst_10_pct": 0.07982234911853361
+        },
+        "emd": {
+          "mean": 0.07130969730662069,
+          "std": 0.018797528043116168,
+          "median": 0.07393452953413138,
+          "worst_10_pct": 0.09596873578608907
+        },
+        "spatial_dispersion": {
+          "mean": 0.15087163297018838,
+          "std": 0.1600757926812616,
+          "median": 0.11129527997418612,
+          "worst_10_pct": 0.2604720586296429
+        },
+        "average_precision": {
+          "mean": 0.07332115484746217,
+          "std": 0.05210504063341504,
+          "median": 0.0633922205321645,
+          "worst_10_pct": 0.027051134857173278
+        },
+        "correlation": {
+          "mean": -0.06775004190216087,
+          "std": 0.07597259267977047,
+          "median": -0.04547426544697184,
+          "worst_10_pct": -0.157790630190849
+        }
+      },
+      "timing": {
+        "total_seconds": 13.142823625123128,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "msp",
+      "dataset_name": "nmm",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.02000933026904449,
+          "std": 0.006151913226974292,
+          "median": 0.01929096077474021,
+          "worst_10_pct": 0.02626834255773691
+        },
+        "emd": {
+          "mean": 0.024861988297895904,
+          "std": 0.006965136440989319,
+          "median": 0.024090637641941852,
+          "worst_10_pct": 0.0348111739653261
+        },
+        "spatial_dispersion": {
+          "mean": 0.09554486706631346,
+          "std": 0.07100590513990576,
+          "median": 0.08396199100719264,
+          "worst_10_pct": 0.1575041807600289
+        },
+        "average_precision": {
+          "mean": 0.41820499146083606,
+          "std": 0.18960352401081393,
+          "median": 0.4136135355918764,
+          "worst_10_pct": 0.1500716166307989
+        },
+        "correlation": {
+          "mean": 0.3206580958933403,
+          "std": 0.1525704961974449,
+          "median": 0.34684831377441927,
+          "worst_10_pct": 0.09959920612220241
+        }
+      },
+      "timing": {
+        "total_seconds": 3.482236291980371,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "nl-champagne",
+      "dataset_name": "nmm",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.02230655946069896,
+          "std": 0.006290175520343985,
+          "median": 0.02133074529234326,
+          "worst_10_pct": 0.03081519478169504
+        },
+        "emd": {
+          "mean": 0.02981895209261425,
+          "std": 0.008853257660480673,
+          "median": 0.029466138337352756,
+          "worst_10_pct": 0.04201476305756778
+        },
+        "spatial_dispersion": {
+          "mean": 0.07068059717342527,
+          "std": 0.04976032075059442,
+          "median": 0.06032074033194715,
+          "worst_10_pct": 0.1274535685232848
+        },
+        "average_precision": {
+          "mean": 0.10925176060424212,
+          "std": 0.04567576925016433,
+          "median": 0.11017627726085108,
+          "worst_10_pct": 0.058168963444018965
+        },
+        "correlation": {
+          "mean": 0.14362620847280796,
+          "std": 0.0944548589017683,
+          "median": 0.1364359307262387,
+          "worst_10_pct": 0.029294938762966148
+        }
+      },
+      "timing": {
+        "total_seconds": 11.344235416967422,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "omni-champagne",
+      "dataset_name": "nmm",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.025654348012704446,
+          "std": 0.011983432440986364,
+          "median": 0.0243636045564336,
+          "worst_10_pct": 0.041484735484712106
+        },
+        "emd": {
+          "mean": 0.03482611064429056,
+          "std": 0.015007872049527094,
+          "median": 0.03275509606585645,
+          "worst_10_pct": 0.05407789629103286
+        },
+        "spatial_dispersion": {
+          "mean": 0.06241086837181915,
+          "std": 0.04185060083805124,
+          "median": 0.04652996695008678,
+          "worst_10_pct": 0.12402305607957284
+        },
+        "average_precision": {
+          "mean": 0.27321924814609594,
+          "std": 0.2338217112818361,
+          "median": 0.19735442326836905,
+          "worst_10_pct": 0.04094549959199732
+        },
+        "correlation": {
+          "mean": 0.26729630777489216,
+          "std": 0.23982772577260236,
+          "median": 0.20449105384891503,
+          "worst_10_pct": -0.0016978676653672518
+        }
+      },
+      "timing": {
+        "total_seconds": 8.195685624843463,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "source-map",
+      "dataset_name": "nmm",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.0284156849092517,
+          "std": 0.008764628623114529,
+          "median": 0.02790845435924247,
+          "worst_10_pct": 0.03955849333400478
+        },
+        "emd": {
+          "mean": 0.032605216698462516,
+          "std": 0.012218816391161983,
+          "median": 0.03066507896404771,
+          "worst_10_pct": 0.05092750941908431
+        },
+        "spatial_dispersion": {
+          "mean": 0.39563664943010673,
+          "std": 0.3727103157113583,
+          "median": 0.313601788163737,
+          "worst_10_pct": 0.8499222157408388
+        },
+        "average_precision": {
+          "mean": 0.18156569217473922,
+          "std": 0.08047441284543586,
+          "median": 0.16813760515096898,
+          "worst_10_pct": 0.08288712452588837
+        },
+        "correlation": {
+          "mean": 0.2606355458954963,
+          "std": 0.08591341723078426,
+          "median": 0.2580474948030386,
+          "worst_10_pct": 0.14663889701620064
+        }
+      },
+      "timing": {
+        "total_seconds": 27.083491333993152,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "source-map-msp",
+      "dataset_name": "nmm",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.026455661186889037,
+          "std": 0.00900418524009942,
+          "median": 0.025966531926758185,
+          "worst_10_pct": 0.03709764628912931
+        },
+        "emd": {
+          "mean": 0.032360439214315376,
+          "std": 0.01203998055125405,
+          "median": 0.03069992135754091,
+          "worst_10_pct": 0.050567845857501764
+        },
+        "spatial_dispersion": {
+          "mean": 0.24380299807816688,
+          "std": 0.20055022238528855,
+          "median": 0.17956127848700282,
+          "worst_10_pct": 0.524549236309678
+        },
+        "average_precision": {
+          "mean": 0.241748313457021,
+          "std": 0.10342675730073268,
+          "median": 0.23564200206682012,
+          "worst_10_pct": 0.1066895139977055
+        },
+        "correlation": {
+          "mean": 0.2741907118271754,
+          "std": 0.08776374400373403,
+          "median": 0.26237518893476997,
+          "worst_10_pct": 0.1618664584703859
+        }
+      },
+      "timing": {
+        "total_seconds": 30.3304098341614,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "subspace-sbl",
+      "dataset_name": "nmm",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.030954923216571686,
+          "std": 0.014783885898576987,
+          "median": 0.03201596247499401,
+          "worst_10_pct": 0.046924406719953626
+        },
+        "emd": {
+          "mean": 0.041471328808588816,
+          "std": 0.01768885404478983,
+          "median": 0.03772413411439716,
+          "worst_10_pct": 0.06539943555332924
+        },
+        "spatial_dispersion": {
+          "mean": 0.09430902186381415,
+          "std": 0.09425113052859452,
+          "median": 0.04577838378844204,
+          "worst_10_pct": 0.24972196222166151
+        },
+        "average_precision": {
+          "mean": 0.28093737882685343,
+          "std": 0.25292768016790373,
+          "median": 0.2000725983526614,
+          "worst_10_pct": 0.03555142461380217
+        },
+        "correlation": {
+          "mean": 0.2603866551939006,
+          "std": 0.26602677546768577,
+          "median": 0.2024426000548179,
+          "worst_10_pct": -0.005626842493148545
+        }
+      },
+      "timing": {
+        "total_seconds": 2.705515957903117,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "subspace-sbl-plus",
+      "dataset_name": "nmm",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.031400225100867735,
+          "std": 0.014432223823957025,
+          "median": 0.03222069942817497,
+          "worst_10_pct": 0.046924406719953626
+        },
+        "emd": {
+          "mean": 0.04097652865737666,
+          "std": 0.017790729824962267,
+          "median": 0.038361492561947874,
+          "worst_10_pct": 0.06570501172667256
+        },
+        "spatial_dispersion": {
+          "mean": 0.08346112128204101,
+          "std": 0.08291682314184348,
+          "median": 0.04188073378548059,
+          "worst_10_pct": 0.23263805748315483
+        },
+        "average_precision": {
+          "mean": 0.2826803963210475,
+          "std": 0.2672312347219914,
+          "median": 0.19423229654661894,
+          "worst_10_pct": 0.033110236124084695
+        },
+        "correlation": {
+          "mean": 0.24757488221098334,
+          "std": 0.27109043310994996,
+          "median": 0.1491590054619618,
+          "worst_10_pct": -0.005626842493148545
+        }
+      },
+      "timing": {
+        "total_seconds": 3.7794011251535267,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "vb-sbl",
+      "dataset_name": "nmm",
+      "category": "bayesian",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.026921184152657526,
+          "std": 0.008827337397918172,
+          "median": 0.027002465708931542,
+          "worst_10_pct": 0.038537494788439305
+        },
+        "emd": {
+          "mean": 0.039975279041387195,
+          "std": 0.013536968511995987,
+          "median": 0.03822392532816325,
+          "worst_10_pct": 0.06050645652023986
+        },
+        "spatial_dispersion": {
+          "mean": 0.10262942929843825,
+          "std": 0.29217113163550607,
+          "median": 0.042826169933539354,
+          "worst_10_pct": 0.09185236053072872
+        },
+        "average_precision": {
+          "mean": 0.14978207417314582,
+          "std": 0.057772027013426853,
+          "median": 0.14520449215675552,
+          "worst_10_pct": 0.08282739175030483
+        },
+        "correlation": {
+          "mean": 0.14296330854096964,
+          "std": 0.08700450427674732,
+          "median": 0.14556004347956394,
+          "worst_10_pct": 0.02855466354282408
+        }
+      },
+      "timing": {
+        "total_seconds": 87.96406983397901,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "apesissy",
+      "dataset_name": "nmm",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.03648347612815368,
+          "std": 0.011094766651691552,
+          "median": 0.03699204639877285,
+          "worst_10_pct": 0.05006059567906522
+        },
+        "emd": {
+          "mean": 0.03567372051230722,
+          "std": 0.010214803038057926,
+          "median": 0.035180902370434725,
+          "worst_10_pct": 0.046569050856697214
+        },
+        "spatial_dispersion": {
+          "mean": 5.580817511883683,
+          "std": 4.967587224185473,
+          "median": 4.443716611816077,
+          "worst_10_pct": 10.86666855390363
+        },
+        "average_precision": {
+          "mean": 0.20940041708900847,
+          "std": 0.1431657615923698,
+          "median": 0.18730050934110076,
+          "worst_10_pct": 0.05657249109524567
+        },
+        "correlation": {
+          "mean": 0.2873369651800707,
+          "std": 0.1260201145304535,
+          "median": 0.26343999583680067,
+          "worst_10_pct": 0.14039735712127915
+        }
+      },
+      "timing": {
+        "total_seconds": 39.768719875020906,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "backus-gilbert",
+      "dataset_name": "nmm",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.05581886093055795,
+          "std": 0.012102666684813041,
+          "median": 0.05489405485200992,
+          "worst_10_pct": 0.0695310972035684
+        },
+        "emd": {
+          "mean": 0.052479182905686476,
+          "std": 0.012435546341763491,
+          "median": 0.049674214135943265,
+          "worst_10_pct": 0.06840120443083511
+        },
+        "spatial_dispersion": {
+          "mean": 6.64160614219276,
+          "std": 7.950018587651589,
+          "median": 4.581660709560955,
+          "worst_10_pct": 14.974294181098896
+        },
+        "average_precision": {
+          "mean": 0.06474456144622569,
+          "std": 0.06094257371816093,
+          "median": 0.04585701527896398,
+          "worst_10_pct": 0.02171917826550677
+        },
+        "correlation": {
+          "mean": 0.03917291088890041,
+          "std": 0.08271280134227917,
+          "median": 0.039748223120671174,
+          "worst_10_pct": -0.07668756911068231
+        }
+      },
+      "timing": {
+        "total_seconds": 16.358676417032257,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "dspm",
+      "dataset_name": "nmm",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.037423604341345645,
+          "std": 0.008326482403413805,
+          "median": 0.03743537502469667,
+          "worst_10_pct": 0.04857432744949082
+        },
+        "emd": {
+          "mean": 0.04520041381799212,
+          "std": 0.008285867281894123,
+          "median": 0.045422382572722825,
+          "worst_10_pct": 0.05674638455421918
+        },
+        "spatial_dispersion": {
+          "mean": 4.318054656984349,
+          "std": 2.9706936913035187,
+          "median": 3.688094859449829,
+          "worst_10_pct": 6.500797428530124
+        },
+        "average_precision": {
+          "mean": 0.07556129112055947,
+          "std": 0.04076002485130277,
+          "median": 0.06796496891336014,
+          "worst_10_pct": 0.034105276772540646
+        },
+        "correlation": {
+          "mean": 0.11724019937122065,
+          "std": 0.04703838600071544,
+          "median": 0.1105358660889997,
+          "worst_10_pct": 0.06312495475991733
+        }
+      },
+      "timing": {
+        "total_seconds": 6.338435583049431,
+        "make_inverse_operator_seconds": 0.011374959023669362,
+        "apply_inverse_seconds": 6.327008957974613
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "epifocus",
+      "dataset_name": "nmm",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.03912968774313498,
+          "std": 0.009375787253055086,
+          "median": 0.03799742902167726,
+          "worst_10_pct": 0.05153584259006863
+        },
+        "emd": {
+          "mean": 0.03786291299749704,
+          "std": 0.005777516748855703,
+          "median": 0.03706526431461792,
+          "worst_10_pct": 0.04546172701379551
+        },
+        "spatial_dispersion": {
+          "mean": 2.4792610309447056,
+          "std": 1.6955386329317714,
+          "median": 2.196091914214822,
+          "worst_10_pct": 4.441569004587287
+        },
+        "average_precision": {
+          "mean": 0.13873782659391856,
+          "std": 0.07334880552366653,
+          "median": 0.12062946504180978,
+          "worst_10_pct": 0.06287213160066796
+        },
+        "correlation": {
+          "mean": 0.18685653194627572,
+          "std": 0.04823374721870497,
+          "median": 0.18412940043895387,
+          "worst_10_pct": 0.12692502074143203
+        }
+      },
+      "timing": {
+        "total_seconds": 6.026446292176843,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "gbf",
+      "dataset_name": "nmm",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.04129245770335013,
+          "std": 0.010170656325674815,
+          "median": 0.040141301510102166,
+          "worst_10_pct": 0.05634846080724462
+        },
+        "emd": {
+          "mean": 0.04345935363156524,
+          "std": 0.0076667137122723,
+          "median": 0.04321688297802008,
+          "worst_10_pct": 0.05317843985055801
+        },
+        "spatial_dispersion": {
+          "mean": 2.9776478033336753,
+          "std": 2.447219179024049,
+          "median": 2.4050487733547135,
+          "worst_10_pct": 4.987139036923814
+        },
+        "average_precision": {
+          "mean": 0.17333222784366176,
+          "std": 0.1310274258196487,
+          "median": 0.13613500729228295,
+          "worst_10_pct": 0.0419022982558772
+        },
+        "correlation": {
+          "mean": 0.2428018803647833,
+          "std": 0.0907565679391959,
+          "median": 0.23865408906635333,
+          "worst_10_pct": 0.1235234998092208
+        }
+      },
+      "timing": {
+        "total_seconds": 5.949664292158559,
+        "make_inverse_operator_seconds": 0.09851845889352262,
+        "apply_inverse_seconds": 5.85105395806022
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "gft-l1",
+      "dataset_name": "nmm",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.038281718060641456,
+          "std": 0.007359744370856924,
+          "median": 0.037241755109971034,
+          "worst_10_pct": 0.04724000035036565
+        },
+        "emd": {
+          "mean": 0.04159817651142388,
+          "std": 0.008190536238806348,
+          "median": 0.04043451416541063,
+          "worst_10_pct": 0.0518198742536619
+        },
+        "spatial_dispersion": {
+          "mean": 4.183076572198412,
+          "std": 2.8009596477533987,
+          "median": 3.616587264266423,
+          "worst_10_pct": 7.058005959687236
+        },
+        "average_precision": {
+          "mean": 0.16377854052996585,
+          "std": 0.11693562969744392,
+          "median": 0.13316233436014327,
+          "worst_10_pct": 0.05052151633709288
+        },
+        "correlation": {
+          "mean": 0.22098563752448283,
+          "std": 0.08523336569401772,
+          "median": 0.2079872330252402,
+          "worst_10_pct": 0.12591782388316994
+        }
+      },
+      "timing": {
+        "total_seconds": 107.45589079195634,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "gft-mne",
+      "dataset_name": "nmm",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.032936670775188304,
+          "std": 0.008320107549226595,
+          "median": 0.03274810920182296,
+          "worst_10_pct": 0.043209078323406494
+        },
+        "emd": {
+          "mean": 0.03718353255350342,
+          "std": 0.006009219158688202,
+          "median": 0.036393541002048266,
+          "worst_10_pct": 0.04526637954781393
+        },
+        "spatial_dispersion": {
+          "mean": 1.7938191425787235,
+          "std": 1.4030363086815285,
+          "median": 1.2938379875165864,
+          "worst_10_pct": 3.107881750829112
+        },
+        "average_precision": {
+          "mean": 0.1751253690008096,
+          "std": 0.10431076547818456,
+          "median": 0.15281834919691667,
+          "worst_10_pct": 0.06205648228058546
+        },
+        "correlation": {
+          "mean": 0.24403168546466653,
+          "std": 0.06745676127480536,
+          "median": 0.24381454846654588,
+          "worst_10_pct": 0.16137545880760565
+        }
+      },
+      "timing": {
+        "total_seconds": 10.220869499957189,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "l1l2",
+      "dataset_name": "nmm",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.033234567074882315,
+          "std": 0.010022713207846605,
+          "median": 0.03161764993804879,
+          "worst_10_pct": 0.04691661768555359
+        },
+        "emd": {
+          "mean": 0.037949717198506955,
+          "std": 0.010121768094719262,
+          "median": 0.03662792412722471,
+          "worst_10_pct": 0.051704819479585884
+        },
+        "spatial_dispersion": {
+          "mean": 0.09606435199511776,
+          "std": 0.06879222188595659,
+          "median": 0.08370113848283497,
+          "worst_10_pct": 0.16638192027301665
+        },
+        "average_precision": {
+          "mean": 0.07438760090973483,
+          "std": 0.03493053366658917,
+          "median": 0.07015108470363625,
+          "worst_10_pct": 0.0363958897861214
+        },
+        "correlation": {
+          "mean": 0.09717038949172192,
+          "std": 0.08290882996523707,
+          "median": 0.07099702300322216,
+          "worst_10_pct": 0.005483733327700252
+        }
+      },
+      "timing": {
+        "total_seconds": 32.94557245797478,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "laura",
+      "dataset_name": "nmm",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.03933846314517539,
+          "std": 0.008840824318357922,
+          "median": 0.03945663799357256,
+          "worst_10_pct": 0.05080748405411434
+        },
+        "emd": {
+          "mean": 0.03960685354744211,
+          "std": 0.006695693184138032,
+          "median": 0.038921267797305995,
+          "worst_10_pct": 0.04817640874866072
+        },
+        "spatial_dispersion": {
+          "mean": 0.9899917019993597,
+          "std": 0.7487994779213034,
+          "median": 0.7923674183745588,
+          "worst_10_pct": 2.048060832924884
+        },
+        "average_precision": {
+          "mean": 0.11390950595903934,
+          "std": 0.06035404392086648,
+          "median": 0.10187788396428882,
+          "worst_10_pct": 0.04443355061910919
+        },
+        "correlation": {
+          "mean": 0.180091653222043,
+          "std": 0.0546444405810588,
+          "median": 0.1821797030737003,
+          "worst_10_pct": 0.10845695169183728
+        }
+      },
+      "timing": {
+        "total_seconds": 8.139103082939982,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "mce",
+      "dataset_name": "nmm",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.030012816156754947,
+          "std": 0.009013538379876153,
+          "median": 0.029252759232069166,
+          "worst_10_pct": 0.04273955651963607
+        },
+        "emd": {
+          "mean": 0.03735158546633133,
+          "std": 0.011526849055696942,
+          "median": 0.0359624419632458,
+          "worst_10_pct": 0.0507058200152324
+        },
+        "spatial_dispersion": {
+          "mean": 0.08115346457094921,
+          "std": 0.06162941780756311,
+          "median": 0.06270948180453265,
+          "worst_10_pct": 0.16101867927687985
+        },
+        "average_precision": {
+          "mean": 0.08992629774960005,
+          "std": 0.04354805431831622,
+          "median": 0.08739532505304397,
+          "worst_10_pct": 0.043251387692351394
+        },
+        "correlation": {
+          "mean": 0.11925856767629084,
+          "std": 0.09346780963145558,
+          "median": 0.09812618051563535,
+          "worst_10_pct": 0.013080896340808721
+        }
+      },
+      "timing": {
+        "total_seconds": 111.09193233307451,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "mne",
+      "dataset_name": "nmm",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.059320314898415515,
+          "std": 0.01372794685250579,
+          "median": 0.05981800239362896,
+          "worst_10_pct": 0.07809378261573925
+        },
+        "emd": {
+          "mean": 0.061076266574058104,
+          "std": 0.012990110094283708,
+          "median": 0.0588427303825821,
+          "worst_10_pct": 0.07942536519711811
+        },
+        "spatial_dispersion": {
+          "mean": 0.500885489835113,
+          "std": 0.4314925379488034,
+          "median": 0.3581860088147994,
+          "worst_10_pct": 0.9064881433849906
+        },
+        "average_precision": {
+          "mean": 0.055124034768354126,
+          "std": 0.031938042029587714,
+          "median": 0.045498867204957966,
+          "worst_10_pct": 0.021576987863948748
+        },
+        "correlation": {
+          "mean": 0.07228423619350118,
+          "std": 0.04176896298543779,
+          "median": 0.07255493519909242,
+          "worst_10_pct": 0.02198957844447026
+        }
+      },
+      "timing": {
+        "total_seconds": 2.902817958034575,
+        "make_inverse_operator_seconds": 0.003521709004417062,
+        "apply_inverse_seconds": 2.899245792068541
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "mxne-bcd",
+      "dataset_name": "nmm",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.027439114267244262,
+          "std": 0.008085497640413632,
+          "median": 0.027126359667401526,
+          "worst_10_pct": 0.038324751882682646
+        },
+        "emd": {
+          "mean": 0.03246978988257632,
+          "std": 0.00876309853527275,
+          "median": 0.03143267310267108,
+          "worst_10_pct": 0.04446835704281254
+        },
+        "spatial_dispersion": {
+          "mean": 0.09582483702774791,
+          "std": 0.0637176873626237,
+          "median": 0.08428914716333308,
+          "worst_10_pct": 0.16179223798949122
+        },
+        "average_precision": {
+          "mean": 0.08438131310656585,
+          "std": 0.039627537515798644,
+          "median": 0.07832215480096541,
+          "worst_10_pct": 0.044443544441106486
+        },
+        "correlation": {
+          "mean": 0.1090424893040654,
+          "std": 0.08393350098038721,
+          "median": 0.10329733570407157,
+          "worst_10_pct": 0.0052218536103359955
+        }
+      },
+      "timing": {
+        "total_seconds": 14.80442758416757,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "s-map",
+      "dataset_name": "nmm",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.04038475533592964,
+          "std": 0.008846088351294312,
+          "median": 0.039607032505377546,
+          "worst_10_pct": 0.05044898634821904
+        },
+        "emd": {
+          "mean": 0.0454342754470622,
+          "std": 0.009166593999092363,
+          "median": 0.04383221049226842,
+          "worst_10_pct": 0.056879831499167983
+        },
+        "spatial_dispersion": {
+          "mean": 15.25999422756305,
+          "std": 10.829988073848693,
+          "median": 12.492818693487791,
+          "worst_10_pct": 26.012906796679097
+        },
+        "average_precision": {
+          "mean": 0.21795110171152887,
+          "std": 0.1962550957439083,
+          "median": 0.15153166117217431,
+          "worst_10_pct": 0.03068779980567044
+        },
+        "correlation": {
+          "mean": 0.18861598065818452,
+          "std": 0.10994418761599792,
+          "median": 0.18115753826262168,
+          "worst_10_pct": 0.05183947864177301
+        }
+      },
+      "timing": {
+        "total_seconds": 38.51547791599296,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "sissy",
+      "dataset_name": "nmm",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.045080895419509694,
+          "std": 0.010760135219057677,
+          "median": 0.044261604403833144,
+          "worst_10_pct": 0.05881238447220304
+        },
+        "emd": {
+          "mean": 0.04670464914120001,
+          "std": 0.010225559408036341,
+          "median": 0.0457755767314739,
+          "worst_10_pct": 0.05988285815915629
+        },
+        "spatial_dispersion": {
+          "mean": 9.33819544698889,
+          "std": 7.443298325183106,
+          "median": 8.03323970700654,
+          "worst_10_pct": 14.650704429170917
+        },
+        "average_precision": {
+          "mean": 0.07528015025098451,
+          "std": 0.06462301565511752,
+          "median": 0.05327694865370608,
+          "worst_10_pct": 0.024292040263309018
+        },
+        "correlation": {
+          "mean": 0.004904012284004731,
+          "std": 0.14526749557800878,
+          "median": 0.0014672297172189852,
+          "worst_10_pct": -0.19782548668325936
+        }
+      },
+      "timing": {
+        "total_seconds": 32.95804166700691,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "sslofo",
+      "dataset_name": "nmm",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.04971092145935516,
+          "std": 0.01182939380155486,
+          "median": 0.04968279943239342,
+          "worst_10_pct": 0.06555981297670203
+        },
+        "emd": {
+          "mean": 0.049360810007658074,
+          "std": 0.00960009840780448,
+          "median": 0.04834284633299475,
+          "worst_10_pct": 0.06286624449407255
+        },
+        "spatial_dispersion": {
+          "mean": 0.6672861210252127,
+          "std": 0.5008077800141596,
+          "median": 0.517532761865386,
+          "worst_10_pct": 1.1582335570744822
+        },
+        "average_precision": {
+          "mean": 0.08680353596969534,
+          "std": 0.05678863582774754,
+          "median": 0.07221226522539703,
+          "worst_10_pct": 0.0354298560363636
+        },
+        "correlation": {
+          "mean": 0.1355589744509469,
+          "std": 0.05379899061402858,
+          "median": 0.13027061895460862,
+          "worst_10_pct": 0.07630519426368716
+        }
+      },
+      "timing": {
+        "total_seconds": 1749.4493030000012,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "tv",
+      "dataset_name": "nmm",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.05753132862891612,
+          "std": 0.012305759492784287,
+          "median": 0.05749550006627206,
+          "worst_10_pct": 0.07564053268811
+        },
+        "emd": {
+          "mean": 0.05857481654920907,
+          "std": 0.010769911542855034,
+          "median": 0.05718558400768381,
+          "worst_10_pct": 0.07163341507795472
+        },
+        "spatial_dispersion": {
+          "mean": 0.4305218038735207,
+          "std": 0.37629305091680026,
+          "median": 0.3280739419025784,
+          "worst_10_pct": 0.7932165282083133
+        },
+        "average_precision": {
+          "mean": 0.05859128939552705,
+          "std": 0.03275965581559976,
+          "median": 0.047739576660531656,
+          "worst_10_pct": 0.02508259613781746
+        },
+        "correlation": {
+          "mean": 0.08838002223143276,
+          "std": 0.04511098869392851,
+          "median": 0.08483920141567172,
+          "worst_10_pct": 0.031243644912441474
+        }
+      },
+      "timing": {
+        "total_seconds": 119.09045362495817,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "wmne",
+      "dataset_name": "nmm",
+      "category": "minimum_norm",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.03720306697901075,
+          "std": 0.008947575158885054,
+          "median": 0.03659487252122052,
+          "worst_10_pct": 0.04812457436952523
+        },
+        "emd": {
+          "mean": 0.038180205930048935,
+          "std": 0.005631035805489282,
+          "median": 0.03762180825020313,
+          "worst_10_pct": 0.045258959247066195
+        },
+        "spatial_dispersion": {
+          "mean": 3.066370786817258,
+          "std": 2.434798929769585,
+          "median": 2.307880884885695,
+          "worst_10_pct": 6.150824981020947
+        },
+        "average_precision": {
+          "mean": 0.1491819708119958,
+          "std": 0.08058933374168632,
+          "median": 0.1369473197397666,
+          "worst_10_pct": 0.06053465500484877
+        },
+        "correlation": {
+          "mean": 0.19072323226353682,
+          "std": 0.050098974020735376,
+          "median": 0.19589926011162276,
+          "worst_10_pct": 0.13338874945967846
+        }
+      },
+      "timing": {
+        "total_seconds": 8.296188042033464,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "eloreta",
+      "dataset_name": "nmm",
+      "category": "loreta",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.06209966231580776,
+          "std": 0.01865155000580103,
+          "median": 0.059780581322919205,
+          "worst_10_pct": 0.08464972609108906
+        },
+        "emd": {
+          "mean": 0.052061041559986816,
+          "std": 0.009659292027555931,
+          "median": 0.0496858237460448,
+          "worst_10_pct": 0.06335078758730522
+        },
+        "spatial_dispersion": {
+          "mean": 2.8670561542140023,
+          "std": 2.364715038983324,
+          "median": 2.247767777095444,
+          "worst_10_pct": 5.194112860786705
+        },
+        "average_precision": {
+          "mean": 0.056981401084231935,
+          "std": 0.03632468802402299,
+          "median": 0.04693687988324482,
+          "worst_10_pct": 0.022434058074339607
+        },
+        "correlation": {
+          "mean": 0.0745016060435325,
+          "std": 0.03902613068120136,
+          "median": 0.07414645992720618,
+          "worst_10_pct": 0.028974267407386674
+        }
+      },
+      "timing": {
+        "total_seconds": 5.604114375077188,
+        "make_inverse_operator_seconds": 0.018840709002688527,
+        "apply_inverse_seconds": 5.585232250159606
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "loreta",
+      "dataset_name": "nmm",
+      "category": "loreta",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.04038475533592964,
+          "std": 0.008846088351294312,
+          "median": 0.039607032505377546,
+          "worst_10_pct": 0.05044898634821904
+        },
+        "emd": {
+          "mean": 0.045434275447059004,
+          "std": 0.00916659399909197,
+          "median": 0.04383221049226255,
+          "worst_10_pct": 0.05687983149916042
+        },
+        "spatial_dispersion": {
+          "mean": 15.25999422756305,
+          "std": 10.829988073848693,
+          "median": 12.492818693487791,
+          "worst_10_pct": 26.012906796679097
+        },
+        "average_precision": {
+          "mean": 0.21795110171152887,
+          "std": 0.1962550957439083,
+          "median": 0.15153166117217431,
+          "worst_10_pct": 0.03068779980567044
+        },
+        "correlation": {
+          "mean": 0.18861598065836074,
+          "std": 0.10994418761599799,
+          "median": 0.18115753826283781,
+          "worst_10_pct": 0.051839478641808955
+        }
+      },
+      "timing": {
+        "total_seconds": 60.30121983308345,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "self-regularized-eloreta",
+      "dataset_name": "nmm",
+      "category": "loreta",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.032128535323365556,
+          "std": 0.00852866870219466,
+          "median": 0.032380580865920466,
+          "worst_10_pct": 0.04069924404784338
+        },
+        "emd": {
+          "mean": 0.03223685936222395,
+          "std": 0.005401639616656605,
+          "median": 0.03176165510319627,
+          "worst_10_pct": 0.03833054960482075
+        },
+        "spatial_dispersion": {
+          "mean": 3.7391411729617148,
+          "std": 2.6393704051243363,
+          "median": 3.282820934461399,
+          "worst_10_pct": 5.880789301469962
+        },
+        "average_precision": {
+          "mean": 0.1427786198746836,
+          "std": 0.06571865653139165,
+          "median": 0.13555201740146872,
+          "worst_10_pct": 0.07535225793225782
+        },
+        "correlation": {
+          "mean": 0.20260527055209085,
+          "std": 0.06312301769676337,
+          "median": 0.19406652745793504,
+          "worst_10_pct": 0.12345365230989028
+        }
+      },
+      "timing": {
+        "total_seconds": 8.840362041955814,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "sloreta",
+      "dataset_name": "nmm",
+      "category": "loreta",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.03289081467111611,
+          "std": 0.007597208833956279,
+          "median": 0.03409715921391135,
+          "worst_10_pct": 0.04302348135578923
+        },
+        "emd": {
+          "mean": 0.03796821438364713,
+          "std": 0.005749468024830442,
+          "median": 0.03761544055798772,
+          "worst_10_pct": 0.04541499413697645
+        },
+        "spatial_dispersion": {
+          "mean": 5.575231622254085,
+          "std": 3.6402129220368686,
+          "median": 4.521728109860918,
+          "worst_10_pct": 10.44299994423419
+        },
+        "average_precision": {
+          "mean": 0.16130408099305954,
+          "std": 0.07292995955416713,
+          "median": 0.1468721800624019,
+          "worst_10_pct": 0.0809853592540038
+        },
+        "correlation": {
+          "mean": 0.19151695332050025,
+          "std": 0.046609624350985854,
+          "median": 0.19039751621903553,
+          "worst_10_pct": 0.13435873920976987
+        }
+      },
+      "timing": {
+        "total_seconds": 8.938127000117674,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "ap",
+      "dataset_name": "nmm",
+      "category": "music",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.03582909856898963,
+          "std": 0.012054990112032407,
+          "median": 0.036057174530103826,
+          "worst_10_pct": 0.05008417105373689
+        },
+        "emd": {
+          "mean": 0.04571708549671372,
+          "std": 0.015418204727466153,
+          "median": 0.043000271532634624,
+          "worst_10_pct": 0.06489562309035515
+        },
+        "spatial_dispersion": {
+          "mean": 0.04052562573360177,
+          "std": 0.02743319089690448,
+          "median": 0.03426341109953906,
+          "worst_10_pct": 0.06319302844453266
+        },
+        "average_precision": {
+          "mean": 0.06585349548510396,
+          "std": 0.03253415136541594,
+          "median": 0.06258608610606137,
+          "worst_10_pct": 0.025043190410714487
+        },
+        "correlation": {
+          "mean": 0.058541382128561435,
+          "std": 0.08381132180807403,
+          "median": 0.005694813467131604,
+          "worst_10_pct": -0.005619995766189276
+        }
+      },
+      "timing": {
+        "total_seconds": 1.8297827921342105,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "exhaustive-ml",
+      "dataset_name": "nmm",
+      "category": "music",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.021553711557582927,
+          "std": 0.007553592581999948,
+          "median": 0.020181829010921776,
+          "worst_10_pct": 0.03093776743686571
+        },
+        "emd": {
+          "mean": 0.02865496294916384,
+          "std": 0.00923506252839507,
+          "median": 0.027724598433583034,
+          "worst_10_pct": 0.03954247766143954
+        },
+        "spatial_dispersion": {
+          "mean": 0.06962891439636426,
+          "std": 0.04895206988758133,
+          "median": 0.05697831762656865,
+          "worst_10_pct": 0.11439699536202189
+        },
+        "average_precision": {
+          "mean": 0.0851059935278238,
+          "std": 0.03791687090651967,
+          "median": 0.08139368876880079,
+          "worst_10_pct": 0.04603908596747129
+        },
+        "correlation": {
+          "mean": 0.12697340777091395,
+          "std": 0.08966646231639627,
+          "median": 0.11844192365105677,
+          "worst_10_pct": 0.0053217021626932315
+        }
+      },
+      "timing": {
+        "total_seconds": 22.27352362498641,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "exso-music",
+      "dataset_name": "nmm",
+      "category": "music",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.049069099626367796,
+          "std": 0.02167545366642269,
+          "median": 0.04434626605484819,
+          "worst_10_pct": 0.08136492738310261
+        },
+        "emd": {
+          "mean": 0.061590960999515304,
+          "std": 0.022326605631444646,
+          "median": 0.059888966651284084,
+          "worst_10_pct": 0.0892132315527609
+        },
+        "spatial_dispersion": {
+          "mean": 0.16033627817309484,
+          "std": 0.1634323921786046,
+          "median": 0.12452203123769426,
+          "worst_10_pct": 0.3108472682479173
+        },
+        "average_precision": {
+          "mean": 0.11050901995241304,
+          "std": 0.0970911362526152,
+          "median": 0.07525235681270875,
+          "worst_10_pct": 0.024404776807359415
+        },
+        "correlation": {
+          "mean": 0.07478433370500963,
+          "std": 0.12451983439751363,
+          "median": 0.009774880183559018,
+          "worst_10_pct": -0.00780803353929457
+        }
+      },
+      "timing": {
+        "total_seconds": 9.245484957937151,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "flex-ap",
+      "dataset_name": "nmm",
+      "category": "music",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.03338236971047025,
+          "std": 0.013601561126549469,
+          "median": 0.034358135229394474,
+          "worst_10_pct": 0.04931018134977051
+        },
+        "emd": {
+          "mean": 0.0428764699245747,
+          "std": 0.01669846721809813,
+          "median": 0.04213299097119173,
+          "worst_10_pct": 0.06502023066065553
+        },
+        "spatial_dispersion": {
+          "mean": 0.08633640973429975,
+          "std": 0.08831634375963522,
+          "median": 0.047302073311884546,
+          "worst_10_pct": 0.2229669741083434
+        },
+        "average_precision": {
+          "mean": 0.18748612299910897,
+          "std": 0.1859613665767059,
+          "median": 0.10099956975976068,
+          "worst_10_pct": 0.03098001296289358
+        },
+        "correlation": {
+          "mean": 0.19007639057162,
+          "std": 0.21602515919816115,
+          "median": 0.1378875472636694,
+          "worst_10_pct": -0.005590897729943044
+        }
+      },
+      "timing": {
+        "total_seconds": 2.2802093338686973,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "flex-greedy-ml",
+      "dataset_name": "nmm",
+      "category": "music",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.01596116076545414,
+          "std": 0.008922499680556497,
+          "median": 0.013719095961454479,
+          "worst_10_pct": 0.028555044074753778
+        },
+        "emd": {
+          "mean": 0.023659673410190613,
+          "std": 0.011412188870142557,
+          "median": 0.02100807963822672,
+          "worst_10_pct": 0.03868987493552613
+        },
+        "spatial_dispersion": {
+          "mean": 0.14430216105506533,
+          "std": 0.12202250488522158,
+          "median": 0.10381983286191873,
+          "worst_10_pct": 0.3106925445541484
+        },
+        "average_precision": {
+          "mean": 0.501263282303321,
+          "std": 0.2530959190718467,
+          "median": 0.49163318056138633,
+          "worst_10_pct": 0.13276153344088476
+        },
+        "correlation": {
+          "mean": 0.4835993597854423,
+          "std": 0.24605192151479818,
+          "median": 0.5125309593403988,
+          "worst_10_pct": 0.08521847060950208
+        }
+      },
+      "timing": {
+        "total_seconds": 145.42391695803963,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "flex-music",
+      "dataset_name": "nmm",
+      "category": "music",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.032754461901292393,
+          "std": 0.014151386341615235,
+          "median": 0.034358135229394474,
+          "worst_10_pct": 0.04840444982777247
+        },
+        "emd": {
+          "mean": 0.04267024477978368,
+          "std": 0.01764199682646866,
+          "median": 0.04189234506480918,
+          "worst_10_pct": 0.06502023066065553
+        },
+        "spatial_dispersion": {
+          "mean": 0.08697307103350076,
+          "std": 0.08898355518915073,
+          "median": 0.046019730249024116,
+          "worst_10_pct": 0.2229669741083434
+        },
+        "average_precision": {
+          "mean": 0.21781460876023412,
+          "std": 0.21416524808643267,
+          "median": 0.1188049130222204,
+          "worst_10_pct": 0.03276952234354458
+        },
+        "correlation": {
+          "mean": 0.1952034870617846,
+          "std": 0.22973103180040308,
+          "median": 0.12501764457650663,
+          "worst_10_pct": -0.0061119056550453105
+        }
+      },
+      "timing": {
+        "total_seconds": 2.274921749951318,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "flex-ssm",
+      "dataset_name": "nmm",
+      "category": "music",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.03122825345915384,
+          "std": 0.014792316391282017,
+          "median": 0.03054880582784239,
+          "worst_10_pct": 0.04805858097976555
+        },
+        "emd": {
+          "mean": 0.041275824160665636,
+          "std": 0.01784873602395776,
+          "median": 0.03792212276156949,
+          "worst_10_pct": 0.06488665345785168
+        },
+        "spatial_dispersion": {
+          "mean": 0.09731614004844008,
+          "std": 0.08834477360300844,
+          "median": 0.054679365277244,
+          "worst_10_pct": 0.24659338363518402
+        },
+        "average_precision": {
+          "mean": 0.27182627231402545,
+          "std": 0.24672882865085335,
+          "median": 0.19445390434472737,
+          "worst_10_pct": 0.03586270908299457
+        },
+        "correlation": {
+          "mean": 0.2504107560650791,
+          "std": 0.26058894262168,
+          "median": 0.19582698667754725,
+          "worst_10_pct": -0.006839717974009352
+        }
+      },
+      "timing": {
+        "total_seconds": 2.1722783751320094,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "flex-trap-music",
+      "dataset_name": "nmm",
+      "category": "music",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.032754461901292393,
+          "std": 0.014151386341615235,
+          "median": 0.034358135229394474,
+          "worst_10_pct": 0.04840444982777247
+        },
+        "emd": {
+          "mean": 0.04267024477978368,
+          "std": 0.01764199682646866,
+          "median": 0.04189234506480918,
+          "worst_10_pct": 0.06502023066065553
+        },
+        "spatial_dispersion": {
+          "mean": 0.08697307103350076,
+          "std": 0.08898355518915073,
+          "median": 0.046019730249024116,
+          "worst_10_pct": 0.2229669741083434
+        },
+        "average_precision": {
+          "mean": 0.21781460876023412,
+          "std": 0.21416524808643267,
+          "median": 0.1188049130222204,
+          "worst_10_pct": 0.03276952234354458
+        },
+        "correlation": {
+          "mean": 0.1952034870617846,
+          "std": 0.22973103180040308,
+          "median": 0.12501764457650663,
+          "worst_10_pct": -0.0061119056550453105
+        }
+      },
+      "timing": {
+        "total_seconds": 2.181935708038509,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "greedy-ml",
+      "dataset_name": "nmm",
+      "category": "music",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.021063507357991146,
+          "std": 0.007992686237291623,
+          "median": 0.01980153267122077,
+          "worst_10_pct": 0.03162021834646101
+        },
+        "emd": {
+          "mean": 0.028227284157780034,
+          "std": 0.008503759628567673,
+          "median": 0.027285548239310647,
+          "worst_10_pct": 0.038487601669531246
+        },
+        "spatial_dispersion": {
+          "mean": 0.07118741629423958,
+          "std": 0.05238157147811673,
+          "median": 0.06035310656904826,
+          "worst_10_pct": 0.1147484690942013
+        },
+        "average_precision": {
+          "mean": 0.08598001392127644,
+          "std": 0.03905292784597248,
+          "median": 0.08356877680800587,
+          "worst_10_pct": 0.044818108269284125
+        },
+        "correlation": {
+          "mean": 0.13095707891157207,
+          "std": 0.09414539189410202,
+          "median": 0.12616474952870216,
+          "worst_10_pct": 0.0017948650744696645
+        }
+      },
+      "timing": {
+        "total_seconds": 33.51823379099369,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "music",
+      "dataset_name": "nmm",
+      "category": "music",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.03658429718636519,
+          "std": 0.013685746163836873,
+          "median": 0.03406754637875874,
+          "worst_10_pct": 0.04904309113032849
+        },
+        "emd": {
+          "mean": 0.038364722579050575,
+          "std": 0.019036762284030836,
+          "median": 0.0322006192861075,
+          "worst_10_pct": 0.06213588376176874
+        },
+        "spatial_dispersion": {
+          "mean": 0.46246774394908985,
+          "std": 0.4340687146153541,
+          "median": 0.406568194429056,
+          "worst_10_pct": 0.8381427005623953
+        },
+        "average_precision": {
+          "mean": 0.09972741238492487,
+          "std": 0.051343273395372625,
+          "median": 0.0956197804531009,
+          "worst_10_pct": 0.03676846091518658
+        },
+        "correlation": {
+          "mean": 0.12892758594873088,
+          "std": 0.09300197767143493,
+          "median": 0.13009647795818763,
+          "worst_10_pct": -0.0025615221776171364
+        }
+      },
+      "timing": {
+        "total_seconds": 3.8841282080393285,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "rap-music",
+      "dataset_name": "nmm",
+      "category": "music",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.035677753662149224,
+          "std": 0.012125801829269115,
+          "median": 0.035616708473591725,
+          "worst_10_pct": 0.05008417105373689
+        },
+        "emd": {
+          "mean": 0.046782764471360705,
+          "std": 0.01635757511855123,
+          "median": 0.04532438762595023,
+          "worst_10_pct": 0.06489562309035515
+        },
+        "spatial_dispersion": {
+          "mean": 0.04117797539500793,
+          "std": 0.03694324884782259,
+          "median": 0.032762336557301174,
+          "worst_10_pct": 0.06223052598863782
+        },
+        "average_precision": {
+          "mean": 0.0679040684525182,
+          "std": 0.03326969860261021,
+          "median": 0.06206682366511499,
+          "worst_10_pct": 0.02628385815603344
+        },
+        "correlation": {
+          "mean": 0.06333213198004216,
+          "std": 0.08919250419243688,
+          "median": 0.005998965885888509,
+          "worst_10_pct": -0.005796306300251146
+        }
+      },
+      "timing": {
+        "total_seconds": 1.8271185420453548,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "ssm",
+      "dataset_name": "nmm",
+      "category": "music",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.03383352437938389,
+          "std": 0.012571082804022287,
+          "median": 0.03346344231635697,
+          "worst_10_pct": 0.04766760998519147
+        },
+        "emd": {
+          "mean": 0.044912314235776775,
+          "std": 0.016118241378212807,
+          "median": 0.04164906685589245,
+          "worst_10_pct": 0.06808738033884079
+        },
+        "spatial_dispersion": {
+          "mean": 0.04182224376696966,
+          "std": 0.025948940417820688,
+          "median": 0.03515232431502666,
+          "worst_10_pct": 0.06834054617752565
+        },
+        "average_precision": {
+          "mean": 0.07028845660091579,
+          "std": 0.0332026458572628,
+          "median": 0.06228723857731522,
+          "worst_10_pct": 0.031418136300061544
+        },
+        "correlation": {
+          "mean": 0.07010167280095934,
+          "std": 0.09054723041539858,
+          "median": 0.006637311631862333,
+          "worst_10_pct": -0.005796306300251146
+        }
+      },
+      "timing": {
+        "total_seconds": 1.8356506249401718,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "trap-music",
+      "dataset_name": "nmm",
+      "category": "music",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.035677753662149224,
+          "std": 0.012125801829269115,
+          "median": 0.035616708473591725,
+          "worst_10_pct": 0.05008417105373689
+        },
+        "emd": {
+          "mean": 0.046782764471360705,
+          "std": 0.01635757511855123,
+          "median": 0.04532438762595023,
+          "worst_10_pct": 0.06489562309035515
+        },
+        "spatial_dispersion": {
+          "mean": 0.04117797539500793,
+          "std": 0.03694324884782259,
+          "median": 0.032762336557301174,
+          "worst_10_pct": 0.06223052598863782
+        },
+        "average_precision": {
+          "mean": 0.0679040684525182,
+          "std": 0.03326969860261021,
+          "median": 0.06206682366511499,
+          "worst_10_pct": 0.02628385815603344
+        },
+        "correlation": {
+          "mean": 0.06333213198004216,
+          "std": 0.08919250419243688,
+          "median": 0.005998965885888509,
+          "worst_10_pct": -0.005796306300251146
+        }
+      },
+      "timing": {
+        "total_seconds": 1.8248304170556366,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "cosamp",
+      "dataset_name": "nmm",
+      "category": "matching_pursuit",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.03315301665740207,
+          "std": 0.010650097546867196,
+          "median": 0.032408575281584764,
+          "worst_10_pct": 0.046569698720205735
+        },
+        "emd": {
+          "mean": 0.041490057066899205,
+          "std": 0.012393349468885156,
+          "median": 0.03905802659566324,
+          "worst_10_pct": 0.05823396830104521
+        },
+        "spatial_dispersion": {
+          "mean": 0.07159363235051912,
+          "std": 0.04688043541225955,
+          "median": 0.06311058412297697,
+          "worst_10_pct": 0.10516599284409961
+        },
+        "average_precision": {
+          "mean": 0.07021676166071215,
+          "std": 0.03689344812876043,
+          "median": 0.06349294290773405,
+          "worst_10_pct": 0.025830565805772025
+        },
+        "correlation": {
+          "mean": 0.045551056205513134,
+          "std": 0.0698936616885095,
+          "median": 0.00921123205116776,
+          "worst_10_pct": -0.004475736215329439
+        }
+      },
+      "timing": {
+        "total_seconds": 1.886505707865581,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "flex-cosamp",
+      "dataset_name": "nmm",
+      "category": "matching_pursuit",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.034050012444459,
+          "std": 0.011807701795317224,
+          "median": 0.03455964340082458,
+          "worst_10_pct": 0.04739605585700882
+        },
+        "emd": {
+          "mean": 0.044334510355701705,
+          "std": 0.014518050053782162,
+          "median": 0.04208683638938839,
+          "worst_10_pct": 0.06436249337999282
+        },
+        "spatial_dispersion": {
+          "mean": 0.06772306258395909,
+          "std": 0.0431870165055962,
+          "median": 0.05856260618140597,
+          "worst_10_pct": 0.10511234435514707
+        },
+        "average_precision": {
+          "mean": 0.07659011740508477,
+          "std": 0.041408676681210774,
+          "median": 0.07068365534649416,
+          "worst_10_pct": 0.026410517449432274
+        },
+        "correlation": {
+          "mean": 0.05369515295196384,
+          "std": 0.08895850607998089,
+          "median": 0.007678159430519561,
+          "worst_10_pct": -0.007866054407369824
+        }
+      },
+      "timing": {
+        "total_seconds": 2.3021432501263916,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "flex-omp",
+      "dataset_name": "nmm",
+      "category": "matching_pursuit",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.03272552326091148,
+          "std": 0.012265499662085254,
+          "median": 0.03074030908745215,
+          "worst_10_pct": 0.048419863904160775
+        },
+        "emd": {
+          "mean": 0.04458924772850667,
+          "std": 0.015366397918089933,
+          "median": 0.04288724238376149,
+          "worst_10_pct": 0.06515702479403422
+        },
+        "spatial_dispersion": {
+          "mean": 0.09828812988160589,
+          "std": 0.07837692569736952,
+          "median": 0.077559485613794,
+          "worst_10_pct": 0.1890825202951249
+        },
+        "average_precision": {
+          "mean": 0.11736552302773726,
+          "std": 0.10290558927651693,
+          "median": 0.0855462658384592,
+          "worst_10_pct": 0.030894259553180974
+        },
+        "correlation": {
+          "mean": 0.039588857102949564,
+          "std": 0.06639652318207004,
+          "median": 0.005802965991307206,
+          "worst_10_pct": -0.005635837587842105
+        }
+      },
+      "timing": {
+        "total_seconds": 3.2508824591059238,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "flex-rembo",
+      "dataset_name": "nmm",
+      "category": "matching_pursuit",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.039454791089281294,
+          "std": 0.010829761838659687,
+          "median": 0.04027306608534906,
+          "worst_10_pct": 0.05255477073278657
+        },
+        "emd": {
+          "mean": 0.04345848070484744,
+          "std": 0.01121270174436098,
+          "median": 0.041571032426707843,
+          "worst_10_pct": 0.0585325019080277
+        },
+        "spatial_dispersion": {
+          "mean": 0.049920107514887714,
+          "std": 0.04370811777995504,
+          "median": 0.03966097361856581,
+          "worst_10_pct": 0.07578839823186588
+        },
+        "average_precision": {
+          "mean": 0.06218226235124596,
+          "std": 0.03251570181348607,
+          "median": 0.05961437194433178,
+          "worst_10_pct": 0.01799423859640229
+        },
+        "correlation": {
+          "mean": 0.047892105003831634,
+          "std": 0.07505580382909458,
+          "median": 0.0045182867478940165,
+          "worst_10_pct": -0.005345907534329859
+        }
+      },
+      "timing": {
+        "total_seconds": 3.9266612911596894,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "flex-sp",
+      "dataset_name": "nmm",
+      "category": "matching_pursuit",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.03210264632768226,
+          "std": 0.010593583124632513,
+          "median": 0.03104212096164348,
+          "worst_10_pct": 0.04576437435751085
+        },
+        "emd": {
+          "mean": 0.04120646578134119,
+          "std": 0.014201179786122552,
+          "median": 0.03857226488179184,
+          "worst_10_pct": 0.060719547950152254
+        },
+        "spatial_dispersion": {
+          "mean": 0.10052271545489379,
+          "std": 0.06934546047356108,
+          "median": 0.08258992824770722,
+          "worst_10_pct": 0.2079516333404903
+        },
+        "average_precision": {
+          "mean": 0.13402153383981205,
+          "std": 0.10534530589988104,
+          "median": 0.09511290173460493,
+          "worst_10_pct": 0.032012419852162154
+        },
+        "correlation": {
+          "mean": 0.028153105838698275,
+          "std": 0.07163116146006097,
+          "median": 0.004463430352829305,
+          "worst_10_pct": -0.028762944008417272
+        }
+      },
+      "timing": {
+        "total_seconds": 1.6885500829666853,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "isubsmp",
+      "dataset_name": "nmm",
+      "category": "matching_pursuit",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.03367392115223164,
+          "std": 0.012899729629837292,
+          "median": 0.030905658637490133,
+          "worst_10_pct": 0.049281927470376845
+        },
+        "emd": {
+          "mean": 0.04502227763891346,
+          "std": 0.015317877435665648,
+          "median": 0.043372396461006255,
+          "worst_10_pct": 0.06613399261616047
+        },
+        "spatial_dispersion": {
+          "mean": 0.09061337262684566,
+          "std": 0.06679321990237823,
+          "median": 0.06951969454760315,
+          "worst_10_pct": 0.1890825202951249
+        },
+        "average_precision": {
+          "mean": 0.11528202904575681,
+          "std": 0.10039073311020873,
+          "median": 0.08526783636436745,
+          "worst_10_pct": 0.029341685228604527
+        },
+        "correlation": {
+          "mean": 0.039902230234821444,
+          "std": 0.0706585261089735,
+          "median": 0.005594929078543039,
+          "worst_10_pct": -0.006181225692920113
+        }
+      },
+      "timing": {
+        "total_seconds": 2.1003219168633223,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "omp",
+      "dataset_name": "nmm",
+      "category": "matching_pursuit",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.03417831162573925,
+          "std": 0.010398519521961674,
+          "median": 0.03236256852515604,
+          "worst_10_pct": 0.04749078749555291
+        },
+        "emd": {
+          "mean": 0.042528654640246764,
+          "std": 0.011744164436812345,
+          "median": 0.0410365728740701,
+          "worst_10_pct": 0.05715914832616475
+        },
+        "spatial_dispersion": {
+          "mean": 0.04454216571478965,
+          "std": 0.029756588570217176,
+          "median": 0.03741911693360275,
+          "worst_10_pct": 0.07265697673559433
+        },
+        "average_precision": {
+          "mean": 0.06724543405511056,
+          "std": 0.033867013405148236,
+          "median": 0.06169458384649924,
+          "worst_10_pct": 0.026801559382932612
+        },
+        "correlation": {
+          "mean": 0.06447900771610922,
+          "std": 0.08580114196351268,
+          "median": 0.005902850379895772,
+          "worst_10_pct": -0.005994684916775249
+        }
+      },
+      "timing": {
+        "total_seconds": 2.528362500015646,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "rembo",
+      "dataset_name": "nmm",
+      "category": "matching_pursuit",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.033772023646811686,
+          "std": 0.00997918185798754,
+          "median": 0.03314607228005485,
+          "worst_10_pct": 0.04712717026878987
+        },
+        "emd": {
+          "mean": 0.039637552657360395,
+          "std": 0.01094232146238452,
+          "median": 0.03940348325862371,
+          "worst_10_pct": 0.05366301059842045
+        },
+        "spatial_dispersion": {
+          "mean": 0.05172604916642226,
+          "std": 0.039405030399907205,
+          "median": 0.040032833939248544,
+          "worst_10_pct": 0.08896833871939618
+        },
+        "average_precision": {
+          "mean": 0.0685321286987735,
+          "std": 0.03264946751666623,
+          "median": 0.06308977250932479,
+          "worst_10_pct": 0.029511461091798134
+        },
+        "correlation": {
+          "mean": 0.07240119816287095,
+          "std": 0.08687266102307259,
+          "median": 0.021927325658338714,
+          "worst_10_pct": -0.00549572206669283
+        }
+      },
+      "timing": {
+        "total_seconds": 3.6489908748771995,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "sp",
+      "dataset_name": "nmm",
+      "category": "matching_pursuit",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.031969637168769244,
+          "std": 0.010094697120192226,
+          "median": 0.0319676192772318,
+          "worst_10_pct": 0.043919518694285696
+        },
+        "emd": {
+          "mean": 0.041441828594074366,
+          "std": 0.012909399717034966,
+          "median": 0.03947442190281698,
+          "worst_10_pct": 0.058012785466152544
+        },
+        "spatial_dispersion": {
+          "mean": 0.06500103917194466,
+          "std": 0.04743745568863243,
+          "median": 0.053611025637414114,
+          "worst_10_pct": 0.10339618766455956
+        },
+        "average_precision": {
+          "mean": 0.07511317520217642,
+          "std": 0.039619728754294585,
+          "median": 0.06865140304520023,
+          "worst_10_pct": 0.031775663219428305
+        },
+        "correlation": {
+          "mean": 0.06395015142211045,
+          "std": 0.07620959470108461,
+          "median": 0.056000643654964447,
+          "worst_10_pct": -0.0072462372034885255
+        }
+      },
+      "timing": {
+        "total_seconds": 1.8515620839316398,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "subsmp",
+      "dataset_name": "nmm",
+      "category": "matching_pursuit",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.03537563291198216,
+          "std": 0.01299617236860458,
+          "median": 0.03612029221231561,
+          "worst_10_pct": 0.05003804602653409
+        },
+        "emd": {
+          "mean": 0.05203395629742355,
+          "std": 0.020266099043213498,
+          "median": 0.04820119397107367,
+          "worst_10_pct": 0.08014097363754141
+        },
+        "spatial_dispersion": {
+          "mean": 0.11466012999934833,
+          "std": 0.09580622024402732,
+          "median": 0.09455605622460031,
+          "worst_10_pct": 0.17833143930943604
+        },
+        "average_precision": {
+          "mean": 0.12540646643096154,
+          "std": 0.09923319329072738,
+          "median": 0.08802793722884684,
+          "worst_10_pct": 0.02791337827512653
+        },
+        "correlation": {
+          "mean": 0.01669136148941415,
+          "std": 0.046922868082469156,
+          "median": 0.003346408570235979,
+          "worst_10_pct": -0.006402964111721671
+        }
+      },
+      "timing": {
+        "total_seconds": 3.233537459047511,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "apse",
+      "dataset_name": "nmm",
+      "category": "other",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.03240804333353402,
+          "std": 0.010871926733520897,
+          "median": 0.03173813875620528,
+          "worst_10_pct": 0.04392136569637288
+        },
+        "emd": {
+          "mean": 0.039878976401142456,
+          "std": 0.01419310457129106,
+          "median": 0.03837714710011367,
+          "worst_10_pct": 0.0579699092702023
+        },
+        "spatial_dispersion": {
+          "mean": 0.07586742576313141,
+          "std": 0.04357653609203891,
+          "median": 0.06934426886450848,
+          "worst_10_pct": 0.1266733032592514
+        },
+        "average_precision": {
+          "mean": 0.15211013923792477,
+          "std": 0.12858084605726644,
+          "median": 0.11857357083653153,
+          "worst_10_pct": 0.04299492856152517
+        },
+        "correlation": {
+          "mean": 0.04729789494997341,
+          "std": 0.11090701831902712,
+          "median": 0.05103981099036502,
+          "worst_10_pct": -0.09861681277103024
+        }
+      },
+      "timing": {
+        "total_seconds": 6.3812467500101775,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "chimera",
+      "dataset_name": "nmm",
+      "category": "other",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.031306697327352445,
+          "std": 0.013123354961354443,
+          "median": 0.030986602850566945,
+          "worst_10_pct": 0.04758197639317024
+        },
+        "emd": {
+          "mean": 0.03989031976500268,
+          "std": 0.016267396887367672,
+          "median": 0.03802720131556353,
+          "worst_10_pct": 0.061490953758030674
+        },
+        "spatial_dispersion": {
+          "mean": 0.08250049592255569,
+          "std": 0.16868688246000535,
+          "median": 0.03819879703474448,
+          "worst_10_pct": 0.13959797963614176
+        },
+        "average_precision": {
+          "mean": 0.2294749603784326,
+          "std": 0.20503519515704513,
+          "median": 0.16819670631118921,
+          "worst_10_pct": 0.042947700844454414
+        },
+        "correlation": {
+          "mean": 0.23819309180137158,
+          "std": 0.22360996924751908,
+          "median": 0.20107387336304494,
+          "worst_10_pct": -0.005363844972207842
+        }
+      },
+      "timing": {
+        "total_seconds": 2.9126574168913066,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "ecd",
+      "dataset_name": "nmm",
+      "category": "other",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.03847386580297925,
+          "std": 0.012361624042878739,
+          "median": 0.03850019865724307,
+          "worst_10_pct": 0.053399847862346944
+        },
+        "emd": {
+          "mean": 0.04919530677228517,
+          "std": 0.015511854823537896,
+          "median": 0.0506137136251615,
+          "worst_10_pct": 0.06808738033884079
+        },
+        "spatial_dispersion": {
+          "mean": 0.03755994453465914,
+          "std": 0.025373419352913963,
+          "median": 0.03224084865749699,
+          "worst_10_pct": 0.05291813776611297
+        },
+        "average_precision": {
+          "mean": 0.06567539743102926,
+          "std": 0.033542356878294065,
+          "median": 0.05920811879090246,
+          "worst_10_pct": 0.025043190410714487
+        },
+        "correlation": {
+          "mean": 0.060671986219320455,
+          "std": 0.08784965108223543,
+          "median": 0.00549260506071495,
+          "worst_10_pct": -0.005619995766189276
+        }
+      },
+      "timing": {
+        "total_seconds": 1.7367186669725925,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "hydra",
+      "dataset_name": "nmm",
+      "category": "other",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.02247407637049526,
+          "std": 0.01113240899275978,
+          "median": 0.02253940938475709,
+          "worst_10_pct": 0.03686686298953852
+        },
+        "emd": {
+          "mean": 0.024938284579363788,
+          "std": 0.010958988667472214,
+          "median": 0.02341526603358331,
+          "worst_10_pct": 0.04178342178674387
+        },
+        "spatial_dispersion": {
+          "mean": 0.3445794667295336,
+          "std": 0.33656278956867686,
+          "median": 0.22115638323447634,
+          "worst_10_pct": 0.831480119512133
+        },
+        "average_precision": {
+          "mean": 0.3965930576010541,
+          "std": 0.2531167148495497,
+          "median": 0.3428841058689509,
+          "worst_10_pct": 0.11262339299497774
+        },
+        "correlation": {
+          "mean": 0.4278508962542056,
+          "std": 0.20700555247667665,
+          "median": 0.3790330557935211,
+          "worst_10_pct": 0.20734208058416886
+        }
+      },
+      "timing": {
+        "total_seconds": 81.80432624998502,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "random-noise",
+      "dataset_name": "nmm",
+      "category": "other",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.0481417149379974,
+          "std": 0.0070934107172074875,
+          "median": 0.04696130571737839,
+          "worst_10_pct": 0.059665165306813
+        },
+        "emd": {
+          "mean": 0.04922969858041525,
+          "std": 0.009242407666945365,
+          "median": 0.0483559126868976,
+          "worst_10_pct": 0.06112838517172945
+        },
+        "spatial_dispersion": {
+          "mean": 3.9866169431724945,
+          "std": 2.685978629776532,
+          "median": 3.470383931628966,
+          "worst_10_pct": 5.9884933266003015
+        },
+        "average_precision": {
+          "mean": 0.041672271448974146,
+          "std": 0.015129031313347373,
+          "median": 0.04100444943550262,
+          "worst_10_pct": 0.022876327408740463
+        },
+        "correlation": {
+          "mean": 0.0014087235196463869,
+          "std": 0.015236700779361744,
+          "median": 0.0014816149347779417,
+          "worst_10_pct": -0.01745309430488268
+        }
+      },
+      "timing": {
+        "total_seconds": 5.70785054191947,
+        "make_inverse_operator_seconds": 0.001214583870023489,
+        "apply_inverse_seconds": 5.706597332842648
+      },
+      "samples": []
+    },
+    {
+      "solver_name": "sesame",
+      "dataset_name": "nmm",
+      "category": "other",
+      "metrics": {
+        "mean_localization_error": {
+          "mean": 0.03715646226731512,
+          "std": 0.01123205446701855,
+          "median": 0.03687322935139946,
+          "worst_10_pct": 0.04835086839164977
+        },
+        "emd": {
+          "mean": 0.047758979578866184,
+          "std": 0.014367604593302413,
+          "median": 0.04665708778786414,
+          "worst_10_pct": 0.06630836678967945
+        },
+        "spatial_dispersion": {
+          "mean": 0.039956970980156784,
+          "std": 0.025900995802574902,
+          "median": 0.033866113594434935,
+          "worst_10_pct": 0.0604775580581479
+        },
+        "average_precision": {
+          "mean": 0.06616379912209919,
+          "std": 0.033381991961988856,
+          "median": 0.058994933924405316,
+          "worst_10_pct": 0.026080808932793468
+        },
+        "correlation": {
+          "mean": 0.05809091031217393,
+          "std": 0.08082375179002216,
+          "median": 0.005983683892931097,
+          "worst_10_pct": -0.005580577849652806
+        }
+      },
+      "timing": {
+        "total_seconds": 2.224180332850665,
+        "make_inverse_operator_seconds": null,
+        "apply_inverse_seconds": null
+      },
+      "samples": []
+    }
+  ]
+}

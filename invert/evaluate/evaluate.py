@@ -34,41 +34,44 @@ def evaluate_all(
     pos_pred,
     mode: str = "dle",
     threshold: float = 0.1,
-    n_time_samples: int = 5,
+    correlation_signal: str = "unsigned",
 ):
     """
     Comprehensive evaluation of source reconstruction.
 
+    Localization metrics (EMD, MLE, SD, AP) are computed on the
+    time-averaged absolute source vectors ``mean(|y|, axis=t)``.
+    Correlation is computed per-source across time (averaged over active
+    sources), falling back to spatial correlation for single-timepoint data.
+
     Parameters
     ----------
     y_true : np.ndarray
-        True source activity
+        True source activity, shape ``(n_sources, n_times)``.
     y_pred : np.ndarray
-        Predicted source activity
+        Predicted source activity, same shape as *y_true*.
     adjacency_true : scipy.sparse matrix
-        Adjacency matrix for true source space
+        Adjacency matrix for true source space.
     adjacency_pred : scipy.sparse matrix
-        Adjacency matrix for predicted source space
+        Adjacency matrix for predicted source space.
     pos_true : np.ndarray
-        Positions of true sources
+        Positions of true sources.
     pos_pred : np.ndarray
-        Positions of predicted sources (typically same as pos_true)
+        Positions of predicted sources (typically same as pos_true).
     mode : str
         MLE aggregation mode (default ``"dle"``).  See
         :func:`eval_mean_localization_error` for details.
     threshold : float
-        Relative threshold for MLE maxima detection (default 0.1).
-        Values below ``threshold * max`` are ignored.
+        Relative threshold for MLE maxima detection and active-source
+        selection (default 0.1).
+    correlation_signal : {"unsigned", "signed"}
+        Whether to report the absolute Pearson correlation (default) or the
+        signed Pearson correlation.
 
     Returns
     -------
     dict
-        Dictionary of evaluation metrics
-
-    Notes
-    -----
-    In typical usage, pos_true and pos_pred are identical (same source space),
-    but this function supports different source spaces for generality.
+        Dictionary of evaluation metrics.
     """
     # Distance matrices for different metric calculations
     distance_matrix_true_pred = cdist(pos_true, pos_pred)  # For EMD and MLE
@@ -89,89 +92,88 @@ def evaluate_all(
         )
 
     n_times = int(y_true.shape[1])
-    time_idc = _equidistant_time_indices(n_times, n=int(n_time_samples))
 
     logger.debug(
-        "Shapes - y_true: %s, y_pred: %s, adj_true: %s, adj_pred: %s, dist_matrix: %s, time_idc: %s",
+        "Shapes - y_true: %s, y_pred: %s, adj_true: %s, adj_pred: %s, dist_matrix: %s",
         y_true.shape,
         y_pred.shape,
         adjacency_true.shape,
         adjacency_pred.shape,
         distance_matrix_true_pred.shape,
-        time_idc,
     )
 
-    # mse = [eval_mse(yy_true, yy_pred) for yy_true, yy_pred in zip(y_true.T, y_pred.T)]
-    # nmse = [eval_nmse(yy_true, yy_pred) for yy_true, yy_pred in zip(y_true.T, y_pred.T)]
-    # auc = [np.mean(eval_auc(yy_true, yy_pred, pos_1, epsilon=0.01, n_redraw=10)) for yy_true, yy_pred in zip(y_true.T, y_pred.T)]
-    # corr = [pearsonr(yy_true, yy_pred)[0] for yy_true, yy_pred in zip(y_true.T, y_pred.T)]
-    # sparsity_pred = eval_sparsity(y_pred)
-    # sparsity_true = eval_sparsity(y_true)
-    # active_true = eval_active(y_true)
-    # active_pred = eval_active(y_pred)
+    # Time-averaged absolute sources for localization metrics
+    y_true_avg = np.abs(y_true).mean(axis=1)
+    y_pred_avg = np.abs(y_pred).mean(axis=1)
 
-    # Magnitude-based metrics for localization/support
-    y_true_mag = np.abs(y_true)
-    y_pred_mag = np.abs(y_pred)
+    # EMD
+    emd_val = float(eval_emd(distance_matrix_true_pred, y_true_avg, y_pred_avg))
 
-    mles = []
-    emds = []
-    sds = []
-    aps = []
-    cors = []
+    # MLE
+    mle_val = float(eval_mean_localization_error(
+        y_true_avg,
+        y_pred_avg,
+        adjacency_true,
+        adjacency_pred,
+        pos_true,
+        pos_pred,
+        distance_matrix_true_pred,
+        mode=mode,
+        threshold=threshold,
+    ))
 
-    for t in time_idc:
-        y_true_t = y_true_mag[:, int(t)]
-        y_pred_t = y_pred_mag[:, int(t)]
+    # Spatial dispersion
+    sd_val = float(get_spatial_dispersion(
+        y_pred_avg,
+        y_true_avg,
+        distance_matrix_pred,
+        distance_matrix_true,
+        adjacency_pred.toarray(),
+        adjacency_true.toarray(),
+    ))
 
-        mle_t = eval_mean_localization_error(
-            y_true_t,
-            y_pred_t,
-            adjacency_true,
-            adjacency_pred,
-            pos_true,
-            pos_pred,
-            distance_matrix_true_pred,
-            mode=mode,
-            threshold=threshold,
-        )
-        mles.append(float(mle_t))
+    # Average precision
+    if np.max(y_true_avg) > 0:
+        y_true_mask = (
+            y_true_avg >= float(threshold) * float(np.max(y_true_avg))
+        ).astype(int)
+    else:
+        y_true_mask = np.zeros_like(y_true_avg, dtype=int)
+    precision, recall, _ = precision_recall_curve(y_true_mask, y_pred_avg)
+    ap_val = float(compute_average_precision(precision, recall))
 
-        emds.append(float(eval_emd(distance_matrix_true_pred, y_true_t, y_pred_t)))
-
-        sd_t = get_spatial_dispersion(
-            y_pred_t,
-            y_true_t,
-            distance_matrix_pred,
-            distance_matrix_true,
-            adjacency_pred.toarray(),
-            adjacency_true.toarray(),
-        )
-        sds.append(float(sd_t))
-
-        # Define "active" sources from ground truth magnitude at this timepoint.
-        # This keeps AP meaningful even when the simulation includes ongoing background.
-        if np.max(y_true_t) > 0:
-            y_true_mask = (
-                y_true_t >= float(threshold) * float(np.max(y_true_t))
-            ).astype(int)
-        else:
-            y_true_mask = np.zeros_like(y_true_t, dtype=int)
-        precision, recall, _ = precision_recall_curve(y_true_mask, y_pred_t)
-        aps.append(float(compute_average_precision(precision, recall)))
-
-        # Signed correlation (do not take abs), one value per selected timepoint.
+    # Correlation: per-source temporal correlation averaged over active sources.
+    # For single-timepoint data, fall back to spatial correlation.
+    if n_times == 1:
         try:
-            cors.append(float(pearsonr(y_true[:, int(t)], y_pred[:, int(t)])[0]))
+            corr_val = float(abs(pearsonr(y_true[:, 0], y_pred[:, 0])[0]))
         except Exception:
-            cors.append(float("nan"))
+            corr_val = float("nan")
+    else:
+        active_threshold = float(threshold) * float(np.max(np.abs(y_true)))
+        active_mask = np.max(np.abs(y_true), axis=1) >= active_threshold
+        if not np.any(active_mask):
+            corr_val = float("nan")
+        else:
+            cors = []
+            for i in np.where(active_mask)[0]:
+                std_true = np.std(y_true[i, :])
+                std_pred = np.std(y_pred[i, :])
+                if std_true == 0 or std_pred == 0:
+                    cors.append(0.0)
+                    continue
+                c = float(pearsonr(y_true[i, :], y_pred[i, :])[0])
+                if correlation_signal == "unsigned":
+                    c = abs(c)
+                cors.append(c)
+            corr_val = float(np.nanmean(cors)) if cors else float("nan")
 
     d = dict(
-        Mean_Localization_Error=float(np.nanmedian(np.asarray(mles, dtype=float))),
-        EMD=float(np.nanmedian(np.asarray(emds, dtype=float))),
-        sd=float(np.nanmedian(np.asarray(sds, dtype=float))),
-        average_precision=float(np.nanmedian(np.asarray(aps, dtype=float))),
-        correlation=float(np.nanmedian(np.asarray(cors, dtype=float))),
+        Mean_Localization_Error=mle_val,
+        EMD=emd_val,
+        sd=sd_val,
+        average_precision=ap_val,
+        correlation=corr_val,
     )
 
     return d

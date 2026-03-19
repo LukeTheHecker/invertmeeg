@@ -2,33 +2,41 @@
 
 import numpy as np
 
-from invert.simulate import SimulationConfig, SimulationGenerator
+from invert.simulate import SimulationBatch, SimulationConfig, SimulationGenerator
 
 
 class TestSimulationGeneratorDefaults:
     def test_output_types(self, forward_model):
-        """Generator should yield numpy arrays."""
+        """Generator should yield SimulationBatch with numpy arrays."""
         gen = SimulationGenerator(forward_model)
-        x, y, info = next(gen.generate())
-        assert isinstance(x, np.ndarray)
-        assert isinstance(y, np.ndarray)
+        batch = next(gen.generate())
+        assert isinstance(batch, SimulationBatch)
+        assert isinstance(batch.x, np.ndarray)
+        assert isinstance(batch.y, np.ndarray)
 
     def test_output_shapes(self, forward_model, dimensions):
         """Default generator shapes should match forward model dimensions."""
         n_chans, n_dipoles = dimensions
         gen = SimulationGenerator(forward_model)
-        x, y, info = next(gen.generate())
+        batch = next(gen.generate())
         # x is (batch, n_channels, n_timepoints)
-        assert x.shape[1] == n_chans
+        assert batch.x.shape[1] == n_chans
         # y is (batch, n_dipoles, n_timepoints)
-        assert y.shape[1] == n_dipoles
+        assert batch.y.shape[1] == n_dipoles
 
     def test_output_finite(self, forward_model):
         """Generator output should be finite."""
         gen = SimulationGenerator(forward_model)
-        x, y, info = next(gen.generate())
-        assert np.all(np.isfinite(x))
-        assert np.all(np.isfinite(y))
+        batch = next(gen.generate())
+        assert np.all(np.isfinite(batch.x))
+        assert np.all(np.isfinite(batch.y))
+
+    def test_backward_compatible_unpacking(self, forward_model):
+        """SimulationBatch should support tuple unpacking."""
+        gen = SimulationGenerator(forward_model)
+        x, y, info, y_patches = next(gen.generate())
+        assert isinstance(x, np.ndarray)
+        assert isinstance(y, np.ndarray)
 
 
 class TestSimulationGeneratorCustom:
@@ -45,10 +53,10 @@ class TestSimulationGeneratorCustom:
             random_seed=42,
         )
         gen = SimulationGenerator(forward_model, config=config)
-        x, y, info = next(gen.generate())
-        assert x.shape[0] == 10
-        assert x.shape[1] == n_chans
-        assert x.shape[2] == 30
+        batch = next(gen.generate())
+        assert batch.x.shape[0] == 10
+        assert batch.x.shape[1] == n_chans
+        assert batch.x.shape[2] == 30
 
     def test_reproducibility(self, forward_model):
         """Same random_seed should produce identical output."""
@@ -59,11 +67,11 @@ class TestSimulationGeneratorCustom:
             random_seed=99,
         )
         gen1 = SimulationGenerator(forward_model, config=config)
-        x1, y1, _ = next(gen1.generate())
+        b1 = next(gen1.generate())
         gen2 = SimulationGenerator(forward_model, config=config)
-        x2, y2, _ = next(gen2.generate())
-        np.testing.assert_array_equal(x1, x2)
-        np.testing.assert_array_equal(y1, y2)
+        b2 = next(gen2.generate())
+        np.testing.assert_array_equal(b1.x, b2.x)
+        np.testing.assert_array_equal(b1.y, b2.y)
 
 
 class TestSimulationGeneratorEdgeCases:
@@ -76,9 +84,9 @@ class TestSimulationGeneratorEdgeCases:
             n_timepoints=10,
         )
         gen = SimulationGenerator(forward_model, config=config)
-        x, y, info = next(gen.generate())
-        assert np.all(np.isfinite(x))
-        assert np.all(np.isfinite(y))
+        batch = next(gen.generate())
+        assert np.all(np.isfinite(batch.x))
+        assert np.all(np.isfinite(batch.y))
 
 
 class TestSimulationGeneratorRealism:
@@ -97,7 +105,8 @@ class TestSimulationGeneratorRealism:
             random_seed=7,
         )
         gen = SimulationGenerator(forward_model, config=config)
-        _, _, info = next(gen.generate())
+        batch = next(gen.generate())
+        info = batch.info
 
         for key in ["noise_cov_true", "noise_cov_est", "projector"]:
             assert key in info.columns
@@ -135,7 +144,7 @@ class TestSimulationGeneratorRealism:
             random_seed=13,
         )
         gen = SimulationGenerator(forward_model, config=config)
-        _, _, info = next(gen.generate())
+        info = next(gen.generate()).info
 
         assert np.all(info["projector_rank"].to_numpy() <= (n_chans - rank_loss))
         assert np.all(info["noise_cov_rank_true"].to_numpy() <= (n_chans - rank_loss))
@@ -153,7 +162,7 @@ class TestSimulationGeneratorRealism:
             random_seed=123,
         )
         gen = SimulationGenerator(forward_model, config=config)
-        _, _, info = next(gen.generate())
+        info = next(gen.generate()).info
 
         snr_target = info["snr"].to_numpy(dtype=float)
         snr_realized = info["snr_realized"].to_numpy(dtype=float)
@@ -174,17 +183,17 @@ class TestSimulationGeneratorRealism:
             random_seed=2026,
         )
         gen1 = SimulationGenerator(forward_model, config=config)
-        x1, y1, info1 = next(gen1.generate())
+        b1 = next(gen1.generate())
         gen2 = SimulationGenerator(forward_model, config=config)
-        x2, y2, info2 = next(gen2.generate())
+        b2 = next(gen2.generate())
 
-        np.testing.assert_allclose(x1, x2)
-        np.testing.assert_allclose(y1, y2)
+        np.testing.assert_allclose(b1.x, b2.x)
+        np.testing.assert_allclose(b1.y, b2.y)
         np.testing.assert_allclose(
-            info1["snr_realized"].to_numpy(), info2["snr_realized"].to_numpy()
+            b1.info["snr_realized"].to_numpy(), b2.info["snr_realized"].to_numpy()
         )
         np.testing.assert_allclose(
-            info1["projector_rank"].to_numpy(), info2["projector_rank"].to_numpy()
+            b1.info["projector_rank"].to_numpy(), b2.info["projector_rank"].to_numpy()
         )
 
 
@@ -204,13 +213,13 @@ class TestContiguousGaussianSimulation:
             random_seed=314,
         )
         gen = SimulationGenerator(forward_model, config=config)
-        x, y, info = next(gen.generate())
+        batch = next(gen.generate())
 
-        assert x.shape == (config.batch_size, n_chans, config.n_timepoints)
-        assert y.shape == (config.batch_size, n_dipoles, config.n_timepoints)
-        assert np.all(info["source_spatial_model"] == "contiguous_gaussian")
-        assert "source_vertices" in info.columns
-        assert "source_ranks" in info.columns
+        assert batch.x.shape == (config.batch_size, n_chans, config.n_timepoints)
+        assert batch.y.shape == (config.batch_size, n_dipoles, config.n_timepoints)
+        assert np.all(batch.info["source_spatial_model"] == "contiguous_gaussian")
+        assert "source_vertices" in batch.info.columns
+        assert "source_ranks" in batch.info.columns
 
     def test_contiguous_model_is_reproducible(self, forward_model):
         """Contiguous Gaussian path must be deterministic under fixed random seed."""
@@ -225,15 +234,15 @@ class TestContiguousGaussianSimulation:
             random_seed=20260217,
         )
         gen1 = SimulationGenerator(forward_model, config=config)
-        x1, y1, info1 = next(gen1.generate())
+        b1 = next(gen1.generate())
         gen2 = SimulationGenerator(forward_model, config=config)
-        x2, y2, info2 = next(gen2.generate())
+        b2 = next(gen2.generate())
 
-        np.testing.assert_allclose(x1, x2)
-        np.testing.assert_allclose(y1, y2)
-        for c1, c2 in zip(info1["centers"], info2["centers"], strict=False):
+        np.testing.assert_allclose(b1.x, b2.x)
+        np.testing.assert_allclose(b1.y, b2.y)
+        for c1, c2 in zip(b1.info["centers"], b2.info["centers"], strict=False):
             np.testing.assert_array_equal(c1, c2)
-        for r1, r2 in zip(info1["source_ranks"], info2["source_ranks"], strict=False):
+        for r1, r2 in zip(b1.info["source_ranks"], b2.info["source_ranks"], strict=False):
             np.testing.assert_array_equal(r1, r2)
 
     def test_patch_rank_two_is_reported(self, forward_model):
@@ -249,6 +258,6 @@ class TestContiguousGaussianSimulation:
             random_seed=99,
         )
         gen = SimulationGenerator(forward_model, config=config)
-        _, _, info = next(gen.generate())
+        info = next(gen.generate()).info
         for ranks in info["source_ranks"]:
             assert np.all(np.asarray(ranks) == 2)

@@ -6,8 +6,9 @@ from pydantic import BaseModel
 class DatasetConfig(BaseModel):
     name: str
     description: str
+    simulator_type: Literal["default", "nmm"] = "default"
     n_sources: int | tuple[int, int]
-    n_orders: int | tuple[int, int]
+    n_orders: int | tuple[int, int] = 0
     snr_range: tuple[float, float]
     n_timepoints: int
     source_spatial_model: Literal["diffusion_basis", "contiguous_gaussian"] = (
@@ -31,6 +32,13 @@ class DatasetConfig(BaseModel):
     noise_low_rank_dim: int | tuple[int, int] | None = None
     source_extent: int | tuple[int, int] | None = None
     n_samples: int = 50
+
+    # NMM-specific parameters (only used when simulator_type="nmm")
+    duration_s: float = 1.0
+    sfreq: float = 256.0
+    spike_mode: bool = False
+    coupling_strength: float | tuple[float, float] = (10.0, 50.0)
+    n_pool: int = 500
 
 
 BENCHMARK_DATASETS: dict[str, DatasetConfig] = {
@@ -69,34 +77,55 @@ BENCHMARK_DATASETS: dict[str, DatasetConfig] = {
     "noisy": DatasetConfig(
         name="Noisy",
         description="Variable sources under challenging low-SNR conditions",
-        n_sources=(1, 3),
-        n_orders=(0, 2),
+        n_sources=(2, 4),
+        n_orders=(1, 3),
         snr_range=(-5.0, 0.0),
+        source_spatial_model="contiguous_gaussian",
+        patch_rank=(1, 2),
         n_timepoints=200,
         correlation_mode="realistic",
         noise_low_rank_dim=(2, 8),
     ),
-    "ongoing_mixture": DatasetConfig(
-        name="Ongoing Mixture",
+    "nmm": DatasetConfig(
+        name="Neural Mass Model",
         description=(
-            "Non-sparse ongoing background activity (mixture) plus multiple "
-            "contiguous patches with heavy-tailed amplitudes under structured noise."
+            "Jansen-Rit neural mass model sources with coupled cortical columns, "
+            "realistic sensor noise, and contiguous spatial patches"
         ),
-        n_sources=(4, 12),
-        n_orders=(1, 3),
-        snr_range=(-3.0, 1.0),
+        simulator_type="nmm",
+        n_sources=(2, 4),
+        snr_range=(1.0, 3.0),
         n_timepoints=200,
+        source_extent=(5, 30),
+        correlation_mode="realistic",
+        noise_low_rank_dim=(2, 8),
+        duration_s=1.0,
+        sfreq=256.0,
+        spike_mode=False,
+    ),
+    "mixed_cortical_activity": DatasetConfig(
+        name="Mixed Cortical Activity",
+        description=(
+            "Contiguous low-rank cortical patches on top of diffuse 1/f background "
+            "with realistic sensor noise"
+        ),
+        simulator_type="default",
+        n_sources=(2, 4),
+        n_orders=0,
+        snr_range=(1.0, 5.0),
+        n_timepoints=256,
         source_spatial_model="contiguous_gaussian",
-        source_extent=(10, 80),
         patch_rank=(1, 2),
         simulation_mode="mixture",
-        background_beta=(0.5, 2.0),
-        background_mixture_alpha=(0.5, 0.8),
-        amplitude_range=(0.05, 1.0),
+        background_beta=(1.0, 2.5),
+        background_mixture_alpha=(0.10, 0.30),
+        amplitude_range=(0.2, 2.0),
         amplitude_distribution="log_uniform",
         correlation_mode="realistic",
-        noise_temporal_beta=(0.5, 2.0),
-        noise_low_rank_dim=(2, 8),
+        noise_temporal_beta=(0.3, 1.2),
+        noise_low_rank_dim=(3, 10),
+        source_extent=(3, 20),
+        n_samples=100,
     ),
 }
 

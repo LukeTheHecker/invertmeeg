@@ -251,10 +251,10 @@ class AutoInverse:
         )
 
         # Get one batch of simulated data
-        x_sim, y_sim, info = next(sim_gen.generate())
+        batch = next(sim_gen.generate())
 
-        logger.info(f"Generated data shapes: X={x_sim.shape}, Y={y_sim.shape}")
-        return x_sim, y_sim
+        logger.info(f"Generated data shapes: X={batch.x.shape}, Y={batch.y.shape}")
+        return batch.x, batch.y
 
     def _compute_inverse_solutions(
         self, simulated_data: tuple[np.ndarray, np.ndarray], forward: Forward
