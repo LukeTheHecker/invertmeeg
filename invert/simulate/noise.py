@@ -293,6 +293,119 @@ def empirical_covariance(noise, shrinkage=0.0, eps=1e-12):
     return cov
 
 
+def apply_sensor_noise_single(
+    x_clean,
+    n_chans,
+    n_timepoints,
+    snr_db,
+    correlation_mode="realistic",
+    noise_color_coeff=0.5,
+    temporal_beta=0.0,
+    rank_deficiency=0,
+    low_rank_dim=4,
+    apply_projector=True,
+    estimate_cov=True,
+    cov_n_baseline=200,
+    cov_shrinkage=0.05,
+    rng=None,
+):
+    """Apply spatially/temporally correlated sensor noise to one clean signal.
+
+    This is the shared noise pipeline used by both ``SimulationGenerator``
+    and ``NMMSimulator``.
+
+    Parameters
+    ----------
+    x_clean : ndarray (n_chans, n_timepoints)
+        Clean sensor signal.
+    n_chans, n_timepoints : int
+        Signal dimensions.
+    snr_db : float
+        Target SNR in dB.
+    correlation_mode : str or None
+        Spatial noise correlation mode (None, 'cholesky', 'banded',
+        'diagonal', 'low_rank', 'realistic').
+    noise_color_coeff : float
+        Strength of spatial noise correlation.
+    temporal_beta : float
+        Power-law exponent for temporal noise coloring (0 = white).
+    rank_deficiency : int
+        Number of projected-out sensor dimensions.
+    low_rank_dim : int
+        Latent rank for low_rank/realistic noise modes.
+    apply_projector : bool
+        Apply rank projector to signal and noise.
+    estimate_cov : bool
+        Estimate noise covariance from independent baseline.
+    cov_n_baseline : int
+        Baseline samples for covariance estimation.
+    cov_shrinkage : float
+        Shrinkage factor for estimated covariance.
+    rng : Generator or None
+
+    Returns
+    -------
+    result : dict with keys:
+        'x_noisy', 'noise_scale', 'snr_realized', 'projector',
+        'projector_rank', 'noise_cov_model', 'noise_cov_true',
+        'noise_cov_est', 'noise_cov_est_scaled',
+        'noise_cov_rank_true', 'noise_cov_rank_est'
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+
+    P, _ = make_rank_projector(n_chans, rank_deficiency=int(rank_deficiency), rng=rng)
+    signal = P @ x_clean if apply_projector else x_clean
+
+    cov_spatial = make_sensor_noise_covariance(
+        n_chans,
+        mode=correlation_mode,
+        noise_color_coeff=float(noise_color_coeff),
+        rng=rng,
+        low_rank_dim=int(low_rank_dim),
+    )
+
+    noise = sample_sensor_noise(
+        cov_spatial, n_timepoints, rng=rng, temporal_beta=float(temporal_beta),
+    )
+    if apply_projector:
+        noise = P @ noise
+
+    noise_scaled, _scale, realized_snr = scale_noise_to_snr(
+        signal, noise, float(snr_db),
+    )
+    x_noisy = signal + noise_scaled
+
+    cov_model = (_scale**2) * (P @ cov_spatial @ P.T if apply_projector else cov_spatial)
+    cov_true = empirical_covariance(noise_scaled, shrinkage=0.0, eps=0.0)
+
+    cov_est = None
+    cov_est_scaled = None
+    if estimate_cov:
+        baseline = sample_sensor_noise(
+            cov_spatial, int(cov_n_baseline), rng=rng,
+            temporal_beta=float(temporal_beta),
+        )
+        if apply_projector:
+            baseline = P @ baseline
+        cov_est = empirical_covariance(baseline, shrinkage=float(cov_shrinkage))
+        cov_est_scaled = (_scale**2) * cov_est
+
+    return {
+        "x_noisy": x_noisy,
+        "noise_scale": _scale,
+        "snr_realized": realized_snr,
+        "projector": P,
+        "projector_rank": int(np.linalg.matrix_rank(P)),
+        "noise_cov_model": cov_model,
+        "noise_cov_true": cov_true,
+        "noise_cov_est": cov_est,
+        "noise_cov_est_scaled": cov_est_scaled,
+        "noise_cov_rank_true": int(np.linalg.matrix_rank(cov_true)),
+        "noise_cov_rank_est": int(np.linalg.matrix_rank(cov_est)) if cov_est is not None else -1,
+    }
+
+
 def scale_noise_to_snr(signal, noise, snr_db, eps=1e-12):
     """Scale noise to match target SNR (in dB) for a given signal."""
     signal_power = float(np.mean(np.asarray(signal, dtype=float) ** 2))

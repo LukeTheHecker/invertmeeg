@@ -5,10 +5,12 @@ from copy import deepcopy
 import numpy as np
 import pandas as pd
 
+from .batch import SimulationBatch
 from .config import SimulationConfig
 from .covariance import get_cov
 from .noise import (
     add_error,
+    apply_sensor_noise_single,
     empirical_covariance,
     make_rank_projector,
     make_sensor_noise_covariance,
@@ -535,76 +537,34 @@ class SimulationGenerator:
             low_rank_dims,
             strict=False,
         ):
-            P, _ = make_rank_projector(
-                self.n_chans, rank_deficiency=int(rank_loss), rng=self.rng
-            )
-            if self.config.apply_sensor_projector:
-                signal = P @ xx
-            else:
-                signal = xx
-
-            cov_spatial = make_sensor_noise_covariance(
+            result = apply_sensor_noise_single(
+                xx,
                 self.n_chans,
-                mode=corr_mode,
-                noise_color_coeff=float(noise_color_level),
-                rng=self.rng,
-                low_rank_dim=int(low_rank_dim),
-            )
-
-            noise = sample_sensor_noise(
-                cov_spatial,
                 self.config.n_timepoints,
-                rng=self.rng,
+                snr_db=float(snr_level),
+                correlation_mode=corr_mode,
+                noise_color_coeff=float(noise_color_level),
                 temporal_beta=float(temporal_beta),
+                rank_deficiency=int(rank_loss),
+                low_rank_dim=int(low_rank_dim),
+                apply_projector=self.config.apply_sensor_projector,
+                estimate_cov=self.config.estimate_noise_cov,
+                cov_n_baseline=int(self.config.noise_cov_n_baseline),
+                cov_shrinkage=float(self.config.noise_cov_shrinkage),
+                rng=self.rng,
             )
-            if self.config.apply_sensor_projector:
-                noise = P @ noise
 
-            noise_scaled, _scale, realized_snr = scale_noise_to_snr(
-                signal, noise, float(snr_level)
-            )
-            x_noisy = signal + noise_scaled
-
-            # Theoretical covariance of the realized noise (up to sampling error).
-            if self.config.apply_sensor_projector:
-                cov_model = (_scale**2) * (P @ cov_spatial @ P.T)
-            else:
-                cov_model = (_scale**2) * cov_spatial
-
-            # True covariance from realized noise in this sample.
-            cov_true = empirical_covariance(noise_scaled, shrinkage=0.0, eps=0.0)
-
-            # Estimated covariance from independent baseline noise.
-            cov_est = None
-            cov_est_s = None
-            if self.config.estimate_noise_cov:
-                baseline = sample_sensor_noise(
-                    cov_spatial,
-                    int(self.config.noise_cov_n_baseline),
-                    rng=self.rng,
-                    temporal_beta=float(temporal_beta),
-                )
-                if self.config.apply_sensor_projector:
-                    baseline = P @ baseline
-                cov_est = empirical_covariance(
-                    baseline, shrinkage=float(self.config.noise_cov_shrinkage)
-                )
-                # Match the baseline estimate to the scaled noise actually added to the data.
-                cov_est_s = (_scale**2) * cov_est
-
-            x_noisy_list.append(x_noisy)
-            realized_snrs.append(realized_snr)
-            noise_scales.append(_scale)
-            projectors.append(P)
-            projector_ranks.append(int(np.linalg.matrix_rank(P)))
-            covariance_model.append(cov_model)
-            covariance_true.append(cov_true)
-            covariance_rank_true.append(int(np.linalg.matrix_rank(cov_true)))
-            covariance_est.append(cov_est)
-            covariance_est_scaled.append(cov_est_s)
-            covariance_rank_est.append(
-                int(np.linalg.matrix_rank(cov_est)) if cov_est is not None else -1
-            )
+            x_noisy_list.append(result["x_noisy"])
+            realized_snrs.append(result["snr_realized"])
+            noise_scales.append(result["noise_scale"])
+            projectors.append(result["projector"])
+            projector_ranks.append(result["projector_rank"])
+            covariance_model.append(result["noise_cov_model"])
+            covariance_true.append(result["noise_cov_true"])
+            covariance_rank_true.append(result["noise_cov_rank_true"])
+            covariance_est.append(result["noise_cov_est"])
+            covariance_est_scaled.append(result["noise_cov_est_scaled"])
+            covariance_rank_est.append(result["noise_cov_rank_est"])
 
         x_noisy = np.stack(x_noisy_list, axis=0)
         noise_meta = {
@@ -693,10 +653,8 @@ class SimulationGenerator:
         """Generate batches of simulations.
 
         Yields:
-            tuple: (x, y, info) where:
-                - x: EEG data [batch_size, n_channels, n_timepoints]
-                - y: Source activity [batch_size, n_dipoles, n_timepoints] (scaled)
-                - info: DataFrame with simulation metadata
+            SimulationBatch with attributes ``x``, ``y``, ``info``,
+            and ``y_patches`` (``None`` unless mixture mode).
         """
         # Setup correlation modes
         if (
@@ -762,7 +720,12 @@ class SimulationGenerator:
                 noise_meta,
             )
 
-            output = (x, y, info)
+            output = SimulationBatch(
+                x=x,
+                y=y,
+                info=info,
+                y_patches=y_patches if alphas is not None else None,
+            )
 
             for _ in range(self.config.batch_repetitions):
                 yield output
