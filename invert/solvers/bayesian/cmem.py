@@ -47,6 +47,8 @@ class SolverCMEM(BaseSolver):
         ),
         references=[
             "Amblard, C., Lapalme, E., & Bhatt, P. (2004). Biomagnetic source detection by maximum entropy and graphical models. IEEE Transactions on Biomedical Engineering, 51(3), 427-442.",
+            "Grova, C., Daunizeau, J., Kobayashi, E., Bagshaw, A. P., Lina, J. M., Dubeau, F., & Gotman, J. (2008). Concordance between distributed EEG source localization and simultaneous EEG-fMRI studies of epileptic spikes. NeuroImage, 39(2), 755-774.",
+            "Chowdhury, R. A., Lina, J. M., Kobayashi, E., & Grova, C. (2013). MEG source localization of spatially extended generators of epileptic activity: comparing entropic and hierarchical bayesian approaches. PloS one, 8(2), e55969.",
         ],
     )
 

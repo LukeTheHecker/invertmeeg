@@ -73,7 +73,7 @@ class SolverFC(BaseSolver):
             "Supervised fully-connected network trained on simulated data to map "
             "sensor time series to source activity."
         ),
-        references=["Lukas Hecker 2025, unpublished"],
+        references=["Hecker, L., Rupprecht, R., Tebartz Van Elst, L., & Kornmeier, J. (2021). ConvDip: A convolutional neural network for better EEG source imaging. Frontiers in Neuroscience, 15, 569918."],
     )
 
     def __init__(self, name="Fully-Connected", **kwargs):
@@ -95,6 +95,7 @@ class SolverFC(BaseSolver):
         loss="cosine_similarity",
         size_validation_set=256,
         patience=100,
+        train_n_timepoints: int | None = None,
         noise_cov: mne.Covariance | None = None,
         alpha="auto",
         **kwargs,
@@ -168,7 +169,7 @@ class SolverFC(BaseSolver):
         self.size_validation_set = size_validation_set
         self.patience = patience
         # Training Data (from simulation_config)
-        self.n_timepoints = self.simulation_config.n_timepoints
+        self.n_timepoints = train_n_timepoints or self.simulation_config.n_timepoints
         self.n_sources = self.simulation_config.n_sources
         self.n_orders = self.simulation_config.n_orders
         self.batch_repetitions = self.simulation_config.batch_repetitions
@@ -355,7 +356,8 @@ class SolverFC(BaseSolver):
         sim_gen = SimulationGenerator(self.forward, config=config)
 
         def _fc_generator():
-            for x, y, _info in sim_gen.generate():
+            for batch in sim_gen.generate():
+                x, y = batch.x, batch.y
                 # x: (batch, n_channels, n_timepoints) -> (batch, n_timepoints, n_channels)
                 x = np.swapaxes(x, 1, 2)
                 x = np.stack([xx / np.max(abs(xx)) for xx in x], axis=0)

@@ -34,6 +34,8 @@ class SolverChampagne(BaseSolver):
             "Wipf, D., & Nagarajan, S. (2009). A unified Bayesian framework for MEG/EEG source imaging. NeuroImage, 44(3), 947–966.",
             "Owen, J. P., Wipf, D. P., Attias, H. T., Sekihara, K., & Nagarajan, S. S. (2012). Performance evaluation of the Champagne source reconstruction algorithm on simulated and real M/EEG data. NeuroImage, 60(1), 305–323.",
             "Cai, C., Kang, H., Hashemi, A., Chen, D., Diwakar, M., Haufe, S., Sekihara, K., Wu, W., & Nagarajan, S. S. (2023). Bayesian algorithms for joint estimation of brain activity and noise in electromagnetic imaging. IEEE Transactions on Medical Imaging, 42(3), 762–773.",
+            "Wipf, D. P., Owen, J. P., Attias, H. T., Sekihara, K., & Nagarajan, S. S. (2010). Robust Bayesian estimation of the location, orientation, and time course of multiple correlated neural sources using MEG. NeuroImage, 49(1), 641–655.",
+            "Hashemi, A., & Haufe, S. (2018). Improving EEG source localization through spatio-temporal sparse Bayesian learning. In 2018 26th European Signal Processing Conference (EUSIPCO) (pp. 1935-1939). IEEE.",
         ],
     )
 

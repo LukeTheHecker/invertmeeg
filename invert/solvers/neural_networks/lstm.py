@@ -348,7 +348,8 @@ class SolverLSTM(BaseSolver):
 
         # Wrap the generator to transpose and return (x, y) in the right format for LSTM
         def wrapped_generator():
-            for x, y, _info in sim_gen.generate():
+            for batch in sim_gen.generate():
+                x, y = batch.x, batch.y
                 # Transpose from (batch, channels, timepoints) to (batch, timepoints, channels)
                 x = np.swapaxes(x, 1, 2)
                 # Transpose from (batch, dipoles, timepoints) to (batch, timepoints, dipoles)

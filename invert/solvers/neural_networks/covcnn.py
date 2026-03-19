@@ -686,7 +686,8 @@ class SolverCovCNN(BaseSolver):
 
         # Wrap the generator to compute covariance and return (x_cov, y_mask)
         def wrapped_generator():
-            for x, y, _info in sim_gen.generate():
+            for batch in sim_gen.generate():
+                x, y = batch.x, batch.y
                 x_cov = np.stack([self.compute_covariance(xx) for xx in x], axis=0)
                 max_abs = np.abs(x_cov).max(axis=(1, 2), keepdims=True)
                 max_abs = np.where(max_abs == 0, 1.0, max_abs)

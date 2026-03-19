@@ -1,8 +1,8 @@
 import logging
-from copy import deepcopy
 
 import mne
 import numpy as np
+from scipy.sparse import csr_matrix, issparse
 
 from invert.util import build_source_adjacency
 
@@ -46,8 +46,9 @@ class SolverSSLOFO(BaseSolver):
 
     References
     ----------
-    [1] Standardized Shrinking LORETA-FOCUSS (SSLOFO): A new method for spatio-temporal
-        EEG source reconstruction
+    [1] Liu, H., Schimpf, P. H., Dong, G., Gao, X., Yang, F., & Gao, S. (2005). 
+    Standardized Shrinking LORETA-FOCUSS (SSLOFO): A new algorithm for spatio-temporal 
+    EEG source reconstruction. IEEE Transactions on Biomedical Engineering, 52(10), 1681–1691.
 
     Notes
     -----
@@ -76,9 +77,8 @@ class SolverSSLOFO(BaseSolver):
             "with iterative source-space shrinking to obtain focal solutions."
         ),
         references=[
-            "Wu, H., Gao, S., Li, J., & Li, X. (2005). A new method for spatio-temporal EEG source reconstruction: standardized shrinking LORETA-FOCUSS (SSLOFO). IEEE Transactions on Biomedical Engineering, 52(11), 1781–1792. https://doi.org/10.1109/TBME.2005.855720",
+            "Liu, H., Schimpf, P. H., Dong, G., Gao, X., Yang, F., & Gao, S. (2005). Standardized Shrinking LORETA-FOCUSS (SSLOFO): A new algorithm for spatio-temporal EEG source reconstruction. IEEE Transactions on Biomedical Engineering, 52(10), 1681–1691.",
             "Pascual-Marqui, R. D. (2002). Standardized low-resolution brain electromagnetic tomography (sLORETA): technical details. Methods and Findings in Experimental and Clinical Pharmacology, 24(Suppl D), 5–12.",
-            "Gorodnitsky, I. F., & Rao, B. D. (1997). Sparse signal reconstruction from limited data using FOCUSS: A re-weighted minimum norm algorithm. IEEE Transactions on Signal Processing, 45(3), 600–616.",
         ],
     )
 
@@ -108,6 +108,10 @@ class SolverSSLOFO(BaseSolver):
         self.spatial_temporal = spatial_temporal
         self.time_window = time_window
         self.sloreta_alpha = sloreta_alpha
+        self.adjacency: csr_matrix | None = None
+        self._adjacency_degree: np.ndarray | None = None
+        self.leadfield_full: np.ndarray | None = None
+        self._sloreta_operator: np.ndarray | None = None
         super().__init__(**kwargs)
         # The default BaseSolver r-grid (up to 1e1) can be too narrow once SSP
         # projection/whitening changes the effective scaling. Widen it so GCV
@@ -141,10 +145,14 @@ class SolverSSLOFO(BaseSolver):
         # Get adjacency matrix for smoothing operations
         self.adjacency = build_source_adjacency(
             forward["src"], verbose=self.verbose
-        ).toarray()
+        ).tocsr()
+        self._adjacency_degree = self.adjacency.getnnz(axis=1).astype(float)
 
         # Store original leadfield
-        self.leadfield_full = deepcopy(self.leadfield)
+        self.leadfield_full = np.array(self.leadfield, copy=True)
+        self._sloreta_operator = self._prepare_sloreta_operator(
+            self.leadfield_full, self.sloreta_alpha
+        )
 
         # Regularization candidates must be scaled to the *effective* leadfield
         # used for selection (whitened/projected space). BaseSolver computed
@@ -205,10 +213,15 @@ class SolverSSLOFO(BaseSolver):
 
         # SSLOFO iterations operate in whitened/projected sensor space.
         data = self._sensor_transform @ data_raw
+        initial_sloreta = self._compute_sloreta(
+            self.leadfield_full, data, self.sloreta_alpha
+        )
 
         if self.spatial_temporal and data.ndim == 2:
             # Use spatio-temporal variant
-            source_mat = self._solve_spatiotemporal(data, alpha)
+            source_mat = self._solve_spatiotemporal(
+                data, alpha, initial_sloreta=initial_sloreta
+            )
         else:
             # Use single-timepoint SSLOFO
             # Solve for each timepoint
@@ -219,13 +232,17 @@ class SolverSSLOFO(BaseSolver):
             for t in range(n_times):
                 if self.verbose > 1:
                     logger.debug(f"Solving timepoint {t + 1}/{n_times}")
-                source_mat[:, t] = self._solve_single_timepoint(data[:, t], alpha)
+                source_mat[:, t] = self._solve_single_timepoint(
+                    data[:, t],
+                    alpha,
+                    initial_sloreta=initial_sloreta[:, t],
+                )
 
         # Convert to SourceEstimate
         stc = self.source_to_object(source_mat)
         return stc
 
-    def _solve_single_timepoint(self, data_t, alpha):
+    def _solve_single_timepoint(self, data_t, alpha, initial_sloreta=None):
         """Solve SSLOFO for a single timepoint.
 
         Parameters
@@ -240,11 +257,14 @@ class SolverSSLOFO(BaseSolver):
         J_final : numpy.ndarray
             Source estimate for this timepoint (n_sources,)
         """
-        leadfield = deepcopy(self.leadfield_full)
-        n_chans, n_sources = leadfield.shape
+        leadfield = self.leadfield_full
+        n_sources = leadfield.shape[1]
 
         # Step 1: Compute initial sLORETA estimate
-        J_sloreta = self._compute_sloreta(leadfield, data_t, self.sloreta_alpha)
+        if initial_sloreta is None:
+            J_sloreta = self._compute_sloreta(leadfield, data_t, self.sloreta_alpha)
+        else:
+            J_sloreta = np.array(initial_sloreta, copy=True)
 
         # Step 2: Initialize FOCUSS weights from sLORETA estimate (full source space)
         W_full = np.abs(J_sloreta) ** self.focuss_power
@@ -337,6 +357,30 @@ class SolverSSLOFO(BaseSolver):
 
         return J_final
 
+    def _solve_sensor_system(self, system, rhs):
+        """Solve the sensor-space linear system, falling back to a pseudo-inverse."""
+        try:
+            return np.linalg.solve(system, rhs)
+        except np.linalg.LinAlgError:
+            return np.linalg.pinv(system) @ rhs
+
+    def _prepare_sloreta_operator(self, leadfield, alpha):
+        """Precompute the full-space standardized sLORETA operator.
+
+        This is reused for every time point. Caching it avoids rebuilding the
+        same full sensor-space inverse at the start of each SSLOFO solve.
+        """
+        system = leadfield @ leadfield.T
+        system.flat[:: system.shape[0] + 1] += alpha
+
+        solved_leadfield = self._solve_sensor_system(system, leadfield)
+        kernel = solved_leadfield.T
+        res_matrix_diag = np.einsum(
+            "ij,ij->j", leadfield, solved_leadfield, optimize=True
+        )
+        res_scale = 1.0 / np.sqrt(np.maximum(res_matrix_diag, 1e-12))
+        return kernel * res_scale[:, np.newaxis]
+
     def _compute_sloreta(self, leadfield, data, alpha):
         """Compute sLORETA estimate.
 
@@ -354,28 +398,32 @@ class SolverSSLOFO(BaseSolver):
         J : numpy.ndarray
             sLORETA source estimate (n_sources,)
         """
-        n_chans = leadfield.shape[0]
-        I = np.identity(n_chans)
+        data_arr = np.asarray(data, dtype=float)
+        data_was_vector = data_arr.ndim == 1
+        if data_was_vector:
+            data_arr = data_arr[:, np.newaxis]
 
-        # Compute MNE inverse operator: K = L.T @ inv(L @ L.T + alpha * I)
-        LLT = leadfield @ leadfield.T
-        try:
-            inner_inv = np.linalg.inv(LLT + alpha * I)
-        except np.linalg.LinAlgError:
-            inner_inv = np.linalg.pinv(LLT + alpha * I)
+        if (
+            self._sloreta_operator is not None
+            and leadfield is self.leadfield_full
+            and np.isclose(alpha, self.sloreta_alpha)
+        ):
+            j_sloreta = self._sloreta_operator @ data_arr
+        else:
+            system = leadfield @ leadfield.T
+            system.flat[:: system.shape[0] + 1] += alpha
 
-        K_MNE = leadfield.T @ inner_inv
+            solved_data = self._solve_sensor_system(system, data_arr)
+            solved_leadfield = self._solve_sensor_system(system, leadfield)
 
-        # Compute resolution matrix diagonal for standardization
-        # Rdiag = diag(K @ L) = sum of element-wise product of K and L.T along axis=1
-        res_matrix_diag = np.sum(K_MNE * leadfield.T, axis=1)
-        res_matrix_diag = np.maximum(res_matrix_diag, 1e-12)  # Avoid division by zero
+            j = leadfield.T @ solved_data
+            res_matrix_diag = np.einsum(
+                "ij,ij->j", leadfield, solved_leadfield, optimize=True
+            )
+            res_matrix_diag = np.maximum(res_matrix_diag, 1e-12)
+            j_sloreta = j / np.sqrt(res_matrix_diag)[:, np.newaxis]
 
-        # Compute current density and standardize
-        j = K_MNE @ data
-        j_sloreta = j / np.sqrt(res_matrix_diag)
-
-        return j_sloreta
+        return j_sloreta[:, 0] if data_was_vector else j_sloreta
 
     def _standardized_focuss_update(self, leadfield, data, weights, alpha):
         """Perform standardized FOCUSS update.
@@ -396,25 +444,23 @@ class SolverSSLOFO(BaseSolver):
         J : numpy.ndarray
             Updated source estimate (n_sources_active,)
         """
-        n_chans = leadfield.shape[0]
-
         # L @ diag(weights) @ L.T via broadcasting (avoids d×d diag matrix)
-        LW = leadfield * weights  # (m, d) broadcasting
+        LW = leadfield * weights[np.newaxis, :]  # (m, d) broadcasting
         LWLT = LW @ leadfield.T  # (m, m)
+        LWLT.flat[:: LWLT.shape[0] + 1] += alpha
 
-        try:
-            inner_inv = np.linalg.inv(LWLT + alpha * np.eye(n_chans))
-        except np.linalg.LinAlgError:
-            inner_inv = np.linalg.pinv(LWLT + alpha * np.eye(n_chans))
+        # Solve A x = b directly instead of forming A^{-1}. The system is only
+        # sensor-sized, so this is faster and numerically better than building
+        # an explicit inverse at every iteration.
+        solved_data = self._solve_sensor_system(LWLT, data)
+        solved_leadfield = self._solve_sensor_system(LWLT, leadfield)
 
-        # K_eff = diag(weights) @ L.T @ inv(...) = weights[:, None] * (L.T @ inv)
-        LtInv = leadfield.T @ inner_inv  # (d, m)
-        K_eff = weights[:, None] * LtInv  # (d, m)
+        j = weights * (leadfield.T @ solved_data)
 
-        j = K_eff @ data
-
-        # Standardize: Rdiag = diag(K @ L)
-        res_matrix_diag = np.sum(K_eff * leadfield.T, axis=1)
+        # diag(diag(w) L^T A^{-1} L) = w_i * l_i^T A^{-1} l_i
+        res_matrix_diag = weights * np.einsum(
+            "ij,ij->j", leadfield, solved_leadfield, optimize=True
+        )
         res_matrix_diag = np.maximum(res_matrix_diag, 1e-12)
         j_standardized = j / np.sqrt(res_matrix_diag)
 
@@ -445,6 +491,8 @@ class SolverSSLOFO(BaseSolver):
         J_smoothed : numpy.ndarray
             Smoothed source estimate (n_sources_active,)
         """
+        adjacency = adjacency.tocsr() if issparse(adjacency) else csr_matrix(adjacency)
+
         # Find prominent sources
         max_val = np.abs(J).max()
         if max_val == 0:
@@ -461,10 +509,10 @@ class SolverSSLOFO(BaseSolver):
         # Convert to global indices
         prominent_global_idx = active_idx[prominent_local_idx]
 
-        # Find neighbors of prominent sources efficiently using vectorized operations
-        # Extract relevant rows from adjacency matrix and combine
-        neighbor_mask = adjacency[prominent_global_idx, :].sum(axis=0) > 0
-        neighbor_global_idx = np.where(neighbor_mask)[0]
+        # Sparse row gathering gives the union of all graph neighbors without
+        # scanning the full dense adjacency matrix.
+        neighbor_rows = adjacency[prominent_global_idx]
+        neighbor_global_idx = np.unique(neighbor_rows.indices)
 
         # Combine prominent sources and neighbors
         keep_global_idx = np.unique(
@@ -477,31 +525,21 @@ class SolverSSLOFO(BaseSolver):
         # Apply light smoothing
         J_smoothed = J.copy()
         if smoothing_weight > 0:
-            # Pre-compute which active indices to smooth
-            smooth_local_idx = np.where(prominent_mask)[0]
-            smooth_global_idx = active_idx[smooth_local_idx]
+            # Restrict smoothing to active sources only. This matches the
+            # original logic but avoids rebuilding a global->local map in Python.
+            adjacency_active = adjacency[active_idx][:, active_idx].tocsr()
+            neighbor_count = adjacency_active.getnnz(axis=1)
+            smooth_local_idx = np.where(prominent_mask & (neighbor_count > 0))[0]
 
-            # Vectorized neighbor finding: get adjacency rows for all sources to smooth
-            # Create a mapping from global to local indices for fast lookup
-            global_to_local = np.full(adjacency.shape[0], -1, dtype=np.int32)
-            global_to_local[active_idx] = np.arange(len(active_idx))
-
-            for local_idx, global_idx in zip(
-                smooth_local_idx, smooth_global_idx, strict=False
-            ):
-                # Find neighbors in global space
-                neighbor_global = adjacency[global_idx, :].nonzero()[0]
-
-                # Map to local indices (filter out inactive neighbors)
-                neighbor_local = global_to_local[neighbor_global]
-                neighbor_local = neighbor_local[neighbor_local >= 0]
-
-                if len(neighbor_local) > 0:
-                    # Weighted average with neighbors
-                    neighbor_avg = np.mean(J[neighbor_local])
-                    J_smoothed[local_idx] = (1 - smoothing_weight) * J[
-                        local_idx
-                    ] + smoothing_weight * neighbor_avg
+            if len(smooth_local_idx) > 0:
+                neighbor_sum = np.asarray(adjacency_active @ J).ravel()
+                neighbor_avg = neighbor_sum[smooth_local_idx] / neighbor_count[
+                    smooth_local_idx
+                ]
+                J_smoothed[smooth_local_idx] = (
+                    (1 - smoothing_weight) * J[smooth_local_idx]
+                    + smoothing_weight * neighbor_avg
+                )
 
         return prominent_mask, J_smoothed
 
@@ -520,19 +558,30 @@ class SolverSSLOFO(BaseSolver):
         J_smoothed : numpy.ndarray
             Smoothed source estimate (n_sources,)
         """
+        adjacency = adjacency.tocsr() if issparse(adjacency) else csr_matrix(adjacency)
         J_smoothed = J.copy()
         active_sources = np.where(np.abs(J) > 0)[0]
+        if len(active_sources) == 0:
+            return J_smoothed
 
-        for idx in active_sources:
-            neighbors = np.where(adjacency[idx, :] == 1)[0]
-            if len(neighbors) > 0:
-                neighbor_vals = J[neighbors]
-                # Light smoothing: 70% original, 30% neighbor average
-                J_smoothed[idx] = 0.7 * J[idx] + 0.3 * np.mean(neighbor_vals)
+        if self._adjacency_degree is not None and len(self._adjacency_degree) == len(J):
+            neighbor_count = self._adjacency_degree
+        else:
+            neighbor_count = adjacency.getnnz(axis=1).astype(float)
+
+        valid_active = active_sources[neighbor_count[active_sources] > 0]
+        if len(valid_active) == 0:
+            return J_smoothed
+
+        neighbor_sum = np.asarray(adjacency @ J).ravel()
+        # This pass averages over all graph neighbors, including zeros for
+        # inactive nodes, exactly like the original dense implementation.
+        neighbor_avg = neighbor_sum[valid_active] / neighbor_count[valid_active]
+        J_smoothed[valid_active] = 0.7 * J[valid_active] + 0.3 * neighbor_avg
 
         return J_smoothed
 
-    def _solve_spatiotemporal(self, data, alpha):
+    def _solve_spatiotemporal(self, data, alpha, initial_sloreta=None):
         """Solve using spatio-temporal variant.
 
         Parameters
@@ -545,7 +594,7 @@ class SolverSSLOFO(BaseSolver):
         source_mat : numpy.ndarray
             Source estimate matrix (n_sources, n_times)
         """
-        n_chans, n_times = data.shape
+        n_times = data.shape[1]
         n_sources = self.leadfield_full.shape[1]
 
         # Determine time window
@@ -560,12 +609,14 @@ class SolverSSLOFO(BaseSolver):
             )
 
         # Step a: Run single-time-point SSLOFO at each sample in window
-        solutions = []
+        solutions = np.zeros((window_size, n_sources))
         for t in range(window_size):
             if self.verbose > 1:
                 logger.debug(f"  Solving timepoint {t + 1}/{window_size}")
-            J_t = self._solve_single_timepoint(data[:, t], alpha)
-            solutions.append(J_t)
+            seed_t = None if initial_sloreta is None else initial_sloreta[:, t]
+            solutions[t, :] = self._solve_single_timepoint(
+                data[:, t], alpha, initial_sloreta=seed_t
+            )
 
         # Step b: Sum solutions and define common support
         J_sum = np.sum(np.abs(solutions), axis=0)
@@ -616,18 +667,13 @@ class SolverSSLOFO(BaseSolver):
         J : numpy.ndarray
             Source estimate (n_sources,) or (n_sources, n_times)
         """
-        n_chans = leadfield.shape[0]
         # L @ diag(weights) @ L.T via broadcasting
-        LW = leadfield * weights  # (m, d)
+        LW = leadfield * weights[np.newaxis, :]  # (m, d)
         LWLT = LW @ leadfield.T  # (m, m)
+        LWLT.flat[:: LWLT.shape[0] + 1] += alpha
 
-        try:
-            inner_inv = np.linalg.inv(LWLT + alpha * np.eye(n_chans))
-        except np.linalg.LinAlgError:
-            inner_inv = np.linalg.pinv(LWLT + alpha * np.eye(n_chans))
-
-        # diag(weights) @ L.T @ inv(...) @ data
-        J = weights[:, None] * (leadfield.T @ (inner_inv @ data))
+        solved_data = self._solve_sensor_system(LWLT, data)
+        J = weights[:, None] * (leadfield.T @ solved_data)
         return J.squeeze()
 
     def _select_regularization_idx(self, data):

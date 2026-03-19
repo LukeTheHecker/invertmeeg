@@ -42,6 +42,8 @@ class SolverIRESMV(BaseBeamformer):
             "downweighting low-power source locations (FOCUSS/IRLS-inspired)."
         ),
         references=[
+            "Yu, J. L., & Yeh, C. C. (1995). Generalized eigenspace-based beamformers. "
+            "IEEE Transactions on Signal Processing, 43(11), 2453-2461.",
             "Lukas Hecker (2025). Unpublished.",
             "Jonmohamadi, Y., Poudel, G., Innes, C., Weiss, D., Krueger, R., & Jones, R. "
             "(2014). Comparison of beamformers for EEG source signal reconstruction. "

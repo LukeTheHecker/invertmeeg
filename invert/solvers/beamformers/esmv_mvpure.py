@@ -32,6 +32,8 @@ class SolverESMVMVPURE(BaseBeamformer):
             "reduced-rank MV-PURE multisource LCMV stage."
         ),
         references=[
+            "Yu, J. L., & Yeh, C. C. (1995). Generalized eigenspace-based beamformers. "
+            "IEEE Transactions on Signal Processing, 43(11), 2453-2461.",
             "Jonmohamadi, Y., Poudel, G., Innes, C., Weiss, D., Krueger, R., & Jones, R. "
             "(2014). Comparison of beamformers for EEG source signal reconstruction. "
             "Biomedical Signal Processing and Control, 14, 175-188.",

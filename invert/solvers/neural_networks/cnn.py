@@ -364,7 +364,8 @@ else:
 
             # Wrap the generator to transpose and return (x, y) in the right format for LSTM
             def wrapped_generator():
-                for x, y, _info in sim_gen.generate():
+                for batch in sim_gen.generate():
+                    x, y = batch.x, batch.y
                     # Match apply_model() preprocessing (CAR + per-time norm + per-sample max abs)
                     x = x - x.mean(axis=1, keepdims=True)
                     norms = np.linalg.norm(x, axis=1, keepdims=True)

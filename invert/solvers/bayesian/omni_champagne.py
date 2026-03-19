@@ -52,6 +52,7 @@ class SolverOmniChampagne(BaseSolver):
             "on penalized evidence."
         ),
         references=[
+            "Wipf, D. P., Owen, J. P., Attias, H. T., Sekihara, K., & Nagarajan, S. S. (2010). Robust Bayesian estimation of the location, orientation, and time course of multiple correlated neural sources using MEG. NeuroImage, 49(1), 641–655.",
             "Lukas Hecker 2025, unpublished",
         ],
     )

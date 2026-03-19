@@ -5,6 +5,7 @@ from typing import Any
 
 import mne
 import numpy as np
+from scipy.linalg import cho_factor, cho_solve
 from scipy.sparse import coo_matrix
 from scipy.sparse.linalg import LinearOperator, cg
 
@@ -44,7 +45,7 @@ class SolverTotalVariation(BaseSolver):
         default_ridge: float | None = None,
         default_n_irls: int = 8,
         default_eps: float = 1e-3,
-        default_cg_tol: float = 1e-4,
+        default_cg_tol: float = 2e-4,
         default_cg_max_iter: int = 200,
         auto_scale_hyperparams: bool = True,
         **kwargs: Any,
@@ -52,6 +53,9 @@ class SolverTotalVariation(BaseSolver):
         self.name = name
         self._edges_i: np.ndarray | None = None
         self._edges_j: np.ndarray | None = None
+        self._leadfield_gram: np.ndarray | None = None
+        self._leadfield_gram_diag: np.ndarray | None = None
+        self._sensor_gram: np.ndarray | None = None
         self.default_tv_weight = float(default_tv_weight)
         self.default_ridge = (
             None if default_ridge is None else max(float(default_ridge), 1e-15)
@@ -62,6 +66,11 @@ class SolverTotalVariation(BaseSolver):
         self.default_cg_max_iter = int(default_cg_max_iter)
         self.auto_scale_hyperparams = bool(auto_scale_hyperparams)
         super().__init__(**kwargs)
+        # TV's make_inverse_operator only depends on the forward/noise model, not
+        # on the individual sample. Marking it reusable lets the benchmark runner
+        # build once and call apply_inverse_operator for each sample instead of
+        # recomputing all caches 50 times.
+        self.require_recompute = False
 
     @staticmethod
     def _auto_scaled_hyperparams(
@@ -106,7 +115,38 @@ class SolverTotalVariation(BaseSolver):
         mask = i < j
         self._edges_i = i[mask]
         self._edges_j = j[mask]
+        self._leadfield_gram = self.leadfield.T @ self.leadfield
+        self._leadfield_gram_diag = np.einsum(
+            "ij,ij->j", self.leadfield, self.leadfield, optimize=True
+        )
+        self._sensor_gram = self.leadfield @ self.leadfield.T
         return self
+
+    def _build_weighted_laplacian(self, weights: np.ndarray) -> coo_matrix:
+        """Build the weighted graph Laplacian for the current IRLS step."""
+        if self._edges_i is None or self._edges_j is None:
+            raise RuntimeError(
+                "Call make_inverse_operator() before building the TV Laplacian."
+            )
+
+        edges_i = self._edges_i
+        edges_j = self._edges_j
+        rows = np.concatenate([edges_i, edges_j, edges_i, edges_j])
+        cols = np.concatenate([edges_i, edges_j, edges_j, edges_i])
+        vals = np.concatenate([weights, weights, -weights, -weights])
+        return coo_matrix(
+            (vals, (rows, cols)),
+            shape=(self.leadfield.shape[1], self.leadfield.shape[1]),
+        ).tocsr()
+
+    @staticmethod
+    def _solve_sensor_system(system: np.ndarray, rhs: np.ndarray) -> np.ndarray:
+        """Solve the small sensor-space SPD system used for the warm start."""
+        try:
+            chol, lower = cho_factor(system, lower=True, check_finite=False)
+            return cho_solve((chol, lower), rhs, check_finite=False)
+        except np.linalg.LinAlgError:
+            return np.linalg.solve(system, rhs)
 
     def apply_inverse_operator(
         self,
@@ -123,13 +163,22 @@ class SolverTotalVariation(BaseSolver):
             raise RuntimeError(
                 "Call make_inverse_operator() before apply_inverse_operator()."
             )
+        if (
+            self._leadfield_gram is None
+            or self._leadfield_gram_diag is None
+            or self._sensor_gram is None
+        ):
+            raise RuntimeError(
+                "TV solver cache is missing. Rebuild the inverse operator first."
+            )
 
         Y = self.unpack_data_obj(mne_obj)
         self.validate_operator_data_compatibility(Y)
+        if Y.ndim == 1:
+            Y = Y[:, np.newaxis]
         Y = self._sensor_transform @ Y
         L = self.leadfield
-        n_chans, n_sources = L.shape
-        n_time = Y.shape[1]
+        n_chans = L.shape[0]
 
         if tv_weight is None:
             tv_weight = self.default_tv_weight
@@ -161,46 +210,48 @@ class SolverTotalVariation(BaseSolver):
             else:
                 ridge_eff = max(float(ridge), 1e-15)
 
-        # Pre-compute L.T @ L once (used in CG matvec every iteration)
-        LTL = L.T @ L  # (d, d)
-        K_mne = np.linalg.solve(L @ L.T + ridge_eff * np.eye(n_chans), L).T
-        X = K_mne @ Y
-
-        edges_i = self._edges_i
-        edges_j = self._edges_j
+        LTL = self._leadfield_gram
+        LTL_diag = self._leadfield_gram_diag
+        LLT = self._sensor_gram
 
         b = L.T @ Y  # (n_sources, n_time)
-
-        def build_weighted_laplacian(weights: np.ndarray) -> coo_matrix:
-            rows = np.concatenate([edges_i, edges_j, edges_i, edges_j])
-            cols = np.concatenate([edges_i, edges_j, edges_j, edges_i])
-            vals = np.concatenate([weights, weights, -weights, -weights])
-            return coo_matrix(
-                (vals, (rows, cols)), shape=(n_sources, n_sources)
-            ).tocsr()
+        sensor_system = LLT + ridge_eff * np.eye(n_chans)
+        # The MNE warm start solves one sensor-sized system for all timepoints
+        # instead of forming an explicit kernel matrix.
+        X = L.T @ self._solve_sensor_system(sensor_system, Y)
 
         for _it in range(int(n_irls)):
-            diff = X[edges_i] - X[edges_j]
+            diff = X[self._edges_i] - X[self._edges_j]
             grad_sq = np.sum(diff * diff, axis=1)
             w = 1.0 / np.sqrt(grad_sq + float(eps) ** 2)
 
-            Lap = build_weighted_laplacian(w)
+            lap = self._build_weighted_laplacian(w)
+            # Jacobi preconditioning is cheap and can reduce CG work on
+            # poorly conditioned IRLS steps without changing the objective.
+            lap_diag = np.asarray(lap.diagonal()).ravel()
+            inv_diag = 1.0 / np.maximum(LTL_diag + lam * lap_diag + ridge_eff, 1e-15)
+            preconditioner = LinearOperator(
+                (len(inv_diag), len(inv_diag)),
+                matvec=lambda v, d=inv_diag: d * v,
+                dtype=np.float64,
+            )
 
-            # matvec: LTL @ v + lam * Lap @ v + ridge * v
-            # Uses pre-computed LTL instead of L.T @ (L @ v) (one matmul vs two)
-            def matvec(v: np.ndarray, Lap_val: np.ndarray = Lap) -> np.ndarray:
-                return LTL @ v + lam * (Lap_val @ v) + ridge_eff * v
+            def matvec(v: np.ndarray, lap_val=lap) -> np.ndarray:
+                return LTL @ v + lam * (lap_val @ v) + ridge_eff * v
 
-            A = LinearOperator((n_sources, n_sources), matvec=matvec, dtype=np.float64)
+            operator = LinearOperator(
+                (L.shape[1], L.shape[1]), matvec=matvec, dtype=np.float64
+            )
 
             X_new = np.empty_like(X)
-            for t in range(n_time):
+            for t in range(X.shape[1]):
                 x_t, info = cg(
-                    A,
+                    operator,
                     b[:, t],
                     x0=X[:, t],
-                    rtol=cg_tol,
+                    rtol=float(cg_tol),
                     maxiter=int(cg_max_iter),
+                    M=preconditioner,
                 )
                 if info != 0:
                     logger.debug("CG did not fully converge at t=%s (info=%s)", t, info)

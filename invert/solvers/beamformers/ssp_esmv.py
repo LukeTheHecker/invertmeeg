@@ -41,6 +41,8 @@ class SolverSSPESMV(BaseBeamformer):
             "set, then applies ESMV-style beamforming on the reduced problem."
         ),
         references=[
+            "Yu, J. L., & Yeh, C. C. (1995). Generalized eigenspace-based beamformers. "
+            "IEEE Transactions on Signal Processing, 43(11), 2453-2461.",
             "Lukas Hecker (2025). Unpublished.",
             "Dai, W., & Milenkovic, O. (2009). Subspace pursuit for compressive sensing "
             "signal reconstruction. IEEE Transactions on Information Theory, 55(5), "

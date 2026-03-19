@@ -104,17 +104,16 @@ __all__ = [
     "SolverExSoMUSIC",
     # Basis Functions
     "SolverBasisFunctions",
+    "SolverFlexGreedyMLDiffuse",
     # Other
     "SolverEPIFOCUS",
     # Hybrids
     "SolverAPSE",
     "SolverChimera",
-    "SolverGraphWienerMixture",
-    "SolverGraphWienerMultiScale",
-    "SolverGraphWienerSmoothSparseEB",
     "SolverGraphWienerSmoothSparseAdaptiveEB",
     "SolverGraphWienerSmoothSparseAdaptiveRobustEB",
     "SolverHydra",
+    "SolverMCASmoothSparseFull",
     # ANN (optional)
     "SolverCNN",
     "SolverCovCNN",
