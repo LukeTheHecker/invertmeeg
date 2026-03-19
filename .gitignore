@@ -1,3 +1,5 @@
+*.png
+!docs/**/*.png
 *.pkl
 *.pyc
 *.h5
@@ -48,3 +50,6 @@ results/*
 # !results/benchmark_results*.json
 !results/release/
 scripts/quick_eval.py
+
+# Cortical folding cache (optimized parameters, precomputed BEM)
+invert/cortical_folding/cache/
