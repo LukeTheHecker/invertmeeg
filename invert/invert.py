@@ -279,16 +279,8 @@ def _build_registry() -> dict[str, Any]:
     _add("chimera", solvers.hybrids.SolverChimera)
     _add("hydra", solvers.hybrids.SolverHydra)
     _add(
-        ["graph-wiener-mixture", "gw-mix", "gwmix", "graph-wiener"],
-        solvers.hybrids.SolverGraphWienerMixture,
-    )
-    _add(
-        ["graph-wiener-multiscale", "gw-mseb", "gw-ms", "gw-multiscale"],
-        solvers.hybrids.SolverGraphWienerMultiScale,
-    )
-    _add(
-        ["graph-wiener-smooth-sparse", "gw-ss", "gwss", "wiener-smooth-sparse"],
-        solvers.hybrids.SolverGraphWienerSmoothSparseEB,
+        ["mca-smooth-sparse-full", "mca-full", "mca-smooth-full"],
+        solvers.hybrids.SolverMCASmoothSparseFull,
     )
     _add(
         [
