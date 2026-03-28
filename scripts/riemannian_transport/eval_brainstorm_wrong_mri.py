@@ -124,18 +124,37 @@ def compute_metrics(stc, labels_aud, src_positions):
 
 
 def save_brain_plots(stc, subject, subjects_dir, name, output_dir):
-    """Save left and right hemisphere brain plots."""
+    """Save left and right hemisphere brain plots with peak marker."""
     import pyvista
     pyvista.OFF_SCREEN = True
 
     stc_plot = abs(stc)
     stc_plot.subject = subject
+
+    # Find peak vertex at t=100ms
+    t_idx = np.argmin(np.abs(stc_plot.times - 0.1))
+    act = stc_plot.data[:, t_idx]
+    peak_src_idx = np.argmax(act)
+    n_lh = len(stc_plot.vertices[0])
+    if peak_src_idx < n_lh:
+        peak_hemi = 'lh'
+        peak_vtx = stc_plot.vertices[0][peak_src_idx]
+    else:
+        peak_hemi = 'rh'
+        peak_vtx = stc_plot.vertices[1][peak_src_idx - n_lh]
+
     for hemi in ['lh', 'rh']:
         brain = stc_plot.plot(
             subjects_dir=subjects_dir, subject=subject,
             surface='inflated', hemi=hemi, cortex='low_contrast',
             initial_time=0.1, time_unit='s', time_viewer=False,
             size=(800, 600), background='white')
+        if peak_hemi == hemi:
+            brain.add_foci(
+                [peak_vtx], coords_as_verts=True,
+                map_surface='inflated',
+                scale_factor=0.5, color='springgreen',
+                alpha=0.9, hemi=hemi)
         fname = os.path.join(output_dir, f'{name}_{hemi}.png')
         brain.save_image(fname)
         brain.close()

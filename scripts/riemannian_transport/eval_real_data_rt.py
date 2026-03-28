@@ -85,10 +85,30 @@ def align_fwd_cov(fwd, C_data_full, cov_ch_names):
 
 
 def save_brain_plots(stc, subject, subjects_dir, name, output_dir,
-                     peak_time=0.1, clim=None):
-    """Save lh and rh brain plots as PNG."""
+                     peak_time=0.1, clim=None, views=None):
+    """Save brain plots as PNG with peak marker.
+
+    Parameters
+    ----------
+    views : list of (hemi, view, suffix) or None
+        Custom views to render.  Default: lateral lh + lateral rh.
+        Example: [('lh', 'lateral', 'lh'), ('rh', 'ventral', 'rh_ventral')]
+    """
     stc_plot = abs(stc)
     stc_plot.subject = subject
+
+    # Find peak vertex at peak_time
+    t_idx = np.argmin(np.abs(stc_plot.times - peak_time))
+    act = stc_plot.data[:, t_idx]
+    peak_src_idx = np.argmax(act)
+    n_lh = len(stc_plot.vertices[0])
+    if peak_src_idx < n_lh:
+        peak_hemi = 'lh'
+        peak_vtx = stc_plot.vertices[0][peak_src_idx]
+    else:
+        peak_hemi = 'rh'
+        peak_vtx = stc_plot.vertices[1][peak_src_idx - n_lh]
+
     plot_kw = dict(
         subjects_dir=subjects_dir, subject=subject,
         surface='inflated', cortex='low_contrast',
@@ -96,17 +116,30 @@ def save_brain_plots(stc, subject, subjects_dir, name, output_dir,
         time_viewer=False, size=(800, 600), background='white')
     if clim is not None:
         plot_kw['clim'] = clim
-    for hemi in ['lh', 'rh']:
+
+    if views is None:
+        views = [('lh', 'lateral', 'lh'), ('rh', 'lateral', 'rh')]
+
+    for hemi, view, suffix in views:
         brain = stc_plot.plot(hemi=hemi, **plot_kw)
-        fname = os.path.join(output_dir, f'{name}_{hemi}.png')
+        brain.show_view(view)
+        # Add peak marker if peak is on this hemisphere
+        if peak_hemi == hemi:
+            brain.add_foci(
+                [peak_vtx], coords_as_verts=True,
+                map_surface='inflated',
+                scale_factor=0.5, color='springgreen',
+                alpha=0.9, hemi=hemi)
+        fname = os.path.join(output_dir, f'{name}_{suffix}.png')
         brain.save_image(fname)
         brain.close()
-    print(f'      Saved {name}_{{lh,rh}}.png')
+    suffixes = ','.join(s for _, _, s in views)
+    print(f'      Saved {name}_{{{suffixes}}}.png')
 
 
 def run_dataset(name, evoked, fwd_correct, fwd_wrong, fwd_wrong_rt,
                 noise_cov, subject_correct, subjects_dir_correct,
-                fs_subjects_dir, peak_time, fit_window=None):
+                fs_subjects_dir, peak_time, fit_window=None, views=None):
     """Run solvers on correct/wrong/wrong+RT and save plots."""
     output_dir = os.path.join(FIGURES_DIR, name)
     os.makedirs(output_dir, exist_ok=True)
@@ -143,7 +176,7 @@ def run_dataset(name, evoked, fwd_correct, fwd_wrong, fwd_wrong_rt,
 
                 save_brain_plots(
                     stc, subj, subj_dir, label, output_dir,
-                    peak_time=peak_time)
+                    peak_time=peak_time, views=views)
                 results.append((solver_name, cond_name, 'ok'))
 
             except Exception as e:
@@ -345,10 +378,17 @@ def run_spm_faces():
 
     del raw
 
+    # Ventral view to see fusiform face area
+    spm_views = [
+        ('lh', 'lateral', 'lh'),
+        ('rh', 'lateral', 'rh'),
+        ('lh', 'ventral', 'lh_ventral'),
+        ('rh', 'ventral', 'rh_ventral'),
+    ]
     return run_dataset(
         'spm_faces', contrast, fwd_correct, fwd_wrong, fwd_wrong_rt,
         noise_cov, 'spm', subjects_dir, fs_subj_dir,
-        peak_time=0.170, fit_window=(0.12, 0.22))
+        peak_time=0.170, fit_window=(0.12, 0.22), views=spm_views)
 
 
 # ── Main ────────────────────────────────────────────────────────────────
