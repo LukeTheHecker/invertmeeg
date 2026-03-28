@@ -38,7 +38,7 @@ from invert.forward.forward import _get_fsaverage_dir
 
 # ── Parameters ──────────────────────────────────────────────────────────
 SOLVERS = ['subspace-sbl', 'champagne', 'eloreta', 'esmv']
-ALPHA = 1.0
+ALPHA = 0.80
 REG = 0.01
 TRANSPORT = 'bures'
 ALPHA_MODE = 'geodesic'

@@ -60,7 +60,7 @@ BATCH_TIMEPOINTS = 500
 RANDOM_SEED = 42
 
 # Transport parameters (updated after MNI-aligned evaluation 2026-03-19)
-ALPHA = 1.0
+ALPHA = 0.80
 REG = 0.01
 TRANSPORT = 'bures'
 ALPHA_MODE = 'geodesic'

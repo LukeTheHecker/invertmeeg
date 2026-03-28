@@ -37,7 +37,7 @@ pyvista.OFF_SCREEN = True
 
 # ── Parameters ──────────────────────────────────────────────────────────
 SOLVERS = ['eloreta', 'esmv']
-ALPHA = 1.0
+ALPHA = 0.80
 REG = 0.01
 TRANSPORT = 'bures'
 ALPHA_MODE = 'geodesic'
