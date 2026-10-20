@@ -17,7 +17,7 @@ import mne
 from invert.forward import prepare_forward
 
 # Load a forward model
-forward = mne.read_forward_solution('forward-sol.fif')
+forward = mne.read_forward_solution("forward-sol.fif")
 
 # Prepare for inverse modeling
 forward_prepared = prepare_forward(forward, depth=0.8)

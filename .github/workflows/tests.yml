@@ -2,28 +2,52 @@ name: Tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, "maintenance/**"]
   pull_request:
     branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.10", "3.11", "3.12"]
-
+    timeout-minutes: 60
+    env:
+      MPLBACKEND: Agg
+      MNE_DONTWRITE_HOME: "true"
+      MNE_DATA: ${{ github.workspace }}/.mne-data
+      SUBJECTS_DIR: ${{ github.workspace }}/.mne-data/MNE-fsaverage-data
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-
-      - name: Set up Python ${{ matrix.python-version }}
-        run: uv python install ${{ matrix.python-version }}
-
-      - name: Install dependencies
-        run: uv sync --extra dev --python ${{ matrix.python-version }} || uv pip install -e ".[dev]" --python ${{ matrix.python-version }}
-
-      - name: Run tests
-        run: uv run pytest tests/ -v --timeout=300
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          enable-cache: true
+      - name: Install Python and all dependencies
+        run: uv sync --locked --all-extras --python 3.14
+      - name: Cache MNE template data
+        uses: actions/cache@v6.1.0
+        with:
+          path: .mne-data
+          key: mne-fsaverage-v1
+      - name: Download MNE template data
+        run: |
+          mkdir -p "$MNE_DATA"
+          uv run --locked --all-extras python -c "import mne; mne.datasets.fetch_fsaverage()"
+      - name: Lint and type check
+        run: make lint
+      - name: Run pre-commit checks
+        run: uv run --locked --all-extras pre-commit run --all-files
+      - name: Run complete test suite
+        run: uv run --locked --all-extras pytest tests/ -v --timeout=600
+      - name: Verify optional dependencies are optional
+        run: |
+          uv sync --locked
+          uv run --locked pytest tests/test_context_lstm_utils.py -v
+      - name: Audit dependencies
+        run: make audit
+      - name: Check package build
+        run: make build

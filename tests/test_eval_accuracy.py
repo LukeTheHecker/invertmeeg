@@ -206,10 +206,8 @@ def test_solver_localization(solver_name, accuracy_setup, update_baselines):
             solver = Solver(solver_name)
             solver.make_inverse_operator(fwd, evoked, **extra_kwargs)
             stc = solver.apply_inverse_operator(evoked)
-        except Exception:
-            emds.append(float("nan"))
-            r2s.append(float("nan"))
-            continue
+        except Exception as exc:
+            pytest.fail(f"{solver_name} failed on seed {seed}: {exc!r}")
 
         # EMD: power-based source distribution
         source_power = np.sum(stc.data**2, axis=1)

@@ -18,28 +18,28 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v10.3.0
 
       - name: Set up Python
-        run: uv python install 3.11
+        run: uv python install 3.14
 
       - name: Install docs dependencies
-        run: uv sync --extra docs --python 3.11 || uv pip install -e ".[docs]" --python 3.11
+        run: uv sync --locked --extra docs
 
       - name: Build MkDocs site
         env:
           MNE_DONTWRITE_HOME: "true"
           MPLCONFIGDIR: ${{ runner.temp }}/matplotlib
-        run: uv run mkdocs build --strict -f mkdocs.yml -d site
+        run: uv run --locked mkdocs build --strict -f mkdocs.yml -d site
 
       - name: Configure Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6.0.0
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5.0.0
         with:
           path: site
 
@@ -51,4 +51,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5.0.1

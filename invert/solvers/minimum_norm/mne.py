@@ -114,7 +114,10 @@ class SolverMNE(BaseSolver):
 
         inverse_operators = []
         if self.use_noise_whitener:
-            svd = np.linalg.svd(leadfield_sensor, full_matrices=False)
+            U, singular_values, Vt = np.linalg.svd(
+                leadfield_sensor, full_matrices=False
+            )
+            svd = (U, singular_values, Vt)
             for alpha in self.alphas:
                 kernel_eff = self.solve_tikhonov_svd(
                     leadfield_sensor,

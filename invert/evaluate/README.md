@@ -10,23 +10,23 @@ from invert.models.priors import PriorEnum
 import mne
 
 # Load your forward model
-forward = mne.read_forward_solution('path/to/forward.fif')
+forward = mne.read_forward_solution("path/to/forward.fif")
 
 # Create evaluation instance
 evaluation = Evaluation(
     forward=forward,
-    solvers=['MNE', 'LORETA', 'Champagne'],  # or solver instances
+    solvers=["MNE", "LORETA", "Champagne"],  # or solver instances
     priors=[PriorEnum.DIPOLE, PriorEnum.PATCH, PriorEnum.BROAD],
     n_samples=100,
-    random_seed=42
+    random_seed=42,
 )
 
 # Run evaluation
 results = evaluation.evaluate()
 
 # Access results
-print(evaluation.summary)      # Summary statistics
-print(evaluation.results)      # Detailed results
+print(evaluation.summary)  # Summary statistics
+print(evaluation.results)  # Detailed results
 ```
 
 ## Features
@@ -97,10 +97,7 @@ The evaluation system supports all solvers that inherit from `BaseSolver`:
 ```python
 # Compare two solvers on dipole sources
 evaluation = Evaluation(
-    forward=forward,
-    solvers=['MNE', 'LORETA'],
-    priors=[PriorEnum.DIPOLE],
-    n_samples=50
+    forward=forward, solvers=["MNE", "LORETA"], priors=[PriorEnum.DIPOLE], n_samples=50
 )
 results = evaluation.evaluate()
 ```
@@ -110,22 +107,22 @@ results = evaluation.evaluate()
 # Full evaluation across all scenarios
 evaluation = Evaluation(
     forward=forward,
-    solvers=['MNE', 'LORETA', 'Champagne', 'MUSIC'],
+    solvers=["MNE", "LORETA", "Champagne", "MUSIC"],
     priors=list(PriorEnum),  # All available priors
-    n_samples=100
+    n_samples=100,
 )
 results = evaluation.evaluate()
 
 # Visualize results
-evaluation.plot_results('mean_localization_error')
-evaluation.plot_results('emd')
+evaluation.plot_results("mean_localization_error")
+evaluation.plot_results("emd")
 ```
 
 ### Find Best Solver
 ```python
 # Identify optimal solver for specific scenarios
-best_for_dipoles = evaluation.get_best_solver('dipole', 'mean_localization_error')
-best_for_patches = evaluation.get_best_solver('patch', 'emd')
+best_for_dipoles = evaluation.get_best_solver("dipole", "mean_localization_error")
+best_for_patches = evaluation.get_best_solver("patch", "emd")
 
 print(f"Best for dipole sources: {best_for_dipoles}")
 print(f"Best for patch sources: {best_for_patches}")
@@ -142,7 +139,7 @@ custom_loreta = SolverLORETA(regularisation_method="L", prep_leadfield=True)
 evaluation = Evaluation(
     forward=forward,
     solvers=[custom_mne, custom_loreta],
-    priors=[PriorEnum.DIPOLE, PriorEnum.PATCH]
+    priors=[PriorEnum.DIPOLE, PriorEnum.PATCH],
 )
 ```
 
@@ -186,8 +183,8 @@ The evaluation system is robust to solver failures:
 ### Export Results
 ```python
 # Save results for further analysis
-evaluation.summary.to_csv('solver_comparison.csv')
-evaluation.results.to_pickle('detailed_results.pkl')
+evaluation.summary.to_csv("solver_comparison.csv")
+evaluation.results.to_pickle("detailed_results.pkl")
 ```
 
 ### Visualization
@@ -197,8 +194,10 @@ import seaborn as sns
 
 # Custom plotting
 plt.figure(figsize=(10, 6))
-sns.boxplot(data=evaluation.results, x='prior', y='mean_localization_error', hue='solver')
-plt.title('Localization Error by Solver and Prior')
+sns.boxplot(
+    data=evaluation.results, x="prior", y="mean_localization_error", hue="solver"
+)
+plt.title("Localization Error by Solver and Prior")
 plt.show()
 ```
 
@@ -207,8 +206,12 @@ plt.show()
 from scipy import stats
 
 # Statistical comparison
-mne_results = evaluation.results[evaluation.results['solver'] == 'MNE']['mean_localization_error']
-loreta_results = evaluation.results[evaluation.results['solver'] == 'LORETA']['mean_localization_error']
+mne_results = evaluation.results[evaluation.results["solver"] == "MNE"][
+    "mean_localization_error"
+]
+loreta_results = evaluation.results[evaluation.results["solver"] == "LORETA"][
+    "mean_localization_error"
+]
 
 t_stat, p_value = stats.ttest_ind(mne_results, loreta_results)
 print(f"MNE vs LORETA: t={t_stat:.3f}, p={p_value:.3f}")

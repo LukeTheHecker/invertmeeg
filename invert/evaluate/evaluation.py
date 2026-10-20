@@ -7,7 +7,7 @@ multiple inverse solvers across different source configurations and datasets.
 
 import logging
 import time
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any
 
 import matplotlib.pyplot as plt
 import mne
@@ -63,7 +63,7 @@ class Evaluation:
         self,
         forward: mne.Forward,
         info: mne.Info,
-        solvers: list[Union["BaseSolver", str]],
+        solvers: list[BaseSolver | str],
         priors: list[PriorEnum | str] | None = None,
         n_samples: int = 100,
         n_timepoints: int | None = None,

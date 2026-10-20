@@ -85,7 +85,7 @@ def _filter_valid_runs(paths: list[Path]) -> list[Path]:
             data = _read_json_sanitized(p)
             if _has_results_list(data):
                 valid.append(p)
-        except (ValueError, json.JSONDecodeError):
+        except ValueError, json.JSONDecodeError:
             pass
     return valid
 

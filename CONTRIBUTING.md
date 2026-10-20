@@ -11,8 +11,7 @@ cd invertmeeg
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Create a virtual environment and install all dependencies
-uv venv --python 3.12
-uv pip install -e ".[dev]"
+uv sync --locked --all-extras
 
 # Run the tests
 uv run pytest tests/ -v
@@ -30,6 +29,7 @@ an existing file if it belongs to the same family). Your class must inherit from
 
 ```python
 from .base import BaseSolver, InverseOperator
+
 
 class SolverMyMethod(BaseSolver):
     name = "MyMethod"

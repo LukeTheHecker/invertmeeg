@@ -1498,7 +1498,8 @@ class BaseSolver:
         svd = None
         if precompute_svd:
             svd_target = A if A is not None else G_white
-            svd = np.linalg.svd(svd_target, full_matrices=False)
+            U, singular_values, Vt = np.linalg.svd(svd_target, full_matrices=False)
+            svd = (U, singular_values, Vt)
 
         # Install whitened state so regularisation methods work in whitened space
         self.leadfield = G_white
@@ -2730,7 +2731,7 @@ class BaseSolver:
                 if current_class is not None and current_class is not self.__class__:
                     # Update the instance's class to the current module's class
                     self.__class__ = current_class
-            except (AttributeError, ImportError):
+            except AttributeError, ImportError:
                 # If we can't fix it, let pickle try anyway
                 pass
 
@@ -2806,7 +2807,7 @@ class BaseSolver:
                 )
 
                 custom_objects["CustomConv2D"] = CustomConv2D
-            except (ImportError, AttributeError):
+            except ImportError, AttributeError:
                 pass
 
             try:

@@ -19,7 +19,7 @@ from invert.viz import plot_glass_brain, plot_surface
 fig = plot_glass_brain(stc, forward)
 
 # Plot on cortical surface
-fig = plot_surface(stc, subject='fsaverage', subjects_dir=subjects_dir)
+fig = plot_surface(stc, subject="fsaverage", subjects_dir=subjects_dir)
 ```
 
 ## API Reference

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.0 — Python 3.14 maintenance update
+
+- Require Python 3.14 or newer and refresh the complete dependency lockfile.
+- Remove the obsolete 2024 requirements snapshot; use `uv sync --locked`.
+- Separate development tools from optional neural-network, GUI, and notebook dependencies.
+- Validate tests, lint, types, documentation, package builds, and dependency advisories in CI.
+- Group weekly dependency updates to reduce maintenance noise.
+
 
 # 0.1.0 11.10.2024
 * Package underwent a complete makeover with new solvers and improved/ fixed mathematical formulations

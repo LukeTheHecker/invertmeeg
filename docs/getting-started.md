@@ -19,7 +19,7 @@ uv add invertmeeg
 ### conda
 
 ```bash
-conda create -n invertmeeg python=3.12
+conda create -n invertmeeg python=3.14
 conda activate invertmeeg
 pip install invertmeeg
 ```

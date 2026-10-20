@@ -54,7 +54,7 @@ def _expects_simulation_config(solver_cls: type[BaseSolver]) -> bool:
 
     try:
         sig = inspect.signature(solver_cls.make_inverse_operator)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return False
 
     params = list(sig.parameters.values())

@@ -5,7 +5,7 @@
 </p>
 
 [![PyPI version](https://badge.fury.io/py/invertmeeg.svg)](https://pypi.org/project/invertmeeg/)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.14+](https://img.shields.io/badge/python-3.14%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 This package provides **96 inverse solvers** for M/EEG source imaging, integrating
@@ -23,6 +23,8 @@ The recommended way to install `invertmeeg` is using [uv](https://github.com/ast
 uv add invertmeeg
 ```
 
+Python 3.14 or newer is required. The core installation does not include neural-network, GUI, or notebook dependencies.
+
 Alternatively, you can use `pip`:
 
 ```bash
@@ -31,6 +33,7 @@ pip install invertmeeg
 
 ### Extras
 - **Neural Networks**: `uv add "invertmeeg[ann]"` (or `pip install "invertmeeg[ann]"`)
+- **Notebooks**: `uv add "invertmeeg[notebooks]"` (or `pip install "invertmeeg[notebooks]"`)
 - **Visualization**: `uv add "invertmeeg[viz]"` (or `pip install "invertmeeg[viz]"`)
 
 ## Development
@@ -45,13 +48,14 @@ This will sync all dependencies (including dev tools) and install the pre-commit
 
 ### Manual uv setup, install all packages except ann
 ```bash
-uv sync --extra viz --extra docs --group dev
+uv sync --locked --extra viz --extra docs --extra notebooks
 ```
 
 ### Useful Commands
 - `make lint`: Run Ruff and Mypy checks.
 - `make format`: Auto-format code with Ruff.
-- `make test`: Run the test suite with pytest.
+- `make test`: Run the fast test suite with pytest.
+- `make test-all`: Run the complete suite, including accuracy and orientation regressions.
 - `make check`: Run all linting and tests.
 - `make clean`: Remove temporary cache files (__pycache__, .mypy_cache, etc.).
 

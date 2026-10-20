@@ -215,7 +215,7 @@ class SolverDSPM(BaseSolver):
         ]
         return self
 
-    def apply_inverse_operator(self, mne_obj) -> "mne.SourceEstimate":  # type: ignore[name-defined]
+    def apply_inverse_operator(self, mne_obj) -> mne.SourceEstimate:  # type: ignore[name-defined]
         """Apply dSPM operator with regularization chosen on the MNE kernel.
 
         dSPM is a *noise-normalized* version of the MNE estimate. Regularization

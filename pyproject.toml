@@ -1,35 +1,32 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [project]
 name = "invertmeeg"
-version = "1.1.0"
+version = "1.2.0"
 description = "A high-level Python library for M/EEG inverse solutions"
 readme = "README.md"
-license = {file = "LICENSE"}
-requires-python = ">=3.10"
+license = "GPL-3.0-only"
+license-files = ["LICENSE"]
+requires-python = ">=3.14"
 authors = [
     { name = "Lukas Hecker", email = "lukas.hecker.job@gmail.com" },
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Programming Language :: Python :: 3.14",
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "numpy<2; python_version<'3.11'",
-    "numpy>=2; python_version>='3.11'",
-    "scipy",
-    "mne",
-    "scikit-learn",
-    "matplotlib",
+    "numpy>=2.4",
+    "scipy>=1.17",
+    "mne>=1.11",
+    "scikit-learn>=1.8",
+    "matplotlib>=3.10",
     "tqdm",
-    "pandas",
-    "POT",
+    "pandas>=3",
+    "POT>=0.9.6.post1",
     "nibabel>=5.3.3",
     "pydantic>=2.12.5",
     "seaborn>=0.13.2",
@@ -40,7 +37,7 @@ invertmeeg = "invert.__main__:main"
 
 [project.optional-dependencies]
 ann = [
-    "torch",
+    "torch>=2.10",
 ]
 viz = [
     "pyvista",
@@ -52,15 +49,9 @@ docs = [
     "mkdocstrings[python]",
     "mkdocs-gen-files",
     "mkdocs-literate-nav",
-    "ruff",
 ]
-dev = [
-    "pytest",
-    "pytest-timeout",
-    "ruff",
-    "mypy",
-    "pre-commit",
-    "invertmeeg[ann,viz]",
+notebooks = [
+    "ipykernel",
 ]
 
 [project.urls]
@@ -79,7 +70,7 @@ markers = [
 
 [tool.ruff]
 line-length = 88
-target-version = "py310"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = [
@@ -109,7 +100,7 @@ ignore = [
 "invert/solvers/neural_networks/*.py" = ["E402"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.14"
 warn_return_any = false
 warn_unused_configs = true
 disallow_untyped_defs = false
@@ -118,5 +109,11 @@ exclude = ["_old/", "scripts/old/"]
 
 [dependency-groups]
 dev = [
-    "ipykernel>=6.31.0",
+    "pytest>=9",
+    "pytest-timeout>=2.4",
+    "ruff",
+    "mypy",
+    "pre-commit",
+    "pip-audit",
+    "twine",
 ]

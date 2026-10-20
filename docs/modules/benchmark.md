@@ -28,6 +28,7 @@ results = runner.run()
 
 # Visualize results
 from invert.benchmark import visualize_results
+
 visualize_results(results)
 ```
 

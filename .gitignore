@@ -48,3 +48,12 @@ results/*
 # !results/benchmark_results*.json
 !results/release/
 scripts/quick_eval.py
+
+# Local Python environment and tool caches
+.venv/
+.ruff_cache/
+.mypy_cache/
+__pycache__/
+.mne_test_home/
+mne_data/
+.mne-data/

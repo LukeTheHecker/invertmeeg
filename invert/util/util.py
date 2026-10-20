@@ -36,7 +36,7 @@ def read_solver(path, name="instance", custom_objects=None):
                 from ..solvers.esinet import CustomConv2D
 
                 custom_objects["CustomConv2D"] = CustomConv2D
-            except (ImportError, AttributeError):
+            except ImportError, AttributeError:
                 pass
 
         # Add loss function if the solver has one and it's not in custom_objects
@@ -73,7 +73,7 @@ def read_solver(path, name="instance", custom_objects=None):
             from ..solvers.esinet import CustomConv2D
 
             custom_objects["CustomConv2D"] = CustomConv2D
-        except (ImportError, AttributeError):
+        except ImportError, AttributeError:
             pass
         model = tf.keras.models.load_model(path, custom_objects=custom_objects)
         solver.model = model
@@ -138,7 +138,7 @@ def pos_from_forward(forward, verbose=0):
                     s["vertno"], hemi_idx, subject_his_id, verbose=verbose
                 )
             )
-    except (FileNotFoundError, OSError, TypeError):
+    except FileNotFoundError, OSError, TypeError:
         # Fallback: use source-space positions directly (head coordinates)
         logger.info(
             "FreeSurfer surfaces not found for %s, using source-space "
