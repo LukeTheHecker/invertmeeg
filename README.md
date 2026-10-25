@@ -37,6 +37,8 @@ pip install invertmeeg
 
 If you are contributing to `invertmeeg`, we use `uv` and `make` to manage the development environment and code quality.
 
+Dependencies are declared in `pyproject.toml` and locked in `uv.lock`; use `uv sync` instead of maintaining a separate pinned requirements file.
+
 ### Setup
 ```bash
 make install
