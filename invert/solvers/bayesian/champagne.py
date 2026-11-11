@@ -366,6 +366,17 @@ class SolverChampagne(BaseSolver):
         for i_iter in range(self.max_iter):
             old_gammas = gammas.copy()
 
+            joint_diagonal_mm = (
+                self.noise_learning == "learn"
+                and self.noise_learning_mode in {"diagonal", "precision"}
+                and rule_lower in {"convexity", "mm"}
+            )
+            if joint_diagonal_mm:
+                residuals_old = Y_scaled - L @ mu_x
+                noise_cov_next = self._update_noise_covariance_pruned(
+                    residuals_old, L, gammas, Sigma_y_inv, noise_cov, n_times
+                )
+
             # SiL cached from posterior recompute (or initial)
             z_diag = np.sum(L * SiL, axis=0)
 
@@ -460,8 +471,11 @@ class SolverChampagne(BaseSolver):
                 gammas = gammas[active_set_idc]
                 L = L[:, active_set_idc]
 
-            # Update noise covariance if learning is enabled
-            if self.noise_learning == "learn":
+            if joint_diagonal_mm:
+                noise_cov = noise_cov_next
+
+            # Other modes retain their existing update schedule.
+            if self.noise_learning == "learn" and not joint_diagonal_mm:
                 # Compute pruned posterior mean using only active columns
                 L_act_full = L_full_scaled[:, active_set]
                 SiL_act = Sigma_y_inv @ L_act_full
@@ -769,31 +783,22 @@ class SolverChampagne(BaseSolver):
             S = np.diag(p)
 
         elif update_mode == "geodesic":
-            # CORRECTED geodesic update (fixed eigenvalue decomposition)
-            eps_default = 1e-8
-
-            # Proper eigenvalue decomposition (FIXED)
-            eigenvals, eigenvecs = np.linalg.eig(C)
-            eigenvals = np.real(eigenvals)
-            eigenvals_sqrt = np.sqrt(np.maximum(eigenvals, eps_default))
-
-            # Build inverse square root of C
-            inv_sqrt_eigenvals = np.zeros_like(eigenvals)
-            valid_idx = eigenvals_sqrt >= eps_default
-            inv_sqrt_eigenvals[valid_idx] = 1.0 / eigenvals_sqrt[valid_idx]
-
-            # Reconstruct matrices
-            sqrt_C = eigenvecs @ np.diag(eigenvals_sqrt) @ eigenvecs.T
-            inv_sqrt_C = eigenvecs @ np.diag(inv_sqrt_eigenvals) @ eigenvecs.T
-
-            # Inner eigenvalue decomposition
-            inner_mat = inv_sqrt_C @ M @ inv_sqrt_C
-            inner_eigenvals, inner_eigenvecs = np.linalg.eig(inner_mat)
-            inner_eigenvals_sqrt = np.sqrt(np.maximum(np.real(inner_eigenvals), 0))
-            A = inner_eigenvecs @ np.diag(inner_eigenvals_sqrt) @ inner_eigenvecs.T
-
-            # Final result
-            S = sqrt_C @ A @ sqrt_C
+            # Solve S C S = M for SPD precision C and PSD residual moment M.
+            C = 0.5 * (C + C.T)
+            eigenvals, eigenvecs = np.linalg.eigh(C)
+            floor = np.finfo(float).eps * max(
+                float(eigenvals.max()), np.finfo(float).tiny
+            )
+            root = np.sqrt(np.maximum(eigenvals, floor))
+            sqrt_C = (eigenvecs * root) @ eigenvecs.T
+            inv_sqrt_C = (eigenvecs / root) @ eigenvecs.T
+            inner = sqrt_C @ (0.5 * (M + M.T)) @ sqrt_C
+            inner_vals, inner_vecs = np.linalg.eigh(0.5 * (inner + inner.T))
+            inner_sqrt = (
+                inner_vecs * np.sqrt(np.maximum(inner_vals, 0.0))
+            ) @ inner_vecs.T
+            S = inv_sqrt_C @ inner_sqrt @ inv_sqrt_C
+            S = 0.5 * (S + S.T)
 
         else:
             raise ValueError(

@@ -8,7 +8,7 @@
 [![Python 3.14+](https://img.shields.io/badge/python-3.14%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-This package provides **96 inverse solvers** for M/EEG source imaging, integrating
+This package provides **98 inverse solvers** for M/EEG source imaging, integrating
 with the [mne-python](https://mne.tools) framework. It covers minimum norm
 methods, beamformers, Bayesian approaches, sparse recovery, subspace methods,
 and deep learning models in a unified API.
@@ -73,9 +73,22 @@ stc = solver.apply_inverse_operator(evoked)
 stc.plot()
 ```
 
+### Mixed-norm solvers
+
+Use `Solver("irmxne")` for iterative reweighting of the spatial groups or
+`Solver("tf-mxne", wsize=64, tstep=4)` for sparse time-frequency activity. Both
+accept fixed, PCA, and free orientations. For PCA, pass the data to
+`make_inverse_operator` along with the forward. The TF-MxNE window and step are
+specified in samples.
+
+For both solvers, `alpha` is a fraction from 0 to 1 of the convex penalty that
+sets all coefficients to zero. The default and `alpha="auto"` both use 0.2.
+Inspect `last_solver_info` after fitting for the available convergence
+diagnostics.
+
 ## Features
 
-- **96 inverse solvers** accessible through a single `Solver("solver_id")` interface
+- **98 inverse solvers** accessible through a single `Solver("solver_id")` interface
 - [**Interactive benchmark leaderboard**](https://lukethehecker.github.io/invertmeeg/benchmarks/) -- compare solver performance across datasets, metrics, and categories
 - Automatic regularization (GCV, L-curve, product methods)
 - Returns standard `mne.SourceEstimate` objects
@@ -85,7 +98,7 @@ stc.plot()
 
 | Category | Count | Examples |
 |----------|-------|---------|
-| Minimum Norm | 9 | MNE, wMNE, dSPM, FISTA, GFT-MNE |
+| Minimum Norm | 11 | MNE, wMNE, dSPM, FISTA, GFT-MNE |
 | LORETA | 4 | LORETA, sLORETA, eLORETA, SSLOFO |
 | Other Minimum-Norm-like | 3 | LAURA, Backus-Gilbert, S-MAP |
 | Bayesian | 21 | Champagne variants, Gamma-MAP, MSP, CMEM, VB-SBL |
@@ -111,6 +124,8 @@ stc.plot()
 | Minimum Current Estimate | "l1", "fista", "mce" |
 | Minimum L1 Norm GPT | "gpt", "l1-gpt" |
 | Minimum L1L2 Norm | "l1l2" |
+| Iterative Reweighted Mixed-Norm Estimate | "irmxne", "ir-mxne" |
+| Time-Frequency Mixed-Norm Estimate | "tf-mxne", "tfmxne" |
 | GFT Minimum L1 Norm | "gft-l1" |
 | Self-Regularized eLORETA | "sr-eloreta", "self-regularized-eloreta" |
 

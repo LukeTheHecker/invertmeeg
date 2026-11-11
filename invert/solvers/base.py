@@ -1019,6 +1019,10 @@ class BaseSolver:
 
         raise ValueError(f"Invalid source_cov with ndim={source_cov.ndim}")
 
+    @staticmethod
+    def _make_sensor_projector(projs, ch_names, bads):
+        return mne.make_projector(projs, ch_names, bads=bads, verbose=0)
+
     def compute_sensor_projector(
         self,
         forward_or_info: Any | None = None,
@@ -1071,9 +1075,7 @@ class BaseSolver:
             ch_names = [str(i) for i in range(n_chans)]
 
         try:
-            projector, _nproj, _ = mne.make_projector(
-                projs, ch_names, bads=bads, verbose=0
-            )
+            projector, _nproj, _ = self._make_sensor_projector(projs, ch_names, bads)
             projector = np.asarray(projector, dtype=float)
             if projector.shape != (n_chans, n_chans):
                 msg = (
@@ -2544,6 +2546,24 @@ class BaseSolver:
             reg = 1e-12 * np.eye(matrix.shape[0])
             return np.linalg.matrix_power(matrix + reg, power)
 
+    def _source_subject(self):
+        """Prefer the anatomical source-space subject over a shared default tag."""
+        subjects = {
+            src.get("subject_his_id")
+            for src in self.forward["src"]
+            if src.get("subject_his_id")
+        }
+        if len(subjects) > 1:
+            raise ValueError(
+                "One source estimate cannot contain multiple anatomical subjects"
+            )
+        if subjects:
+            return next(iter(subjects))
+        subject_info = self.obj_info.get("subject_info")
+        if isinstance(subject_info, dict) and "his_id" in subject_info:
+            return subject_info["his_id"]
+        return "fsaverage"
+
     def source_to_object(
         self, source_mat: npt.NDArray[np.floating]
     ) -> mne.SourceEstimate:
@@ -2597,13 +2617,7 @@ class BaseSolver:
         tmin = self.tmin
         sfreq = self.obj_info["sfreq"]
         tstep = 1 / sfreq
-        subject = self.obj_info["subject_info"]
-
-        if isinstance(subject, dict) and "his_id" in subject:
-            subject = subject["his_id"]
-        # else assume fsaverage as subject id
-        else:
-            subject = "fsaverage"
+        subject = self._source_subject()
 
         if len(vertices) == 2 and all(src_type == "surf" for src_type in src_types):
             stc = mne.SourceEstimate(
@@ -2641,7 +2655,12 @@ class BaseSolver:
         | mne.VolVectorSourceEstimate
         | mne.MixedVectorSourceEstimate
     ):
-        """Convert a (3*n_sources, n_times) matrix into a VectorSourceEstimate."""
+        """Convert local forward coefficients to a Cartesian VectorSourceEstimate.
+
+        Free surface forwards can use a local tangential/normal basis. MNE
+        vector STCs use Cartesian components, obtained with the transpose of
+        each source_nn basis, as in MNE's own source-estimate conversion.
+        """
 
         # Undo depth weighting only for solvers that explicitly use it.
         if (
@@ -2668,6 +2687,10 @@ class BaseSolver:
 
         n_src = int(source_mat.shape[0] // n_orient)
         vec = source_mat.reshape(n_src, n_orient, -1)
+        basis = np.asarray(self.forward["source_nn"], dtype=float)
+        if basis.shape != (n_src * 3, 3):
+            raise ValueError("Free source_nn must contain one 3x3 basis per source")
+        vec = np.einsum("nki,nkt->nit", basis.reshape(n_src, 3, 3), vec)
 
         source_model = self.forward["src"]
         vertices = [np.asarray(s["vertno"]) for s in source_model]
@@ -2675,12 +2698,7 @@ class BaseSolver:
         tmin = self.tmin
         sfreq = self.obj_info["sfreq"]
         tstep = 1 / sfreq
-        subject = self.obj_info["subject_info"]
-
-        if isinstance(subject, dict) and "his_id" in subject:
-            subject = subject["his_id"]
-        else:
-            subject = "fsaverage"
+        subject = self._source_subject()
 
         if len(vertices) == 2 and all(src_type == "surf" for src_type in src_types):
             return mne.VectorSourceEstimate(

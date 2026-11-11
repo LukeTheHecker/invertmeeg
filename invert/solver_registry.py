@@ -94,6 +94,20 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         aliases=("mce-l1l2",),
     ),
     SolverSpec(
+        solver_id="irmxne",
+        module_path="invert.solvers.minimum_norm.mixed_norm",
+        class_name="SolverIRMxNE",
+        aliases=("ir-mxne", "iterative-mxne"),
+        display_name="irMxNE",
+    ),
+    SolverSpec(
+        solver_id="tf-mxne",
+        module_path="invert.solvers.minimum_norm.mixed_norm",
+        class_name="SolverTFMxNE",
+        aliases=("tfmxne", "time-frequency-mxne"),
+        display_name="TF-MxNE",
+    ),
+    SolverSpec(
         solver_id="mxne-bcd",
         module_path="invert.solvers.minimum_norm.mxne",
         class_name="SolverMxNEBCD",

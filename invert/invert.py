@@ -51,6 +51,8 @@ def _build_registry() -> dict[str, Any]:
     _add(["gpt", "l1-gpt", "l1gpt"], solvers.SolverMinimumL1NormGPT)
     _add("l1l2", solvers.SolverMinimumL1L2Norm)
     _add(["mxne", "mxne-bcd", "mixed-norm-bcd"], solvers.SolverMxNEBCD)
+    _add(["irmxne", "ir-mxne", "iterative-mxne"], solvers.SolverIRMxNE)
+    _add(["tf-mxne", "tfmxne", "time-frequency-mxne"], solvers.SolverTFMxNE)
     _add(["gft-l1", "gft-minimum-l1"], solvers.SolverGFTMinimumL1Norm)
     _add(
         ["self-regularized-eloreta", "sr-eloreta", "sreloreta"],

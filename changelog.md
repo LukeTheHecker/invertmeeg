@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.3.0 — Mixed-norm solvers and numerical corrections
+
+- Add irMxNE (`irmxne`) for reweighted sparse estimation and TF-MxNE
+  (`tf-mxne`) for time-frequency sparse estimation. Both are opt-in through
+  `Solver` and support fixed, PCA, and free orientations.
+- Keep the anatomical subject from the forward model in MNE source estimates
+  and convert free-orientation vector output to Cartesian components.
+- Use consistent posterior statistics for Champagne's diagonal MM noise update
+  and correct the full-noise geodesic covariance update.
+- Keep the cMEM objective and gradient consistent at high energies and align
+  VB-SBL data to the channels selected by whitening.
+- Keep SESAME's best particle aligned with its pre-resampling residual.
+- Update the locked Tornado version used by the optional notebook dependencies.
+
 ## 1.2.0 — Python 3.14 maintenance update
 
 - Require Python 3.14 or newer and refresh the complete dependency lockfile.

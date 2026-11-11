@@ -179,6 +179,11 @@ class SolverSESAME(BaseSolver):
 
             particles = new_particles
 
+            best_idx = int(np.argmin(rss_list))
+            residual_best = residuals[best_idx]
+            best_dipoles = particles[best_idx].astype(int)
+            best_rss = float(rss_list[best_idx])
+
             ess = 1.0 / float(np.sum(weights * weights))
             if ess < float(resample_threshold) * len(particles):
                 idx = rng.choice(
@@ -189,11 +194,6 @@ class SolverSESAME(BaseSolver):
                 weights = np.full(
                     len(particles), 1.0 / len(particles), dtype=np.float64
                 )
-
-            best_idx = int(np.argmin(rss_list))
-            residual_best = residuals[best_idx]
-            best_dipoles = particles[best_idx].astype(int)
-            best_rss = float(rss_list[best_idx])
 
         if best_dipoles.size == 0:
             # Fallback: match ECD (single best dipole)

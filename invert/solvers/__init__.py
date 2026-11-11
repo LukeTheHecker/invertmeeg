@@ -28,6 +28,8 @@ __all__ = [
     "SolverMinimumL1NormGPT",
     "SolverMinimumL1L2Norm",
     "SolverMxNEBCD",
+    "SolverIRMxNE",
+    "SolverTFMxNE",
     "SolverGFTMinimumL1Norm",
     "SolverSelfRegularizedELORETA",
     "SolverTotalVariation",
