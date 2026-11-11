@@ -126,6 +126,11 @@ class SolverSSPIRESMV(BaseBeamformer):
         C = y @ y.T
         C_sub = self.select_signal_subspace(C)
         eigs = np.linalg.svd(C, compute_uv=False)
+        # Dimensionless eigenvalue weighting preserves relative subspace
+        # weights without multiplying output amplitudes by covariance power.
+        covariance_scale = float(eigs.max())
+        if covariance_scale > 0.0:
+            C_sub = C_sub / covariance_scale
 
         # Warm start: boost SSP-identified sources
         w = np.ones(n_dipoles) * 0.1

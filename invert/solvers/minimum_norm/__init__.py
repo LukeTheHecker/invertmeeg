@@ -11,6 +11,7 @@ from .loreta import SolverLORETA
 from .minimum_l1_l2_norm import SolverMinimumL1L2Norm
 from .minimum_l1_norm import SolverMinimumL1Norm
 from .minimum_l1_norm_gpt import SolverMinimumL1NormGPT
+from .mixed_norm import SolverIRMxNE, SolverTFMxNE
 from .mne import SolverMNE
 from .mxne import SolverMxNEBCD
 from .self_regularized import SolverSelfRegularizedELORETA
@@ -32,6 +33,8 @@ __all__ = [
     "SolverMinimumL1NormGPT",
     "SolverMinimumL1L2Norm",
     "SolverMxNEBCD",
+    "SolverIRMxNE",
+    "SolverTFMxNE",
     "SolverLORETA",
     "SolverSLORETA",
     "SolverELORETA",

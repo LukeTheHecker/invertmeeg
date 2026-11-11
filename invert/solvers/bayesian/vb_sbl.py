@@ -64,10 +64,9 @@ class SolverVBSBL(BaseSolver):
     ):
         super().make_inverse_operator(forward, mne_obj, *args, alpha=alpha, **kwargs)
 
+        wf = self.prepare_whitened_forward(noise_cov)
         Y = self.unpack_data_obj(mne_obj)
         Y = Y - Y.mean(axis=0, keepdims=True)
-
-        wf = self.prepare_whitened_forward(noise_cov)
         Yw = wf.sensor_transform @ Y
 
         data_cov = self.data_covariance(Yw, center=False, ddof=1)

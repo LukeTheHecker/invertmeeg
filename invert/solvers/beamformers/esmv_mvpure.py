@@ -106,6 +106,11 @@ class SolverESMVMVPURE(BaseBeamformer):
         I = np.identity(n_chans)
         C = self.data_covariance(y, center=False, ddof=1)
         C_sub = self.select_signal_subspace(C)
+        # Dimensionless eigenvalue weighting preserves relative subspace
+        # weights without multiplying output amplitudes by covariance power.
+        covariance_scale = float(np.linalg.norm(C, ord=2))
+        if covariance_scale > 0.0:
+            C_sub = C_sub / covariance_scale
         cov_mats, self.alphas, cov_meta = build_covariance_candidates(
             C=C,
             I=I,

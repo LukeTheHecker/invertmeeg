@@ -750,7 +750,15 @@ def _mem_dual_obj_grad(lambda_vec, y_t, L, precomputed, w_full):
         denom = (1.0 - alpha_k) + alpha_k * exp_E
         p_k = alpha_k * exp_E / denom
 
-        obj += np.log(denom)
+        if E_k > 500.0:
+            # Avoid clipping the dual objective while differentiating the
+            # unclipped energy. Preserve the ordinary-energy arithmetic.
+            log_active = np.log(alpha_k) + float(E_k)
+            log_partition = np.logaddexp(np.log1p(-alpha_k), log_active)
+            p_k = np.exp(log_active - log_partition)
+            obj += log_partition
+        else:
+            obj += np.log(denom)
         w_full[vertices] = p_k * (mu_k + Sigma_xi)
 
     grad += L @ w_full
