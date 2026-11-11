@@ -5,8 +5,6 @@
 - Add irMxNE (`irmxne`) for reweighted sparse estimation and TF-MxNE
   (`tf-mxne`) for time-frequency sparse estimation. Both are opt-in through
   `Solver` and support fixed, PCA, and free orientations.
-- Build SSP projectors with the current MNE API so EEG average reference and
-  other configured projections are applied in the inverse pipeline.
 - Keep the anatomical subject from the forward model in MNE source estimates
   and convert free-orientation vector output to Cartesian components.
 - Use consistent posterior statistics for Champagne's diagonal MM noise update

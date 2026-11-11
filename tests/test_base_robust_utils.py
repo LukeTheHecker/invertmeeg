@@ -48,17 +48,6 @@ def test_compute_sensor_projector_identity_without_projs():
     np.testing.assert_allclose(projector, np.eye(3))
 
 
-def test_compute_sensor_projector_applies_eeg_average_reference():
-    info = mne.create_info(["Fp1", "Fp2", "Cz"], 200.0, "eeg")
-    evoked = mne.EvokedArray(np.eye(3), info, verbose=False)
-    evoked.set_eeg_reference("average", projection=True, verbose=False)
-    projector = BaseSolver().compute_sensor_projector(
-        forward_or_info=evoked.info, n_chans=3
-    )
-
-    np.testing.assert_allclose(projector, np.eye(3) - np.ones((3, 3)) / 3)
-
-
 def test_compute_sensor_whitener_whitens_retained_subspace():
     noise_cov = np.diag([4.0, 1.0, 0.0])
     whitener = BaseSolver.compute_sensor_whitener(noise_cov, rank_tol=1e-12, eps=1e-15)

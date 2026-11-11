@@ -38,6 +38,16 @@ def test_factory(solver_id, cls):
 
 
 @pytest.mark.parametrize("cls", [SolverIRMxNE, SolverTFMxNE])
+def test_mixed_norm_applies_eeg_average_reference(cls, forward_model, simulated_evoked):
+    n_channels = len(forward_model.ch_names)
+    solver = cls()
+    solver.make_inverse_operator(forward_model, simulated_evoked)
+
+    projector = np.eye(n_channels) - np.ones((n_channels, n_channels)) / n_channels
+    np.testing.assert_allclose(solver._sensor_transform, projector)
+
+
+@pytest.mark.parametrize("cls", [SolverIRMxNE, SolverTFMxNE])
 def test_whitening_scaling_zero_and_channels(cls, forward_model, simulated_evoked):
     fwd, evoked = forward_model, simulated_evoked
     cov = mne.Covariance(

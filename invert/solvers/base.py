@@ -13,7 +13,6 @@ import mne
 import numpy as np
 import numpy.typing as npt
 from mne.io.constants import FIFF
-from mne.proj import make_projector
 
 from ..util import find_corner
 from .orientation import (
@@ -1020,6 +1019,10 @@ class BaseSolver:
 
         raise ValueError(f"Invalid source_cov with ndim={source_cov.ndim}")
 
+    @staticmethod
+    def _make_sensor_projector(projs, ch_names, bads):
+        return mne.make_projector(projs, ch_names, bads=bads, verbose=0)
+
     def compute_sensor_projector(
         self,
         forward_or_info: Any | None = None,
@@ -1072,7 +1075,7 @@ class BaseSolver:
             ch_names = [str(i) for i in range(n_chans)]
 
         try:
-            projector, _nproj, _ = make_projector(projs, ch_names, bads=bads)
+            projector, _nproj, _ = self._make_sensor_projector(projs, ch_names, bads)
             projector = np.asarray(projector, dtype=float)
             if projector.shape != (n_chans, n_chans):
                 msg = (
