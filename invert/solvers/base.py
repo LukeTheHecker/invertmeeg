@@ -13,6 +13,7 @@ import mne
 import numpy as np
 import numpy.typing as npt
 from mne.io.constants import FIFF
+from mne.proj import make_projector
 
 from ..util import find_corner
 from .orientation import (
@@ -1071,9 +1072,7 @@ class BaseSolver:
             ch_names = [str(i) for i in range(n_chans)]
 
         try:
-            projector, _nproj, _ = mne.make_projector(
-                projs, ch_names, bads=bads, verbose=0
-            )
+            projector, _nproj, _ = make_projector(projs, ch_names, bads=bads)
             projector = np.asarray(projector, dtype=float)
             if projector.shape != (n_chans, n_chans):
                 msg = (
