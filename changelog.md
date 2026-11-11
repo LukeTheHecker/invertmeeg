@@ -11,8 +11,7 @@
   and correct the full-noise geodesic covariance update.
 - Keep the cMEM objective and gradient consistent at high energies and align
   VB-SBL data to the channels selected by whitening.
-- Normalize covariance eigenweights in four ESMV variants to preserve output
-  scaling and keep SESAME's best particle aligned with its pre-resampling residual.
+- Keep SESAME's best particle aligned with its pre-resampling residual.
 - Update the locked Tornado version used by the optional notebook dependencies.
 
 ## 1.2.0 — Python 3.14 maintenance update
