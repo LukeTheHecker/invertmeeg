@@ -123,9 +123,16 @@ class SolverSSPIRESMV(BaseBeamformer):
         # --- Phase 2: IR-ESMV with SSP warm start ---
         # Initialize weights from SSP support
         L = leadfield / np.linalg.norm(leadfield, axis=0)
-        C = y @ y.T
-        C_sub = self.select_signal_subspace(C)
+        data_scale = np.max(np.abs(y))
+        if data_scale == 0:
+            return np.zeros((n_dipoles, y.shape[1]))
+        y_unit = y / data_scale
+        C = y_unit @ y_unit.T
+        C /= np.linalg.norm(C, ord=2)
+        C_sub = self.select_signal_subspace(C, rank=self.rank)
         eigs = np.linalg.svd(C, compute_uv=False)
+        if eigs.max() > 0:
+            C_sub /= eigs.max()
 
         # Warm start: boost SSP-identified sources
         w = np.ones(n_dipoles) * 0.1
@@ -147,7 +154,7 @@ class SolverSSPIRESMV(BaseBeamformer):
 
             power = np.sqrt(np.mean(x**2, axis=1))
             power_max = power.max()
-            if power_max < 1e-15:
+            if power_max == 0:
                 break
 
             w = (power / power_max) ** self.sparsity_exponent

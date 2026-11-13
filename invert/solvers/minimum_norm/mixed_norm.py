@@ -17,7 +17,6 @@ from mne.inverse_sparse.mxne_optim import (
     norm_epsilon_inf,
     tf_mixed_norm_solver,
 )
-from mne.proj import make_projector
 
 from ..base import BaseSolver, SolverMeta
 from .irmxne_optim import iterative_mixed_norm_solver_safe
@@ -36,10 +35,6 @@ class _MixedNormBase(BaseSolver):
         self.depth = depth
         self.debias = debias
         super().__init__(**kwargs)
-
-    @staticmethod
-    def _make_sensor_projector(projs, ch_names, bads):
-        return make_projector(projs, ch_names, bads=bads)
 
     def make_inverse_operator(
         self, forward, *args, alpha=0.2, noise_cov=None, **kwargs

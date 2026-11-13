@@ -105,7 +105,10 @@ class SolverESMVMVPURE(BaseBeamformer):
         y -= y.mean(axis=1, keepdims=True)
         I = np.identity(n_chans)
         C = self.data_covariance(y, center=False, ddof=1)
-        C_sub = self.select_signal_subspace(C)
+        C_sub = self.select_signal_subspace(C, rank=self.rank)
+        covariance_scale = float(np.linalg.norm(C, ord=2))
+        if covariance_scale > 0:
+            C_sub /= covariance_scale
         cov_mats, self.alphas, cov_meta = build_covariance_candidates(
             C=C,
             I=I,

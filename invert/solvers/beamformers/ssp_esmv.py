@@ -127,10 +127,17 @@ class SolverSSPESMV(BaseBeamformer):
         L_T_norm = L_T / np.linalg.norm(L_T, axis=0)
 
         # Eigenspace beamformer on the reduced problem
-        C = y @ y.T
-        C_sub = self.select_signal_subspace(C)
+        data_scale = np.max(np.abs(y))
+        if data_scale == 0:
+            return np.zeros((n_dipoles, y.shape[1]))
+        y_unit = y / data_scale
+        C = y_unit @ y_unit.T
+        C /= np.linalg.norm(C, ord=2)
+        C_sub = self.select_signal_subspace(C, rank=self.rank)
 
         eigs = np.linalg.svd(C, compute_uv=False)
+        if eigs.max() > 0:
+            C_sub /= eigs.max()
         alpha_val = eigs.max() * 1e-3  # moderate regularization
 
         I = np.eye(n_chans)

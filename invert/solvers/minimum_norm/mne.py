@@ -43,14 +43,24 @@ class SolverMNE(BaseSolver):
         self,
         name="Minimum Norm Estimate",
         use_noise_whitener: bool = True,
+        depth: float | None = None,
+        depth_limit: float = 10.0,
         rank_tol: float = 1e-12,
         eps: float = 1e-15,
         **kwargs,
     ):
         self.name = name
         self.use_noise_whitener = bool(use_noise_whitener)
+        if depth is not None and (not np.isfinite(depth) or not 0 <= depth <= 1):
+            raise ValueError("depth must be None or a finite value in [0, 1]")
+        if not np.isfinite(depth_limit) or depth_limit < 1:
+            raise ValueError("depth_limit must be finite and at least 1")
+        self.depth = depth
+        self.depth_limit = float(depth_limit)
         self.rank_tol = float(rank_tol)
         self.eps = float(eps)
+        if depth is not None:
+            kwargs["use_depth_weighting"] = False
         super().__init__(**kwargs)
         self.require_recompute = False
         self.require_data = False
@@ -91,7 +101,7 @@ class SolverMNE(BaseSolver):
             if noise_cov is None:
                 wf = self.prepare_whitened_forward(
                     None,
-                    apply_projector_when_no_cov=False,
+                    apply_projector_when_no_cov=True,
                     rank_tol=self.rank_tol,
                     eps=self.eps,
                 )
@@ -108,29 +118,44 @@ class SolverMNE(BaseSolver):
 
         leadfield_sensor = wf.G_white
         sensor_transform = wf.sensor_transform
+        prior_sqrt = np.ones(leadfield_sensor.shape[1])
+        if self.depth is not None and self.depth > 0:
+            # Build the prior after channel selection, SSP and whitening.
+            n_orient = self._n_orient
+            blocks = leadfield_sensor.reshape(leadfield_sensor.shape[0], -1, n_orient)
+            sensitivity = (
+                np.linalg.norm(blocks.transpose(1, 0, 2), ord=2, axis=(1, 2)) ** 2
+            )
+            maximum = float(sensitivity.max())
+            if maximum > 0:
+                relative = np.maximum(sensitivity / maximum, 1 / self.depth_limit**2)
+                prior_sqrt = np.repeat(relative ** (-self.depth / 2), n_orient)
+        effective_gain = leadfield_sensor * prior_sqrt
 
         # Keep alpha scaling consistent with the actual leadfield used to build K.
-        self.get_alphas(reference=leadfield_sensor @ leadfield_sensor.T)
+        self.get_alphas(reference=effective_gain @ effective_gain.T)
 
         inverse_operators = []
         if self.use_noise_whitener:
-            U, singular_values, Vt = np.linalg.svd(
-                leadfield_sensor, full_matrices=False
-            )
+            U, singular_values, Vt = np.linalg.svd(effective_gain, full_matrices=False)
             svd = (U, singular_values, Vt)
             for alpha in self.alphas:
                 kernel_eff = self.solve_tikhonov_svd(
-                    leadfield_sensor,
+                    effective_gain,
                     float(alpha),
+                    left_scale=prior_sqrt,
                     svd=svd,
                     eps=self.eps,
                 )
                 inverse_operators.append(kernel_eff @ sensor_transform)
         else:
-            LLT = leadfield_sensor @ leadfield_sensor.T
+            LLT = effective_gain @ effective_gain.T
             I = np.identity(int(leadfield_sensor.shape[0]))
             for alpha in self.alphas:
-                kernel_eff = np.linalg.solve(LLT + float(alpha) * I, leadfield_sensor).T
+                kernel_eff = (
+                    prior_sqrt[:, None]
+                    * np.linalg.solve(LLT + float(alpha) * I, effective_gain).T
+                )
                 inverse_operators.append(kernel_eff @ sensor_transform)
 
         self.inverse_operators = [

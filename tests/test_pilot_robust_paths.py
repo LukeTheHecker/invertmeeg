@@ -96,16 +96,20 @@ def test_dspm_gcv_selects_alpha_on_mne_kernel(forward_model, simulated_evoked):
     # Recompute the GCV values the solver should have used (on MNE kernels).
     data = solver.unpack_data_obj(simulated_evoked)
     L = solver.leadfield
+    original_gain = solver._leadfield_orig
+    effective_data = solver._sensor_transform @ data
     gamma = float(solver.gcv_gamma)
     gcv_values = []
     for op in solver._mne_inverse_operators:
         W = op.data[0]
         x = W @ data
         M_hat = L @ x
-        trace_H = float(np.sum(L * W.T))
-        residual = data - M_hat
+        trace_H = float(np.sum(original_gain * W.T))
+        residual = effective_data - M_hat
         residual_ss = float(np.linalg.norm(np.asarray(residual)) ** 2)
-        effective_dof = L.shape[0] - gamma * trace_H
+        effective_dof = (
+            np.linalg.matrix_rank(solver._sensor_transform) - gamma * trace_H
+        )
         if effective_dof <= 0 or abs(effective_dof) < 1e-10:
             gcv_values.append(np.inf)
         else:
@@ -134,7 +138,7 @@ def test_esmv_robust_covariance_mode_accepts_noise_cov(forward_model, simulated_
     kernel = _kernel(solver)
     assert np.all(np.isfinite(kernel))
     assert kernel.shape[0] == solver.leadfield.shape[1]
-    assert kernel.shape[1] == solver.leadfield.shape[0]
+    assert kernel.shape[1] == len(solver.forward.ch_names)
 
 
 def test_esmv_robust_covariance_mode_maps_back_to_raw_sensors(
@@ -220,7 +224,7 @@ def test_eloreta_robust_whitener_mode_accepts_noise_cov(
     kernel = _kernel(solver)
     assert np.all(np.isfinite(kernel))
     assert kernel.shape[0] == solver.leadfield.shape[1]
-    assert kernel.shape[1] == solver.leadfield.shape[0]
+    assert kernel.shape[1] == len(solver.forward.ch_names)
 
 
 def test_eloreta_robust_whitener_mode_validates_noise_cov_shape(

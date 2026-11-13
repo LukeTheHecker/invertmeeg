@@ -592,7 +592,9 @@ class TestDepthWeightingIntegration:
         )
         processed = _get_leadfield(solver)
 
-        np.testing.assert_allclose(processed, raw_leadfield, atol=1e-12)
+        np.testing.assert_allclose(
+            processed, solver._sensor_transform @ raw_leadfield, atol=1e-12
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -971,6 +973,13 @@ class TestChampagneConvergence:
         alpha_val = solver.alphas[0]
         noise_cov_normalized = noise_cov_proj / noise_scale
         noise_cov_used = float(alpha_val) * noise_cov_normalized
+
+        eigenvalues, eigenvectors = np.linalg.eigh(wf.projector)
+        basis = eigenvectors[:, eigenvalues > 0.5].T
+        L = basis @ L
+        Y = basis @ Y
+        noise_cov_used = basis @ noise_cov_used @ basis.T
+        n_chans = len(basis)
 
         L_norms = np.maximum(np.linalg.norm(L, axis=0), 1e-15)
         L_scaled = L / L_norms

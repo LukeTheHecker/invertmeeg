@@ -92,7 +92,7 @@ class SolverELORETA(BaseSolver):
             if noise_cov is None:
                 wf = self.prepare_whitened_forward(
                     None,
-                    apply_projector_when_no_cov=False,
+                    apply_projector_when_no_cov=True,
                     trace_normalize=self.use_trace_normalization,
                     rank_tol=self.rank_tol,
                     eps=self.eps,

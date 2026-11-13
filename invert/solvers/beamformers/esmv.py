@@ -127,9 +127,11 @@ class SolverESMV(BaseBeamformer):
             leadfield_eff = wf.G_white
             y_eff = sensor_transform @ y_raw
         else:
-            sensor_transform = None
-            leadfield_eff = leadfield
-            y_eff = y_raw
+            wf = self.prepare_whitened_forward(None)
+            sensor_transform = wf.sensor_transform
+            leadfield_eff = wf.G_white
+            y_eff = sensor_transform @ y_raw
+        leadfield_eff /= np.maximum(np.linalg.norm(leadfield_eff, axis=0), self.eps)
         n_chans_eff = int(leadfield_eff.shape[0])
         I = np.identity(n_chans_eff)
 
@@ -142,8 +144,12 @@ class SolverESMV(BaseBeamformer):
         eigvecs = eigvecs[:, order]
         if isinstance(self.rank, str):
             n_comp = self.estimate_n_sources(C, method=self.rank)
-        elif isinstance(self.rank, int):
-            n_comp = self.rank
+        elif isinstance(self.rank, (int, np.integer)) and not isinstance(
+            self.rank, bool
+        ):
+            if not 1 <= self.rank <= n_chans_eff:
+                raise ValueError("rank must be between 1 and the sensor dimension")
+            n_comp = int(self.rank)
         else:
             raise ValueError(
                 f"Unknown rank: {self.rank}. Must be 'auto', 'L', 'drop', 'mean', or a positive integer."
@@ -154,10 +160,10 @@ class SolverESMV(BaseBeamformer):
         if self.subspace_weighting == "projector":
             subspace_weights = np.ones(n_comp, dtype=float)
         elif self.subspace_weighting == "sqrt_eig":
-            max_ev = max(float(np.max(signal_eigs)), self.eps)
+            max_ev = max(float(np.max(signal_eigs)), np.finfo(float).tiny)
             subspace_weights = np.sqrt(signal_eigs / max_ev)
         elif self.subspace_weighting == "eig":
-            max_ev = max(float(np.max(signal_eigs)), self.eps)
+            max_ev = max(float(np.max(signal_eigs)), np.finfo(float).tiny)
             subspace_weights = signal_eigs / max_ev
         else:
             raise ValueError(
@@ -181,7 +187,9 @@ class SolverESMV(BaseBeamformer):
 
         inverse_operators = []
         for cov_mat in cov_mats:
-            C_inv = self.robust_inverse(cov_mat)
+            # Unitless inversion keeps numerical floors independent of sensor units.
+            cov_scale = max(np.linalg.norm(cov_mat, ord=2), np.finfo(float).tiny)
+            C_inv = self.robust_inverse(cov_mat / cov_scale)
             C_inv_leadfield = C_inv @ leadfield_eff
             diag_elements = np.einsum("ij,ji->i", leadfield_eff.T, C_inv_leadfield)
             W_mv = np.zeros_like(C_inv_leadfield)
