@@ -1,6 +1,6 @@
 # Projection, rank, regularization and depth
 
-These corrections are prepared for the next release after 1.3.0.
+These corrections were introduced in invertmeeg 1.4.0.
 
 ## SSP and sensor rank
 
