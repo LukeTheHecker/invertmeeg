@@ -13,8 +13,8 @@ import mne
 import numpy as np
 import numpy.typing as npt
 from mne.io.constants import FIFF
+from mne.proj import make_projector
 
-from ..util import find_corner
 from .orientation import (
     ensure_surface_free_surf_ori,
     estimate_orientation_pca,
@@ -65,7 +65,7 @@ class WhitenedForward:
     whitener_mode: (
         str  # "projected" | "identity_projector" | "identity_projector+jitter" | "none"
     )
-    n_eff: int  # effective sensor rank (= rows of sensor_transform)
+    n_eff: int  # effective sensor rank (SSP can make the transform singular)
 
     # Populated when source_cov or depth is given
     prior_diag: np.ndarray | None = None  # (n_sources,)
@@ -849,7 +849,12 @@ class BaseSolver:
         self.store_obj_information(mne_obj)
 
         if self.reduce_rank:
-            data = self.select_signal_subspace(data, rank=self.rank)
+            # Reject SSP components before estimating the signal subspace.
+            # Otherwise a strong rejected artifact can consume the selected rank.
+            projector = self._projector_for_channels(
+                mne_obj_meeg.ch_names, mne_obj_meeg.info
+            )
+            data = self.select_signal_subspace(projector @ data, rank=self.rank)
 
         self._last_data_ch_names = tuple(mne_obj_meeg.ch_names)
 
@@ -915,7 +920,8 @@ class BaseSolver:
             Y = np.asarray(self.unpack_data_obj(mne_obj), dtype=float)
 
         if self.reduce_rank:
-            Y = self.select_signal_subspace(np.asarray(Y, dtype=float), rank=self.rank)
+            projector = self._projector_for_channels(kept, obj.info)
+            Y = self.select_signal_subspace(projector @ Y, rank=self.rank)
         return np.asarray(Y, dtype=float), kept
 
     def get_alphas(self, reference=None):
@@ -1021,15 +1027,19 @@ class BaseSolver:
 
     @staticmethod
     def _make_sensor_projector(projs, ch_names, bads):
-        return mne.make_projector(projs, ch_names, bads=bads, verbose=0)
+        return make_projector(projs, ch_names, bads=bads)
 
     def compute_sensor_projector(
         self,
         forward_or_info: Any | None = None,
         n_chans: int | None = None,
-        fallback_identity: bool = True,
+        fallback_identity: bool = False,
     ) -> np.ndarray:
-        """Compute SSP projector in sensor space (identity if unavailable)."""
+        """Compute SSP in sensor space; identity only when no projections exist.
+
+        Invalid projection metadata raises by default. ``fallback_identity=True``
+        explicitly opts into the legacy warning-and-identity fallback.
+        """
         if forward_or_info is None:
             forward_or_info = getattr(self, "forward", None)
 
@@ -1072,7 +1082,7 @@ class BaseSolver:
             return np.eye(n_chans, dtype=float)
 
         if len(ch_names) != n_chans:
-            ch_names = [str(i) for i in range(n_chans)]
+            raise ValueError("SSP projection requires matching sensor channel names")
 
         try:
             projector, _nproj, _ = self._make_sensor_projector(projs, ch_names, bads)
@@ -1089,6 +1099,22 @@ class BaseSolver:
                 raise
             logger.warning("Failed to build SSP projector (%s); using I.", err)
             return np.eye(n_chans, dtype=float)
+
+    def _projector_for_channels(self, ch_names, data_info=None):
+        """Use data SSP metadata, falling back to the forward, in channel order."""
+        if data_info is None:
+            data_obj = getattr(self, "_orientation_data_obj", None)
+            data_info = getattr(data_obj, "info", None)
+        if data_info is None or not data_info.get("projs", []):
+            data_info = self.forward["info"]
+        return self.compute_sensor_projector(
+            {
+                "projs": list(data_info.get("projs", []) or []),
+                "bads": list(data_info.get("bads", []) or []),
+                "ch_names": list(ch_names),
+            },
+            n_chans=len(ch_names),
+        )
 
     @staticmethod
     def compute_sensor_whitener(
@@ -1237,9 +1263,7 @@ class BaseSolver:
             w_max = w_min * float(depth_limit) ** 2
             weights = np.minimum(weights, w_max)
 
-        if depth != 0:
-            weights = weights ** float(depth)
-        return weights
+        return weights ** float(depth)
 
     @staticmethod
     def trace_normalize_operator(
@@ -1412,27 +1436,7 @@ class BaseSolver:
         if noise_cov_mat is None and not apply_projector_when_no_cov:
             P = np.eye(n_chans, dtype=float)
         else:
-            # Prefer projectors from the MNE data object passed to make_inverse_operator
-            # (when available). This matches MNE's behavior: whitening/projection is
-            # defined by the *data* preprocessing, and forward solutions loaded from
-            # disk can legitimately have empty info['projs'].
-            projector_source: Any = self.forward
-            data_obj = getattr(self, "_orientation_data_obj", None)
-            data_info = (
-                getattr(data_obj, "info", None) if data_obj is not None else None
-            )
-            data_projs = list(data_info.get("projs", []) or []) if data_info else []
-            if data_projs:
-                assert data_info is not None  # guaranteed by data_projs being non-empty
-                projector_source = {
-                    "projs": data_projs,
-                    "bads": list(data_info.get("bads", []) or []),
-                    "ch_names": list(forward_ch_names),
-                }
-            P = self.compute_sensor_projector(
-                forward_or_info=projector_source,
-                n_chans=n_chans,
-            )
+            P = self._projector_for_channels(forward_ch_names)
 
         # --- Sensor whitening ---
         if noise_cov_mat is not None:
@@ -1463,7 +1467,7 @@ class BaseSolver:
         else:
             sensor_transform = P  # (n_chans, n_chans)
             G_white = P @ G  # (n_chans, n_sources)
-            n_eff = n_chans
+            n_eff = int(np.linalg.matrix_rank(P))
             whitener_mode = "none"
 
         # --- Source prior ---
@@ -1493,7 +1497,9 @@ class BaseSolver:
             A, trace_scale = self.trace_normalize_operator(
                 A, target_rank=n_eff, eps=eps
             )
-            if R_sqrt is not None:
+            if R_sqrt is None:
+                R_sqrt = np.full(n_sources, trace_scale)
+            else:
                 R_sqrt = R_sqrt * trace_scale
 
         # --- SVD ---
@@ -1772,8 +1778,8 @@ class BaseSolver:
         L_orig = _lo if _lo is not None else self.leadfield
         # Residual: use whitened space if whitening was applied
         L_resid = self.leadfield  # G_white if whitened, else original
-        n_eff = L_resid.shape[0]
         _st = getattr(self, "_sensor_transform", None)
+        n_eff = L_resid.shape[0] if _st is None else int(np.linalg.matrix_rank(_st))
 
         need_trace_A2 = method in {"rgcv", "r1gcv", "composite"}
 
@@ -1810,7 +1816,7 @@ class BaseSolver:
             if need_trace_A2:
                 # A = L_orig @ W  (n_chans × n_chans — small matrix, e.g. 32×32)
                 A = L_orig @ W
-                trace_A2 = float(np.sum(A * A))  # ||A||_F² = tr(A²) since A symmetric
+                trace_A2 = float(np.einsum("ij,ji->", A, A))
 
             if method == "rgcv":
                 mu2 = trace_A2 / n_eff
@@ -1984,7 +1990,18 @@ class BaseSolver:
             Number of components based on L-curve criterion
         """
         iters = np.arange(len(D))
-        n_comp_L = find_corner(deepcopy(iters), deepcopy(D))
+        values = np.asarray(D, dtype=float)
+        if len(values) < 3:
+            return max(1, len(values) - 1)
+        scale = np.max(np.abs(values))
+        if scale == 0:
+            return 1
+        values = values / scale
+        areas = np.abs(
+            (iters[-1] - iters[0]) * (values[1:-1] - values[0])
+            - (values[-1] - values[0]) * (iters[1:-1] - iters[0])
+        )
+        n_comp_L = int(np.argmax(areas)) + 1
         return n_comp_L
 
     @staticmethod
@@ -2031,7 +2048,11 @@ class BaseSolver:
             Estimated number of active sources
         """
         # Compute data covariance
-        C = data @ data.T
+        scale = np.max(np.abs(data))
+        if scale == 0:
+            return 1
+        normalized = data / scale
+        C = normalized @ normalized.T
 
         # SVD decomposition
         _, D, _ = np.linalg.svd(C, full_matrices=False)
@@ -2068,7 +2089,11 @@ class BaseSolver:
 
     # More robust approach for correlated sources:
     def robust_estimate_n_sources(self, data):
-        C = data @ data.T
+        scale = np.max(np.abs(data))
+        if scale == 0:
+            return 1
+        normalized = data / scale
+        C = normalized @ normalized.T
         _, S, _ = np.linalg.svd(C, full_matrices=False)
         S_norm = S / S.max()
 
@@ -2112,8 +2137,10 @@ class BaseSolver:
 
         if isinstance(rank, str):
             rank = self.estimate_n_sources(data_matrix, method=rank)
-        elif isinstance(rank, int):
-            rank = rank
+        elif isinstance(rank, (int, np.integer)) and not isinstance(rank, bool):
+            if not 1 <= rank <= len(S):
+                raise ValueError("rank must be between 1 and the sensor dimension")
+            rank = int(rank)
         else:
             raise ValueError(
                 f"Unknown rank: {rank}. Must be 'auto', 'L', 'drop', 'mean', 'enhanced', or some positive integer"

@@ -91,7 +91,7 @@ class SolverSLORETA(BaseSolver):
             if noise_cov is None:
                 wf = self.prepare_whitened_forward(
                     None,
-                    apply_projector_when_no_cov=False,
+                    apply_projector_when_no_cov=True,
                     trace_normalize=self.use_trace_normalization,
                     rank_tol=self.rank_tol,
                     eps=self.eps,
@@ -175,13 +175,16 @@ class SolverSLORETA(BaseSolver):
         else:
             if self.regularisation_method.lower() == "l":
                 _, idx = self.regularise_lcurve(data, plot=self.plot_reg)
-            elif self.regularisation_method.lower() in {"gcv", "mgcv"}:
-                gamma = (
-                    self.gcv_gamma
-                    if self.regularisation_method.lower() == "gcv"
-                    else self.mgcv_gamma
+            elif self.regularisation_method.lower() in {
+                "gcv",
+                "mgcv",
+                "rgcv",
+                "r1gcv",
+                "composite",
+            }:
+                _, idx = self.regularise_gcv(
+                    data, plot=self.plot_reg, method=self.regularisation_method.lower()
                 )
-                _, idx = self.regularise_gcv(data, plot=self.plot_reg, gamma=gamma)
             elif self.regularisation_method.lower() == "product":
                 _, idx = self.regularise_product(data, plot=self.plot_reg)
             else:

@@ -93,5 +93,6 @@ nav:
     - Forward Modeling: modules/forward.md
     - Benchmarking: modules/benchmark.md
   - Leaderboard: benchmarks.md
+  - Numerical Methods: numerical-methods.md
   - API Reference: api.md
   - License: license.md

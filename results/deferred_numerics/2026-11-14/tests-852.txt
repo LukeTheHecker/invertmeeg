@@ -1,0 +1,31 @@
+........................................................................ [  8%]
+........s............................................................... [ 16%]
+........................................................................ [ 25%]
+........................................................................ [ 33%]
+........................................................................ [ 42%]
+........................................................................ [ 50%]
+........................................................................ [ 59%]
+........................................................................ [ 67%]
+........................................................................ [ 75%]
+........................................................................ [ 84%]
+........................................................................ [ 92%]
+.............................................................            [100%]
+=============================== warnings summary ===============================
+tests/test_bayesian_covariance_alignment.py::test_covariance_subset_matches_explicit_channel_selection[False]
+  /Users/lukas/projects/invert/invert-numerics-1.4/tests/test_bayesian_covariance_alignment.py:16: FutureWarning: Montage name 'standard_1020' is deprecated and will be removed in MNE 1.14. Use 'colin27_1020' instead.
+    info.set_montage("standard_1020")
+
+tests/test_eval_orientation.py::test_orientation_emd_on_tangential[champagne-adaptive]
+  /Users/lukas/projects/invert/invert-numerics-1.4/invert/solvers/bayesian/champagne.py:295: RuntimeWarning: invalid value encountered in power
+    return (upper / (z_diag + 1e-20)) ** exp
+
+tests/test_solvers.py: 12 warnings
+  /Users/lukas/projects/invert/invert-numerics-1.4/invert/solvers/bayesian/sbl_core.py:93: RuntimeWarning: invalid value encountered in sqrt
+    return np.sqrt(upper / (z_diag + 1e-20))
+
+tests/test_whitening_equivalence.py::test_dspm_noise_cov_matches_manual_prewhitened_excluding_bads
+  /Users/lukas/projects/invert/invert-numerics-1.4/tests/test_whitening_equivalence.py:53: RuntimeWarning: No average EEG reference present in info["projs"], covariance may be adversely affected. Consider recomputing covariance using with an average eeg reference projector added.
+    whitener, _ = mne.cov.compute_whitener(cov_good, ev_good.info, rank="info")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+852 passed, 1 skipped, 15 warnings in 140.60s (0:02:20)

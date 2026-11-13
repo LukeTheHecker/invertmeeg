@@ -68,12 +68,12 @@ def test_compute_sensor_whitener_respects_projector_rank_cap():
     np.testing.assert_allclose(whitened_cov, np.eye(2), atol=1e-12)
 
 
-def test_compute_depth_prior_whitened_depth_zero_returns_inverse_sensitivity():
+def test_compute_depth_prior_whitened_depth_zero_returns_identity():
     G_white = np.array([[1.0, 0.5, 2.0], [0.0, 0.5, 0.0]])
     prior = BaseSolver.compute_depth_prior_whitened(
         G_white, depth=0.0, depth_limit=10.0, eps=1e-15
     )
-    expected = 1.0 / np.sum(G_white * G_white, axis=0)
+    expected = np.ones(G_white.shape[1])
     np.testing.assert_allclose(prior, expected)
 
 

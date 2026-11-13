@@ -125,7 +125,7 @@ class SolverDSPM(BaseSolver):
             if noise_cov is None:
                 wf = self.prepare_whitened_forward(
                     None,
-                    apply_projector_when_no_cov=False,
+                    apply_projector_when_no_cov=True,
                     source_cov=source_cov,
                     depth=self.depth if self.use_depth_weighting else None,
                     depth_limit=self.depth_limit,

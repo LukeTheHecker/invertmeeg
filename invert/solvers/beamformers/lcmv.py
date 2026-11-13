@@ -186,9 +186,14 @@ class SolverLCMV(BaseBeamformer):
             leadfield_eff = wf.G_white
             y_eff = sensor_transform @ y_raw
         else:
-            sensor_transform = None
-            leadfield_eff = leadfield
-            y_eff = y_raw
+            wf = self.prepare_whitened_forward(None)
+            sensor_transform = wf.sensor_transform
+            leadfield_eff = wf.G_white
+            if not getattr(self, "_free_orientation", False):
+                leadfield_eff /= np.maximum(
+                    np.linalg.norm(leadfield_eff, axis=0), self.eps
+                )
+            y_eff = sensor_transform @ y_raw
 
         n_chans_eff = int(leadfield_eff.shape[0])
         I = np.identity(n_chans_eff)
@@ -288,13 +293,13 @@ class SolverLCMV(BaseBeamformer):
             # Map weights back to raw sensor space so the operator can be applied
             # to raw sensor data (matches dSPM-MNE pattern: K_full = K_white @ W_P).
             if self.weight_norm:
-                if sensor_transform is not None:
+                if use_robust_covariance:
                     # In whitened coordinates the sensor-noise covariance is I.
                     noise_power = np.sum(W_eff * W_eff, axis=0)
                     W_eff = W_eff / np.sqrt(np.maximum(noise_power, self.eps))
                     W_raw = sensor_transform.T @ W_eff
                 else:
-                    W_raw = W_eff
+                    W_raw = sensor_transform.T @ W_eff
                     if noise_cov_raw is not None:
                         noise_power = np.sum(
                             W_raw * (noise_cov_raw @ W_raw),

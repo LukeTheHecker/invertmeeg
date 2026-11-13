@@ -100,14 +100,9 @@ class SolverLCMVMVPURE(BaseBeamformer):
         super().make_inverse_operator(forward, mne_obj, *args, alpha=alpha, **kwargs)
         data = self.unpack_data_obj(mne_obj)
 
-        if noise_cov is None:
-            # Match vanilla LCMV exactly in the no-noise-covariance path.
-            sensor_transform = np.eye(int(self.leadfield.shape[0]), dtype=float)
-            leadfield = self.leadfield
-        else:
-            wf = self.prepare_whitened_forward(noise_cov)
-            sensor_transform = wf.sensor_transform
-            leadfield = wf.G_white
+        wf = self.prepare_whitened_forward(noise_cov)
+        sensor_transform = wf.sensor_transform
+        leadfield = wf.G_white
 
         leadfield_norm = np.linalg.norm(leadfield, axis=0, keepdims=True)
         leadfield_norm = np.where(leadfield_norm > 0, leadfield_norm, 1.0)
