@@ -12,6 +12,7 @@ This script:
 from __future__ import annotations
 
 import ast
+import gzip
 import importlib.util
 import json
 import os
@@ -22,8 +23,6 @@ from pathlib import Path
 from typing import Any
 
 import mkdocs_gen_files
-
-_RE_NAN = re.compile(r"\bNaN\b")
 
 os.environ.setdefault("MNE_DONTWRITE_HOME", "true")
 os.environ.setdefault("MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "matplotlib"))
@@ -54,9 +53,12 @@ class RunInfo:
 
 
 def _read_json_sanitized(path: Path) -> dict[str, Any]:
-    raw = path.read_text(encoding="utf-8", errors="ignore")
-    raw = _RE_NAN.sub("null", raw)
-    obj = json.loads(raw)
+    if path.suffix == ".gz":
+        with gzip.open(path, "rt", encoding="utf-8") as stream:
+            raw = stream.read()
+    else:
+        raw = path.read_text(encoding="utf-8", errors="ignore")
+    obj = json.loads(raw, parse_constant=lambda token: None)
     if not isinstance(obj, dict):
         raise ValueError(f"Expected dict JSON in {path}, got {type(obj).__name__}")
     return obj
@@ -70,7 +72,9 @@ def _has_results_list(data: dict[str, Any]) -> bool:
 def _list_runs(results_dir: Path) -> list[Path]:
     release_dir = results_dir / "release"
     if release_dir.is_dir():
-        release_runs = sorted(release_dir.glob("*.json"))
+        release_runs = sorted(
+            [*release_dir.glob("*.json"), *release_dir.glob("*.json.gz")]
+        )
         if release_runs:
             return release_runs
     # Legacy fallback
@@ -91,7 +95,13 @@ def _filter_valid_runs(paths: list[Path]) -> list[Path]:
 
 
 def _get_default_run_id(paths: list[Path]) -> str | None:
-    # Prefer the "leaderboard" stem
+    for p in paths:
+        if p.name in {
+            "leaderboard-protocol-v2.json",
+            "leaderboard-protocol-v2.json.gz",
+        }:
+            return "leaderboard-protocol-v2"
+    # Prefer the historical leaderboard when the corrected artifact is absent.
     for p in paths:
         if p.stem == "leaderboard":
             return p.stem
@@ -125,13 +135,16 @@ def _compute_all_dataset_rows(data: dict[str, Any]) -> None:
         if not isinstance(metrics, dict):
             continue
 
-        meta_by_solver.setdefault(
+        base = meta_by_solver.setdefault(
             solver,
             {
                 "solver_name": solver,
                 "category": category,
             },
         )
+
+        if isinstance(row.get("case_count"), int):
+            base["case_count"] = base.get("case_count", 0) + row["case_count"]
 
         for metric_name, stats in metrics.items():
             if not isinstance(metric_name, str) or not isinstance(stats, dict):
@@ -141,6 +154,7 @@ def _compute_all_dataset_rows(data: dict[str, Any]) -> None:
                 {
                     "mean": stats.get("mean"),
                     "median": stats.get("median"),
+                    "valid_count": stats.get("valid_count"),
                 }
             )
 
@@ -152,7 +166,8 @@ def _compute_all_dataset_rows(data: dict[str, Any]) -> None:
         medians: list[float] = [
             v for s in stats_list if isinstance((v := s.get("median")), (int, float))
         ]
-        if not means and not medians:
+        counts = [v for s in stats_list if isinstance((v := s.get("valid_count")), int)]
+        if not means and not medians and not counts:
             continue
 
         mean_mean = sum(means) / len(means) if means else None
@@ -172,6 +187,7 @@ def _compute_all_dataset_rows(data: dict[str, Any]) -> None:
             "mean": mean_mean,
             "median": median_mean,
             "std": None,
+            "valid_count": sum(counts) if len(counts) == len(stats_list) else None,
         }
 
     for solver, base in meta_by_solver.items():
@@ -182,6 +198,7 @@ def _compute_all_dataset_rows(data: dict[str, Any]) -> None:
             {
                 "solver_name": solver,
                 "dataset_name": "all",
+                "case_count": base.get("case_count"),
                 "category": base.get("category") or "other",
                 "metrics": metrics,
                 "samples": [],
@@ -400,8 +417,12 @@ def main() -> None:
     solvers_in_runs: set[str] = set()
 
     for path in run_paths:
-        run_id = path.stem
+        run_id = path.name.removesuffix(".gz").removesuffix(".json")
         data = _read_json_sanitized(path)
+        if path.suffix == ".gz":
+            # Keep the dashboard lightweight. Full records remain in the archive.
+            for row in data.get("results", []):
+                row.pop("samples", None)
         _compute_all_dataset_rows(data)
         _ensure_dataset_configs(data)
         for row in data.get("results") or []:
@@ -423,7 +444,7 @@ def main() -> None:
         )
 
         with mkdocs_gen_files.open(f"assets/benchmarks/{run_id}.json", "w") as f:
-            json.dump(data, f, indent=2, sort_keys=True)
+            json.dump(data, f, indent=2, sort_keys=True, allow_nan=False)
 
     with mkdocs_gen_files.open("assets/benchmarks/manifest.json", "w") as f:
         json.dump(manifest, f, indent=2, sort_keys=True)

@@ -1,13 +1,17 @@
 (() => {
   const METRIC_LABELS = {
-    mean_localization_error: "MLE (m)",
+    mean_localization_error: "MLE",
     emd: "EMD",
     spatial_dispersion: "Spatial Disp.",
     average_precision: "Avg Precision",
     correlation: "Correlation",
+    local_correlation: "Local waveform correlation",
   };
 
-  const HIGHER_BETTER = new Set(["average_precision", "correlation"]);
+  // Metrics stored in meters that should be displayed in millimeters.
+  const M_TO_MM = new Set(["mean_localization_error", "emd"]);
+
+  const HIGHER_BETTER = new Set(["average_precision", "correlation", "local_correlation"]);
 
   const RANK_VIEW = "__rank__";
   const RANK_LABEL = "Rank";
@@ -55,7 +59,11 @@
     return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
   }
 
-  function toLabel(metric) {
+  function toLabel(metric, units) {
+    if (M_TO_MM.has(metric)) {
+      const label = units === "m" || units === "mm" ? "mm" : "units unrecorded";
+      return METRIC_LABELS[metric] + " (" + label + ")";
+    }
     return METRIC_LABELS[metric] || metric.replace(/_/g, " ");
   }
 
@@ -301,15 +309,15 @@
       return docsUrl(rel).toString();
     }
 
-    function renderMetricButtons(metrics) {
+    function renderMetricButtons(metrics, units) {
       metricToggle.innerHTML = "";
 
-      const ordered = [...metrics].sort((a, b) => toLabel(a).localeCompare(toLabel(b)));
+      const ordered = [...metrics].sort((a, b) => toLabel(a, units).localeCompare(toLabel(b, units)));
       const view = state.metricView;
 
       const buttons = [
         { key: RANK_VIEW, label: RANK_LABEL },
-        ...ordered.map((m) => ({ key: m, label: toLabel(m) })),
+        ...ordered.map((m) => ({ key: m, label: toLabel(m, units) })),
       ];
 
       for (const { key, label } of buttons) {
@@ -368,13 +376,13 @@
       return data;
     }
 
-    function getMetricStat(row, field) {
+    function getMetricStat(row, field, units) {
       const metrics = row.metrics || {};
       const stat = metrics[state.metric] || {};
       const value = stat[field];
       if (value === null || value === undefined) return null;
       if (typeof value !== "number" || Number.isNaN(value)) return null;
-      return value;
+      return units === "m" && M_TO_MM.has(state.metric) ? value * 1000 : value;
     }
 
     function compareText(a, b, sortMode) {
@@ -481,7 +489,7 @@
           const showRank = view === RANK_VIEW;
           const hb = HIGHER_BETTER.has(state.metric);
 
-          const metricValue = (r, field) => getMetricStat(r, field);
+          const metricValue = (r, field) => getMetricStat(r, field, data.metadata?.pos_units);
 
           // Rank accessor: global_ranks when dataset="all", per-dataset ranks otherwise
           const rankFor = (r) => {
@@ -509,6 +517,9 @@
                 { key: "mean", label: "Mean", sortable: true, type: "number" },
                 { key: "worst_10_pct", label: "Worst 10%", sortable: true, type: "number" },
               ];
+
+          const showCoverage = !showRank && filtered.some((r) => Number.isInteger(r.case_count));
+          if (showCoverage) columns.push({ key: "coverage", label: "Valid cases", sortable: false });
 
           const sortableKeys = new Set(columns.filter((c) => c.sortable).map((c) => c.key));
           if (!sortableKeys.has(state.sortKey)) {
@@ -552,7 +563,7 @@
           const sortLabel = columns.find((c) => c.key === sortKey)?.label || sortKey;
           const sortArrow = effectiveSortDir(sortKey, hb, sortMode) === "desc" ? "↓" : "↑";
 
-          const metricLabel = showRank ? RANK_LABEL : toLabel(state.metric);
+          const metricLabel = showRank ? RANK_LABEL : toLabel(state.metric, data.metadata?.pos_units);
 
           setSummaryHtml(
             renderMetaWidget({
@@ -618,6 +629,11 @@
                   { text: formatNumber(metricValue(r, "mean")), cls: "num" },
                   { text: formatNumber(metricValue(r, "worst_10_pct")), cls: "num" },
                 ];
+
+            if (showCoverage) {
+              const valid = r.metrics?.[state.metric]?.valid_count;
+              cells.push({ text: Number.isInteger(valid) ? valid + " / " + r.case_count : "–", cls: "num" });
+            }
 
             for (const c of cells) {
               const td = document.createElement("td");
@@ -711,7 +727,6 @@
       populateSelect(datasetSel, datasets.map((d) => ({ value: d, label: String(d) })));
       datasetSel.value = state.dataset || (datasets[0] || "all");
 
-      renderMetricButtons(metrics);
       await loadSolverPages();
 
       // Categories depend on the selected run's contents.
@@ -719,6 +734,7 @@
       clearTable();
       try {
         const data = await loadRunData(runEntry.id);
+        renderMetricButtons(metrics, data.metadata?.pos_units);
         const results = Array.isArray(data.results) ? data.results : [];
 
         // Now that we have the run payload, use dataset configs (if present) for labels.

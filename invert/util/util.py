@@ -151,6 +151,57 @@ def pos_from_forward(forward, verbose=0):
     return pos
 
 
+def pos_from_forward_info(forward, verbose=0) -> tuple[np.ndarray, dict[str, str]]:
+    """Like :func:`pos_from_forward`, but also returns coordinate metadata.
+
+    Returns
+    -------
+    pos : numpy.ndarray
+        Positions in meters.
+    info : dict
+        Keys:
+        - ``coord_frame``: ``"mni"`` or ``"head"``
+        - ``original_units``: ``"mm"`` (MNI) or ``"m"`` (head/source-space)
+        - ``units``: always ``"m"``
+    """
+    src = forward["src"]
+    subject_his_id = src[0].get("subject_his_id")
+
+    parts = []
+    coord_frame = "head"
+    original_units = "m"
+    try:
+        if subject_his_id is None:
+            raise TypeError("no subject_his_id")
+        # Preferred: MNI coordinates via FreeSurfer surfaces
+        for hemi_idx, s in enumerate(src):
+            parts.append(
+                mne.vertex_to_mni(
+                    s["vertno"], hemi_idx, subject_his_id, verbose=verbose
+                )
+            )
+        coord_frame = "mni"
+        original_units = "mm"
+    except FileNotFoundError, OSError, TypeError:
+        # Fallback: use source-space positions directly (head coordinates)
+        logger.info(
+            "FreeSurfer surfaces not found for %s, using source-space "
+            "positions instead of MNI coordinates.",
+            subject_his_id,
+        )
+        parts = [s["rr"][s["vertno"]] for s in src]
+
+    pos = np.concatenate(parts, axis=0)
+    if coord_frame == "mni":
+        # MNE's vertex_to_mni returns coordinates in millimeters.
+        pos = pos * 1e-3
+    return pos, {
+        "coord_frame": coord_frame,
+        "original_units": original_units,
+        "units": "m",
+    }
+
+
 def thresholding(x, k):
     """Set all but the k largest magnitudes in x to zero (0).
 

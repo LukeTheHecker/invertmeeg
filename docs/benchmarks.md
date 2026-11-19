@@ -1,8 +1,12 @@
 # Leaderboard
 
-This page renders an interactive dashboard from benchmark artifacts generated at
-docs build time. It is designed to work as a **fully static** site (e.g. GitHub
-Pages).
+The default run compares development solvers on the same simulated EEG recordings across six scenarios. Each solver uses its public API and the noise covariance for that recording. Distances are displayed in millimetres when the artifact records its units.
+
+Global rank averages four equally weighted metric ranks across scenarios. The four metrics are mean localization error, earth mover’s distance, average precision with tied predictions grouped, and unsigned waveform correlation at active vertices. A rank requires valid scores for every contributing case. Spatial dispersion and two-hop waveform correlation are available as diagnostics. The mixed cortical activity scenario scores recovery of the patches within diffuse background activity.
+
+Each scenario uses 50 recordings on the fixed-orientation BioSemi32/ico3 forward model. MWE and ReMWE use a separate grouped benchmark. The development run includes methods and parameter settings outside the released package. Earlier runs remain available in the selector with their original scores.
+
+[Download the corrected per-recording results (compressed JSON)](https://github.com/LukeTheHecker/invertmeeg/raw/refs/heads/main/results/release/leaderboard-protocol-v2.json.gz)
 
 ## Dashboard
 

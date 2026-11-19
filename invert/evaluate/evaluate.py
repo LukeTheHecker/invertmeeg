@@ -15,6 +15,13 @@ from sklearn.metrics import auc, roc_curve
 logger = logging.getLogger(__name__)
 
 
+def _waveform_correlation(truth, prediction, unsigned):
+    if np.ptp(truth) == 0 or np.ptp(prediction) == 0:
+        return 0.0
+    value = float(pearsonr(truth, prediction).statistic)
+    return abs(value) if unsigned else value
+
+
 def evaluate_all(
     y_true,
     y_pred,
@@ -24,99 +31,140 @@ def evaluate_all(
     pos_pred,
     mode: str = "dle",
     threshold: float = 0.1,
+    correlation_signal: str = "unsigned",
 ):
     """
     Comprehensive evaluation of source reconstruction.
 
+    Localization metrics (EMD, MLE, SD, AP) are computed on the
+    time-averaged absolute source vectors ``mean(|y|, axis=t)``.
+    Correlation is computed per-source across time (averaged over active
+    sources), falling back to spatial correlation for single-timepoint data.
+
     Parameters
     ----------
     y_true : np.ndarray
-        True source activity
+        True source activity, shape ``(n_sources, n_times)``.
     y_pred : np.ndarray
-        Predicted source activity
+        Predicted source activity, same shape as *y_true*.
     adjacency_true : scipy.sparse matrix
-        Adjacency matrix for true source space
+        Adjacency matrix for true source space.
     adjacency_pred : scipy.sparse matrix
-        Adjacency matrix for predicted source space
+        Adjacency matrix for predicted source space.
     pos_true : np.ndarray
-        Positions of true sources
+        Positions of true sources.
     pos_pred : np.ndarray
-        Positions of predicted sources (typically same as pos_true)
+        Positions of predicted sources (typically same as pos_true).
     mode : str
         MLE aggregation mode (default ``"dle"``).  See
         :func:`eval_mean_localization_error` for details.
     threshold : float
-        Relative threshold for MLE maxima detection (default 0.1).
-        Values below ``threshold * max`` are ignored.
+        Relative threshold for MLE maxima detection and active-source
+        selection (default 0.1).
+    correlation_signal : {"unsigned", "signed"}
+        Whether to report the absolute Pearson correlation (default) or the
+        signed Pearson correlation.
 
     Returns
     -------
     dict
-        Dictionary of evaluation metrics
-
-    Notes
-    -----
-    In typical usage, pos_true and pos_pred are identical (same source space),
-    but this function supports different source spaces for generality.
+        Dictionary of evaluation metrics.
     """
-    # Distance matrices for different metric calculations
-    distance_matrix_true_pred = cdist(pos_true, pos_pred)  # For EMD and MLE
-    distance_matrix_true = cdist(pos_true, pos_true)  # For spatial dispersion of true
-    distance_matrix_pred = cdist(pos_pred, pos_pred)  # For spatial dispersion of pred
+    # Only distances on the transport support, detected peaks and mesh edges
+    # contribute to these metrics. Computing a full distance matrix per epoch
+    # scales quadratically even for a single active vertex.
+    y_true = np.asarray(y_true)
+    y_pred = np.asarray(y_pred)
 
-    y_true_collapsed = abs(y_true).mean(axis=-1)
-    y_pred_collapsed = abs(y_pred).mean(axis=-1)
+    if y_true.ndim == 1:
+        y_true = y_true[:, np.newaxis]
+    if y_pred.ndim == 1:
+        y_pred = y_pred[:, np.newaxis]
+
+    if y_true.shape != y_pred.shape:
+        raise ValueError(
+            f"y_true and y_pred shape mismatch: {y_true.shape} vs {y_pred.shape}"
+        )
+
+    n_times = int(y_true.shape[1])
 
     logger.debug(
-        "Shapes - y_true: %s, y_pred: %s, adj_true: %s, adj_pred: %s, dist_matrix: %s",
-        y_true_collapsed.shape,
-        y_pred_collapsed.shape,
+        "Shapes - y_true: %s, y_pred: %s, adj_true: %s, adj_pred: %s",
+        y_true.shape,
+        y_pred.shape,
         adjacency_true.shape,
         adjacency_pred.shape,
-        distance_matrix_true_pred.shape,
     )
 
-    # mse = [eval_mse(yy_true, yy_pred) for yy_true, yy_pred in zip(y_true.T, y_pred.T)]
-    # nmse = [eval_nmse(yy_true, yy_pred) for yy_true, yy_pred in zip(y_true.T, y_pred.T)]
-    # auc = [np.mean(eval_auc(yy_true, yy_pred, pos_1, epsilon=0.01, n_redraw=10)) for yy_true, yy_pred in zip(y_true.T, y_pred.T)]
-    # corr = [pearsonr(yy_true, yy_pred)[0] for yy_true, yy_pred in zip(y_true.T, y_pred.T)]
-    # sparsity_pred = eval_sparsity(y_pred)
-    # sparsity_true = eval_sparsity(y_true)
-    # active_true = eval_active(y_true)
-    # active_pred = eval_active(y_pred)
+    # Time-averaged absolute sources for localization metrics
+    y_true_avg = np.abs(y_true).mean(axis=1)
+    y_pred_avg = np.abs(y_pred).mean(axis=1)
 
-    mle = eval_mean_localization_error(
-        y_true_collapsed,
-        y_pred_collapsed,
-        adjacency_true,
-        adjacency_pred,
-        pos_true,
-        pos_pred,
-        distance_matrix_true_pred,
-        mode=mode,
-        threshold=threshold,
-    )
-    emd = eval_emd(distance_matrix_true_pred, y_true_collapsed, y_pred_collapsed)
-    sd = get_spatial_dispersion(
-        y_pred,
-        y_true,
-        distance_matrix_pred,
-        distance_matrix_true,
-        adjacency_pred.toarray(),
-        adjacency_true.toarray(),
+    # EMD
+    emd_val = float(
+        eval_emd(None, y_true_avg, y_pred_avg, positions=(pos_true, pos_pred))
     )
 
-    precision, recall, _ = precision_recall_curve(y_true, y_pred)
-    average_precision = compute_average_precision(precision, recall)
+    # MLE
+    mle_val = float(
+        eval_mean_localization_error(
+            y_true_avg,
+            y_pred_avg,
+            adjacency_true,
+            adjacency_pred,
+            pos_true,
+            pos_pred,
+            None,
+            mode=mode,
+            threshold=threshold,
+        )
+    )
 
-    correlation = np.nanmedian(corr(y_true, y_pred))
+    # Spatial dispersion
+    true_extent = _mesh_extent(y_true_avg, adjacency_true, pos_true)
+    pred_extent = _mesh_extent(y_pred_avg, adjacency_pred, pos_pred)
+    sd_val = pred_extent / true_extent if true_extent else np.inf
+
+    # Average precision
+    if np.max(y_true_avg) > 0:
+        y_true_mask = (
+            y_true_avg >= float(threshold) * float(np.max(y_true_avg))
+        ).astype(int)
+    else:
+        y_true_mask = np.zeros_like(y_true_avg, dtype=int)
+    precision, recall, _ = precision_recall_curve(y_true_mask, y_pred_avg)
+    ap_val = float(compute_average_precision(precision, recall))
+
+    # Correlation: per-source temporal correlation averaged over active sources.
+    # For single-timepoint data, fall back to spatial correlation.
+    if n_times == 1:
+        corr_val = _waveform_correlation(
+            y_true[:, 0], y_pred[:, 0], correlation_signal == "unsigned"
+        )
+        local_corr = corr_val
+    else:
+        peak = np.max(np.abs(y_true), axis=1)
+        active = np.flatnonzero((peak > 0) & (peak >= threshold * peak.max()))
+        graph = scipy.sparse.csr_matrix(adjacency_pred)
+        energy = np.max(np.abs(y_pred), axis=1)
+        exact, local = [], []
+        unsigned = correlation_signal == "unsigned"
+        for i in active:
+            exact.append(_waveform_correlation(y_true[i], y_pred[i], unsigned))
+            neighbors = graph[i : i + 1].indices
+            nearby = np.unique(np.r_[i, neighbors, graph[neighbors].indices])
+            strongest = nearby[np.argmax(energy[nearby])]
+            local.append(_waveform_correlation(y_true[i], y_pred[strongest], unsigned))
+        corr_val = float(np.mean(exact)) if exact else np.nan
+        local_corr = float(np.mean(local)) if local else np.nan
 
     d = dict(
-        Mean_Localization_Error=np.nanmedian(mle),
-        EMD=emd,
-        sd=sd,
-        average_precision=average_precision,
-        correlation=correlation,
+        Mean_Localization_Error=mle_val,
+        EMD=emd_val,
+        sd=sd_val,
+        average_precision=ap_val,
+        correlation=corr_val,
+        local_correlation=local_corr,
     )
 
     return d
@@ -134,7 +182,7 @@ def eval_sparsity(y):
     return np.linalg.norm(y_scaled, ord=1)
 
 
-def eval_emd(M, values_1, values_2, threshold=0.25, p=1):
+def eval_emd(M, values_1, values_2, threshold=0.25, p=1, *, positions=None):
     """Compute Earth Mover's Distance between two distributions.
 
     Before computing EMD, values below ``threshold * max`` in each
@@ -200,14 +248,22 @@ def eval_emd(M, values_1, values_2, threshold=0.25, p=1):
     values_2 = values_2 / sum_2
 
     # Validate dimensions match cost matrix
-    if M.shape != (len(values_1), len(values_2)):
+    if M is not None and M.shape != (len(values_1), len(values_2)):
         raise ValueError(
             f"Cost matrix shape {M.shape} doesn't match distribution shapes "
             f"({len(values_1)}, {len(values_2)})"
         )
 
     try:
-        emd_value = ot.emd2(values_1, values_2, M**p)
+        first = np.flatnonzero(values_1)
+        second = np.flatnonzero(values_2)
+        if M is None:
+            costs = cdist(positions[0][first], positions[1][second])
+        else:
+            costs = M[np.ix_(first, second)]
+        emd_value = ot.emd2(
+            values_1[first], values_2[second], costs if p == 1 else costs**p
+        )
         # emd_value = sinkhorn_divergence(values_1, values_2, M**2, reg)
     except Exception as e:
         logger.error(f"Error calculating EMD: {e}")
@@ -347,6 +403,14 @@ def coeff_det(M, M_hat):
     return 1 - (SS_res / SS_tot)
 
 
+def _mesh_extent(activity, adjacency, positions):
+    """Sum incident edge lengths at vertices above half-maximum."""
+    graph = adjacency.tocoo()
+    selected = (activity[graph.row] > 0.5 * activity.max()) & (graph.data > 0)
+    edges = positions[graph.row[selected]] - positions[graph.col[selected]]
+    return float(np.linalg.norm(edges, axis=1).sum())
+
+
 def compute_fwhm(current_density, distance_matrix, adj_matrix):
     # Identify nodes with density above 50% of the maximum
     threshold = 0.5 * current_density.max()
@@ -408,7 +472,7 @@ def eval_mean_localization_error(
     adjacency_est: scipy.sparse.csr_matrix,
     pos_true: np.ndarray,
     pos_pred: np.ndarray,
-    distance_matrix: np.ndarray,
+    distance_matrix: np.ndarray | None,
     mode: str = "dle",
     threshold: float = 0.1,
     smooth_solution: bool = False,
@@ -505,11 +569,10 @@ def eval_mean_localization_error(
         return np.nan
 
     # Get pairwise distance between true and estimated source locations.
-    pairwise_dist = np.zeros((len(maxima_idc_true), len(maxima_idc_est)))
-
-    for ii, idx_true in enumerate(maxima_idc_true):
-        for jj, idx_est in enumerate(maxima_idc_est):
-            pairwise_dist[ii, jj] = distance_matrix[idx_true, idx_est]
+    if distance_matrix is None:
+        pairwise_dist = cdist(pos_true[maxima_idc_true], pos_pred[maxima_idc_est])
+    else:
+        pairwise_dist = distance_matrix[np.ix_(maxima_idc_true, maxima_idc_est)]
     if mode == "dle":
         mle = (pairwise_dist.min(axis=0).mean() + pairwise_dist.min(axis=1).mean()) / 2
     elif mode == "est":
@@ -558,28 +621,16 @@ def find_maxima(
     """
     # Apply thresholding in-place to avoid copying the array
     y_thresholded = np.where(abs(y) >= abs(y).max() * threshold, y, 0)
-    list_of_maxima = []
-
     # Only iterate over non-zero thresholded elements
     nonzeros = np.nonzero(y_thresholded)[0]
 
-    if isinstance(adjacency, scipy.sparse.csr_matrix):
-        adjacency = adjacency.toarray()
-
-    for i in nonzeros:
-        # Get indices of neighbors
-        neighbors = np.flatnonzero(adjacency[i])
-
-        # remove itself
-        neighbors = np.delete(neighbors, np.where(neighbors == i)[0])
-
-        # Check if the value at index i is greater than or equal to all its neighbors
-        if np.all(y_thresholded[i] > y_thresholded[neighbors]):
-            list_of_maxima.append(i)
-        # if len(list_of_maxima) == max_val_return:
-        #     break
-    # print("Maxima before")
-    # print(y_thresholded[np.array(list_of_maxima)])
+    graph = scipy.sparse.coo_matrix(adjacency)
+    off_diagonal = (graph.row != graph.col) & (graph.data != 0)
+    neighbor_max = np.full(len(y), -np.inf)
+    np.maximum.at(
+        neighbor_max, graph.row[off_diagonal], y_thresholded[graph.col[off_diagonal]]
+    )
+    list_of_maxima = nonzeros[y_thresholded[nonzeros] > neighbor_max[nonzeros]].tolist()
     if len(list_of_maxima) > max_val_return:
         # retain only the largest maxima
         list_of_maxima = sorted(
@@ -687,7 +738,7 @@ def get_maxima(
     max_iter: int = 100,
 ):
     maxima_idc_raw = find_maxima(
-        Y, adjacency.toarray(), threshold=threshold, max_val_return=max_maxima
+        Y, adjacency, threshold=threshold, max_val_return=max_maxima
     )
 
     Y_smoothed = Y
@@ -935,13 +986,15 @@ def precision_recall_curve(y_true, y_pred):
     # Total number of positive samples
     total_positives = np.sum(y_true)
 
-    # Calculate precision and recall
-    precision = tp_cumsum / (tp_cumsum + fp_cumsum)
-    recall = tp_cumsum / total_positives
-
-    # Include thresholds corresponding to each point in the curve
-    thresholds = y_pred
-
+    # A decision threshold includes all vertices with the same score.
+    ends = np.flatnonzero(np.r_[np.diff(y_pred) != 0, True])
+    precision = tp_cumsum[ends] / (tp_cumsum[ends] + fp_cumsum[ends])
+    recall = (
+        tp_cumsum[ends] / total_positives
+        if total_positives
+        else np.zeros_like(precision)
+    )
+    thresholds = y_pred[ends]
     return precision, recall, thresholds
 
 

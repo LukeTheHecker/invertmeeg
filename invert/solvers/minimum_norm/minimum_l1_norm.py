@@ -210,8 +210,8 @@ class SolverMinimumL1Norm(BaseSolver):
         L = max(float(L), 1e-12)
         lr = 1.0 / L
 
-        # Pre-compute A.T @ A and A.T @ Y to halve per-iteration matmul cost
-        ATA = A.T @ A  # (d, d)
+        # Use the cheaper factorization when the source space is wide.
+        gram = A.T @ A if A.shape[1] <= 2 * A.shape[0] else None
         ATY = A.T @ Y  # (d, t)
 
         if scale_l1_by_lmax:
@@ -229,8 +229,8 @@ class SolverMinimumL1Norm(BaseSolver):
         t = 1.0
         for _i in range(max_iter):
             x_prev = x.copy()
-            # grad = A.T @ (A @ z - Y) + l2_reg * z = ATA @ z - ATY + l2_reg * z
-            grad = ATA @ z - ATY + l2_reg * z
+            projection = gram @ z if gram is not None else A.T @ (A @ z)
+            grad = projection - ATY + l2_reg * z
             x = z - lr * grad
             # Soft thresholding step (proximal for L1)
             x = soft_threshold(x, lambda_eff * lr)

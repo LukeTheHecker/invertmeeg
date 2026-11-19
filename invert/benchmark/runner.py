@@ -1,19 +1,22 @@
 from __future__ import annotations
 
+import gzip
 import importlib.util as _ilu
 import json
 import logging
 import os
 import random
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import mne
 import numpy as np
-from pydantic import BaseModel
+from pydantic import BaseModel, BeforeValidator
+from pydantic_core import to_json
 from tqdm import tqdm
 
 _spec = _ilu.spec_from_file_location(
@@ -25,14 +28,14 @@ assert _spec.loader is not None
 _eval_mod = _ilu.module_from_spec(_spec)
 _spec.loader.exec_module(_eval_mod)
 evaluate_all = _eval_mod.evaluate_all
-from invert.simulate import SimulationConfig, SimulationGenerator  # noqa: E402
+from invert.simulate import NMMSimulator, SimulationConfig, SimulationGenerator  # noqa: E402
 from invert.solver_registry import (  # noqa: E402
     get_solver_class,
     get_solver_spec,
     iter_solver_specs,
 )
 from invert.solvers.base import BaseSolver  # noqa: E402
-from invert.util.util import pos_from_forward  # noqa: E402
+from invert.util.util import pos_from_forward_info  # noqa: E402
 
 from .datasets import BENCHMARK_DATASETS, DatasetConfig  # noqa: E402
 from .depth_tuning import (  # noqa: E402
@@ -42,6 +45,38 @@ from .depth_tuning import (  # noqa: E402
 )
 
 logger = logging.getLogger(__name__)
+
+_RANK_EXCLUDED_METRICS = frozenset({"spatial_dispersion", "local_correlation"})
+
+
+def _read_results_file(path: Path) -> dict:
+    payload = path.read_bytes()
+    return json.loads(gzip.decompress(payload) if path.suffix == ".gz" else payload)
+
+
+def _write_results_file(path: Path, data: dict) -> None:
+    payload = to_json(data, indent=2, inf_nan_mode="null")
+    if path.suffix == ".gz":
+        payload = gzip.compress(payload, mtime=0)
+    path.write_bytes(payload)
+
+
+def _ranked_metric_names(metric_names: set[str]) -> list[str]:
+    """Return the metrics that should contribute to leaderboard ranking."""
+    return sorted(name for name in metric_names if name not in _RANK_EXCLUDED_METRICS)
+
+
+def _evaluation_protocol_metadata() -> dict[str, Any]:
+    return {
+        "version": 2,
+        "time_sampling": {"kind": "all"},
+        "covariance": "per_recording",
+        "correlation_location": "exact_vertex",
+        "mixed_cortical_activity_target": "patches",
+        "localization_signal": "magnitude",
+        "correlation_signal": "unsigned",
+        "excluded_from_ranking": sorted(_RANK_EXCLUDED_METRICS),
+    }
 
 
 def _expects_simulation_config(solver_cls: type[BaseSolver]) -> bool:
@@ -82,17 +117,16 @@ def _default_nn_batch_size(forward: mne.Forward) -> int:
 def _generate_solver_categories() -> dict[str, list[str]]:
     """Automatically generate solver categories from solver_registry.
 
-    Categories are determined by the solver's module path:
-    - beamformers/ -> beamformer
-    - bayesian/ -> bayesian
-    - minimum_norm/ -> loreta (if solver_id contains "loreta") or minimum_norm
-    - music/ -> music
-    - matching_pursuit/ -> matching_pursuit
-    - hybrids/ -> other
-    - neural_networks/ -> neural_networks
-    - dipoles/ -> other
-    - random_noise -> other
+    Categories are determined by the solver's module path. The directory
+    name is used directly as the category, except for a few renames
+    (beamformers -> beamformer) and minimum_norm which splits out loreta.
+    Top-level solver files (e.g. random_noise.py) go to "other".
     """
+    # directory name -> category name (identity if not listed)
+    _DIR_TO_CATEGORY = {
+        "beamformers": "beamformer",
+    }
+
     categories: dict[str, list[str]] = {}
 
     for spec in iter_solver_specs(include_internal=False, include_unavailable=True):
@@ -102,29 +136,18 @@ def _generate_solver_categories() -> dict[str, list[str]]:
         # Extract directory from module path
         # e.g., "invert.solvers.beamformers.esmv" -> "beamformers"
         parts = module_path.split(".")
-        if len(parts) < 3 or parts[0] != "invert" or parts[1] != "solvers":
+        if len(parts) < 4 or parts[0] != "invert" or parts[1] != "solvers":
+            # Top-level solver files (random_noise.py, etc.)
             categories.setdefault("other", []).append(solver_id)
             continue
 
         directory = parts[2]
 
-        if directory == "beamformers":
-            category = "beamformer"
-        elif directory == "bayesian":
-            category = "bayesian"
-        elif directory == "minimum_norm":
-            if "loreta" in solver_id:
-                category = "loreta"
-            else:
-                category = "minimum_norm"
-        elif directory == "music":
-            category = "music"
-        elif directory == "matching_pursuit":
-            category = "matching_pursuit"
-        elif directory == "neural_networks":
-            category = "neural_networks"
+        # Special split: loreta variants out of minimum_norm
+        if directory == "minimum_norm" and "loreta" in solver_id:
+            category = "loreta"
         else:
-            category = "other"
+            category = _DIR_TO_CATEGORY.get(directory, directory)
 
         categories.setdefault(category, []).append(solver_id)
 
@@ -230,23 +253,6 @@ _DEFAULT_SOLVERS = ["mne", "eloreta", "lcmv", "champagne-mackay", "random-noise"
 # ---------------------------------------------------------------------------
 
 
-def _apply_inverse_worker(
-    idx: int,
-    inv_op_matrix: np.ndarray,
-    x_sample: np.ndarray,
-    y_sample: np.ndarray,
-    adjacency,
-    pos: np.ndarray,
-) -> tuple[int, dict]:
-    """Worker for applying precomputed inverse operator.
-
-    Returns (sample_idx, metrics_dict) for ordering results.
-    """
-    y_pred = inv_op_matrix @ x_sample
-    metrics = evaluate_all(y_sample, y_pred, adjacency, adjacency, pos, pos)
-    return idx, metrics
-
-
 def _split_solver_params(
     solver_params: dict[str, Any] | None,
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
@@ -299,7 +305,7 @@ def _compute_and_apply_worker(
         forward=forward,
         require_data=require_data,
         evoked=evoked,
-        alpha="auto",
+        alpha=make_params.pop("alpha", "auto"),
         noise_cov=noise_cov,
         make_kwargs=make_params,
     )
@@ -362,18 +368,39 @@ class TimingInfo(BaseModel):
     apply_inverse_seconds: float | None = None
 
 
+# JSON represents undefined scores as null. Accept both current and legacy artifacts.
+MetricValue = Annotated[
+    float, BeforeValidator(lambda value: np.nan if value is None else value)
+]
+
+
 class SampleMetrics(BaseModel):
-    mle: float
-    emd: float
-    sd: float
-    ap: float
-    correlation: float
+    mle: MetricValue
+    emd: MetricValue
+    sd: MetricValue
+    ap: MetricValue
+    correlation: MetricValue
+    local_correlation: float | None = None
+    case_id: int | None = None
+    error: str | None = None
+
+    @classmethod
+    def failed(cls, exc: Exception):
+        return cls(
+            mle=np.nan,
+            emd=np.nan,
+            sd=np.nan,
+            ap=np.nan,
+            correlation=np.nan,
+            error=f"{type(exc).__name__}: {exc}",
+        )
 
 
 class AggregateStats(BaseModel):
-    mean: float
-    std: float
-    median: float
+    valid_count: int | None = None
+    mean: MetricValue
+    std: MetricValue
+    median: MetricValue
     # Optional for compact dashboard exports.
     worst_10_pct: float | None = None  # 10th/90th percentile of worst predictions
 
@@ -385,6 +412,13 @@ class BenchmarkResult(BaseModel):
     metrics: dict[str, AggregateStats]
     samples: list[SampleMetrics]
     timing: TimingInfo | None = None
+    case_count: int | None = None
+
+    def complete(self, metric: str) -> bool:
+        return (
+            self.case_count is None
+            or self.metrics[metric].valid_count == self.case_count
+        )
 
 
 class BenchmarkRunner:
@@ -451,8 +485,99 @@ class BenchmarkRunner:
 
         self._results: list[BenchmarkResult] = []
 
-    def run(self) -> list[BenchmarkResult]:
-        pos = pos_from_forward(self.forward)
+    def _generate_default_batch(self, ds_config: DatasetConfig):
+        """Generate a batch using the default SimulationGenerator."""
+        sim_kwargs: dict[str, Any] = dict(
+            batch_size=self.n_samples,
+            n_sources=ds_config.n_sources,
+            n_orders=ds_config.n_orders,
+            snr_range=ds_config.snr_range,
+            n_timepoints=ds_config.n_timepoints,
+            source_spatial_model=ds_config.source_spatial_model,
+            patch_rank=ds_config.patch_rank,
+            simulation_mode=getattr(ds_config, "simulation_mode", "patches"),
+            random_seed=self.random_seed,
+            estimate_noise_cov=True,
+            return_noise_cov=True,
+        )
+        if getattr(ds_config, "background_beta", None) is not None:
+            sim_kwargs["background_beta"] = ds_config.background_beta
+        if getattr(ds_config, "background_mixture_alpha", None) is not None:
+            sim_kwargs["background_mixture_alpha"] = ds_config.background_mixture_alpha
+        if getattr(ds_config, "amplitude_range", None) is not None:
+            sim_kwargs["amplitude_range"] = ds_config.amplitude_range
+        if getattr(ds_config, "amplitude_distribution", None) is not None:
+            sim_kwargs["amplitude_distribution"] = ds_config.amplitude_distribution
+        if getattr(ds_config, "correlation_mode", None) is not None:
+            sim_kwargs["correlation_mode"] = ds_config.correlation_mode
+        if getattr(ds_config, "correlation_modes", None) is not None:
+            sim_kwargs["correlation_modes"] = ds_config.correlation_modes
+        if getattr(ds_config, "correlation_mode_weights", None) is not None:
+            sim_kwargs["correlation_mode_weights"] = ds_config.correlation_mode_weights
+        if getattr(ds_config, "noise_temporal_beta", None) is not None:
+            sim_kwargs["noise_temporal_beta"] = ds_config.noise_temporal_beta
+        if getattr(ds_config, "noise_low_rank_dim", None) is not None:
+            sim_kwargs["noise_low_rank_dim"] = ds_config.noise_low_rank_dim
+        if getattr(ds_config, "source_extent", None) is not None:
+            sim_kwargs["source_extent"] = ds_config.source_extent
+
+        sim_config = SimulationConfig(**sim_kwargs)
+        gen = SimulationGenerator(self.forward, config=sim_config)
+        batch = next(gen.generate_batches())
+        batch._sim_config = sim_config  # expose for NN training path
+        return batch
+
+    def _generate_nmm_batch(self, ds_config: DatasetConfig):
+        """Generate a batch using the NMMSimulator."""
+        nmm_kwargs: dict[str, Any] = dict(
+            batch_size=self.n_samples,
+            n_sources=ds_config.n_sources,
+            snr_range=ds_config.snr_range,
+            duration_s=ds_config.duration_s,
+            sfreq=ds_config.sfreq,
+            spike_mode=ds_config.spike_mode,
+            coupling_strength=ds_config.coupling_strength,
+            n_pool=ds_config.n_pool,
+            correlation_mode=ds_config.correlation_mode or "realistic",
+            estimate_noise_cov=True,
+            return_noise_cov=True,
+            random_seed=self.random_seed,
+        )
+        if getattr(ds_config, "source_extent", None) is not None:
+            nmm_kwargs["source_extent"] = ds_config.source_extent
+        if getattr(ds_config, "noise_temporal_beta", None) is not None:
+            nmm_kwargs["noise_temporal_beta"] = ds_config.noise_temporal_beta
+        if getattr(ds_config, "noise_low_rank_dim", None) is not None:
+            nmm_kwargs["noise_low_rank_dim"] = ds_config.noise_low_rank_dim
+
+        gen = NMMSimulator(self.forward, **nmm_kwargs)
+        batch = next(gen.generate())
+
+        # Build a SimulationConfig so NN solvers can generate training data.
+        sim_kwargs: dict[str, Any] = dict(
+            batch_size=self.n_samples,
+            n_sources=ds_config.n_sources,
+            snr_range=ds_config.snr_range,
+            n_timepoints=int(ds_config.duration_s * ds_config.sfreq),
+            estimate_noise_cov=True,
+            return_noise_cov=True,
+            random_seed=self.random_seed,
+        )
+        if getattr(ds_config, "source_extent", None) is not None:
+            sim_kwargs["source_extent"] = ds_config.source_extent
+        if getattr(ds_config, "noise_temporal_beta", None) is not None:
+            sim_kwargs["noise_temporal_beta"] = ds_config.noise_temporal_beta
+        if getattr(ds_config, "noise_low_rank_dim", None) is not None:
+            sim_kwargs["noise_low_rank_dim"] = ds_config.noise_low_rank_dim
+        if getattr(ds_config, "correlation_mode", None) is not None:
+            sim_kwargs["correlation_mode"] = ds_config.correlation_mode
+        batch._sim_config = SimulationConfig(**sim_kwargs)
+        return batch
+
+    def run(
+        self, *, on_result: Callable[[BenchmarkResult], None] | None = None
+    ) -> list[BenchmarkResult]:
+        pos, _ = pos_from_forward_info(self.forward)
         adjacency = mne.spatial_src_adjacency(self.forward["src"], verbose=0)
         results = []
 
@@ -466,35 +591,33 @@ class BenchmarkRunner:
                 logger.info("Dataset: %s", ds_name)
 
                 # Generate all samples for this dataset once
-                sim_config = SimulationConfig(
-                    batch_size=self.n_samples,
-                    n_sources=ds_config.n_sources,
-                    n_orders=ds_config.n_orders,
-                    snr_range=ds_config.snr_range,
-                    n_timepoints=ds_config.n_timepoints,
-                    source_spatial_model=ds_config.source_spatial_model,
-                    patch_rank=ds_config.patch_rank,
-                    random_seed=self.random_seed,
-                    estimate_noise_cov=True,
-                    return_noise_cov=True,
+                recording_info = self.info
+                if getattr(ds_config, "simulator_type", "default") == "nmm":
+                    batch = self._generate_nmm_batch(ds_config)
+                    recording_info = self.info.copy()
+                    # This generator samples its own time grid, independently
+                    # of the sampling frequency used to build the template.
+                    with recording_info._unlock():
+                        recording_info["sfreq"] = ds_config.sfreq
+                        lowpass = recording_info["lowpass"]
+                        if lowpass is not None:
+                            recording_info["lowpass"] = min(
+                                lowpass, ds_config.sfreq / 2
+                            )
+                else:
+                    batch = self._generate_default_batch(ds_config)
+                x_batch, y_batch, sim_info = batch.x, batch.y, batch.info
+                y_eval_batch = (
+                    batch.y_patches if batch.y_patches is not None else y_batch
                 )
-                gen = SimulationGenerator(self.forward, config=sim_config)
-                x_batch, y_batch, sim_info = next(gen.generate())
-                # Per-sample noise covariance (scaled to match the actual
-                # noise level in each sample).  Solvers that recompute per
-                # sample receive the matching covariance; non-recompute
-                # solvers receive sample-0's estimate (consistent with
-                # already using x_batch[0] for their inverse operator).
                 noise_covs = [
                     _make_mne_covariance(
                         sim_info.iloc[j]["noise_cov_est_scaled"],
-                        self.info,
+                        recording_info,
                         nfree=1,
                     )
                     for j in range(len(sim_info))
                 ]
-                noise_cov = noise_covs[0]
-
                 for solver_name in self.solvers:
                     logger.info("  Solver: %s", solver_name)
                     spec = get_solver_spec(solver_name)
@@ -525,8 +648,17 @@ class BenchmarkRunner:
                     timing_info: TimingInfo | None = None
 
                     if _expects_simulation_config(solver_cls):
-                        train_sim_config = sim_config.model_copy(
-                            update={"batch_size": _default_nn_batch_size(self.forward)}
+                        train_sim_config = batch._sim_config.model_copy(
+                            update={
+                                "batch_size": _default_nn_batch_size(self.forward),
+                                "random_seed": None
+                                if self.random_seed is None
+                                else int(
+                                    np.random.SeedSequence(self.random_seed)
+                                    .spawn(1)[0]
+                                    .generate_state(1)[0]
+                                ),
+                            }
                         )
                         logger.info(
                             "ANN training batch_size=%d for %s",
@@ -548,128 +680,28 @@ class BenchmarkRunner:
                             position=1,
                             leave=False,
                         ):
-                            evoked = mne.EvokedArray(
-                                x_batch[i], self.info, tmin=0.0, verbose=0
-                            )
-                            stc = solver.apply_inverse_operator(evoked, **apply_params)
-                            y_pred = stc.data
-                            metrics = evaluate_all(
-                                y_batch[i], y_pred, adjacency, adjacency, pos, pos
-                            )
-                            sample_metrics.append(self._metrics_from_dict(metrics))
-                        apply_seconds = time.perf_counter() - t_apply
-                        total_seconds = time.perf_counter() - t_solver_start
-                        timing_info = TimingInfo(
-                            total_seconds=total_seconds,
-                            make_inverse_operator_seconds=make_seconds,
-                            apply_inverse_seconds=apply_seconds,
-                        )
-
-                    # Parallelize based on require_recompute
-                    elif not solver.require_recompute:
-                        # Compute inverse operator once, then parallelize application
-                        evoked = None
-                        if solver.require_data:
-                            evoked = mne.EvokedArray(
-                                x_batch[0], self.info, tmin=0.0, verbose=0
-                            )
-                        t_make = time.perf_counter()
-                        _make_inverse_operator_with_covariance(
-                            solver=solver,
-                            forward=self.forward,
-                            require_data=bool(solver.require_data),
-                            evoked=evoked,
-                            alpha="auto",
-                            noise_cov=noise_cov,
-                            make_kwargs=make_params,
-                        )
-                        make_seconds = time.perf_counter() - t_make
-
-                        # Some solvers do not expose inverse operators, or may leave the
-                        # list empty for data-dependent paths. In both cases, fall back
-                        # to direct per-sample application.
-                        t_apply = time.perf_counter()
-                        inverse_ops = getattr(solver, "inverse_operators", None)
-                        if not inverse_ops:
-                            # Fall back to direct application for each sample
-                            sample_metrics = []
-                            for i in range(len(x_batch)):
+                            try:
                                 evoked = mne.EvokedArray(
-                                    x_batch[i], self.info, tmin=0.0, verbose=0
+                                    x_batch[i], recording_info, tmin=0.0, verbose=0
                                 )
                                 stc = solver.apply_inverse_operator(
                                     evoked, **apply_params
                                 )
                                 y_pred = stc.data
                                 metrics = evaluate_all(
-                                    y_batch[i], y_pred, adjacency, adjacency, pos, pos
+                                    y_eval_batch[i],
+                                    y_pred,
+                                    adjacency,
+                                    adjacency,
+                                    pos,
+                                    pos,
                                 )
                                 sample_metrics.append(self._metrics_from_dict(metrics))
-                        else:
-                            # Select optimal regularization via L-curve/GCV
-                            n_ops = len(inverse_ops)
-                            if get_solver_category(solver_name) == "beamformer":
-                                # Beamformer regularization selection: do not use
-                                # residual-based GCV/L-curve criteria.
-                                optimal_idx = 0
-                            elif n_ops > 1:
-                                try:
-                                    # Aggregate GCV scores across multiple samples
-                                    # for more robust regularization selection.
-                                    n_gcv = min(5, len(x_batch))
-                                    all_scores = np.stack(
-                                        [
-                                            solver.compute_gcv_scores(x_batch[k])
-                                            for k in range(n_gcv)
-                                        ]
-                                    )
-                                    median_scores = np.median(all_scores, axis=0)
-                                    valid = np.isfinite(median_scores)
-                                    if np.any(valid):
-                                        valid_idx = np.where(valid)[0]
-                                        optimal_idx = valid_idx[
-                                            np.argmin(median_scores[valid])
-                                        ]
-                                    else:
-                                        optimal_idx = len(median_scores) // 2
-                                except Exception as exc:
-                                    logger.warning(
-                                        "Regularisation selection failed for %s on %s; "
-                                        "falling back to first inverse operator (%s).",
-                                        solver_name,
-                                        ds_name,
-                                        exc,
-                                    )
-                                    optimal_idx = 0
-                            else:
-                                optimal_idx = 0
-                            if optimal_idx < 0 or optimal_idx >= n_ops:
-                                clipped_idx = int(np.clip(optimal_idx, 0, n_ops - 1))
-                                logger.warning(
-                                    "Regularisation index %d out of bounds for %s on %s "
-                                    "(n_ops=%d); using idx=%d instead.",
-                                    optimal_idx,
-                                    solver_name,
-                                    ds_name,
-                                    n_ops,
-                                    clipped_idx,
+                            except Exception as exc:
+                                logger.exception(
+                                    "%s/%s case %d failed", ds_name, solver_name, i
                                 )
-                                optimal_idx = clipped_idx
-                            inv_op = inverse_ops[optimal_idx]
-
-                            # Extract the inverse operator matrix (numpy array)
-                            inv_op_matrix = inv_op.data[0]
-
-                            # Parallel application
-                            sample_metrics = self._run_parallel_apply(
-                                inv_op_matrix,
-                                x_batch,
-                                y_batch,
-                                adjacency,
-                                pos,
-                                ds_name,
-                                solver_name,
-                            )
+                                sample_metrics.append(SampleMetrics.failed(exc))
                         apply_seconds = time.perf_counter() - t_apply
                         total_seconds = time.perf_counter() - t_solver_start
                         timing_info = TimingInfo(
@@ -677,8 +709,9 @@ class BenchmarkRunner:
                             make_inverse_operator_seconds=make_seconds,
                             apply_inverse_seconds=apply_seconds,
                         )
+
                     else:
-                        # Parallelize full computation (require_recompute=True)
+                        # Independent recordings can have different noise covariances.
                         # Merge default_kwargs as init__ prefixed keys so the
                         # worker receives them through _split_solver_params.
                         merged_params = {
@@ -690,9 +723,9 @@ class BenchmarkRunner:
                             spec.module_path,
                             spec.class_name,
                             self.forward,
-                            self.info,
+                            recording_info,
                             x_batch,
-                            y_batch,
+                            y_eval_batch,
                             adjacency,
                             pos,
                             solver.require_data,
@@ -707,6 +740,8 @@ class BenchmarkRunner:
                     result = self._aggregate(solver_name, ds_name, sample_metrics)
                     result.timing = timing_info
                     results.append(result)
+                    if on_result is not None:
+                        on_result(result)
                     pbar_overall.update(1)
                     pbar_overall.set_postfix(
                         {"dataset": ds_name, "solver": solver_name}
@@ -714,70 +749,6 @@ class BenchmarkRunner:
 
         self._results = results
         return results
-
-    def _run_parallel_apply(
-        self,
-        inv_op_matrix: np.ndarray,
-        x_batch: np.ndarray,
-        y_batch: np.ndarray,
-        adjacency,
-        pos: np.ndarray,
-        ds_name: str,
-        solver_name: str,
-    ) -> list[SampleMetrics]:
-        """Parallelize inverse operator application (require_recompute=False)."""
-        if self.n_jobs == 1:
-            sample_metrics = []
-            for i in tqdm(
-                range(self.n_samples),
-                desc=f"{ds_name}/{solver_name}",
-                position=1,
-                leave=False,
-            ):
-                _, metrics = _apply_inverse_worker(
-                    i, inv_op_matrix, x_batch[i], y_batch[i], adjacency, pos
-                )
-                sample_metrics.append(self._metrics_from_dict(metrics))
-            return sample_metrics
-
-        sample_metrics_dict = {}
-        with ThreadPoolExecutor(max_workers=self.n_jobs) as executor:
-            futures = {
-                executor.submit(
-                    _apply_inverse_worker,
-                    i,
-                    inv_op_matrix,
-                    x_batch[i],
-                    y_batch[i],
-                    adjacency,
-                    pos,
-                ): i
-                for i in range(self.n_samples)
-            }
-
-            with tqdm(
-                total=self.n_samples,
-                desc=f"{ds_name}/{solver_name}",
-                position=1,
-                leave=False,
-            ) as pbar:
-                for future in as_completed(futures):
-                    try:
-                        idx, metrics = future.result()
-                        sample_metrics_dict[idx] = self._metrics_from_dict(metrics)
-                    except Exception as e:
-                        logger.error(f"Sample {futures[future]} failed: {e}")
-                        idx = futures[future]
-                        sample_metrics_dict[idx] = SampleMetrics(
-                            mle=float("nan"),
-                            emd=float("nan"),
-                            sd=float("nan"),
-                            ap=float("nan"),
-                            correlation=float("nan"),
-                        )
-                    pbar.update(1)
-
-        return [sample_metrics_dict[i] for i in range(self.n_samples)]
 
     def _run_parallel_compute(
         self,
@@ -795,38 +766,11 @@ class BenchmarkRunner:
         noise_covs: list[mne.Covariance] | None = None,
         solver_params: dict[str, Any] | None = None,
     ) -> list[SampleMetrics]:
-        """Parallelize full computation (require_recompute=True)."""
-        if self.n_jobs == 1:
-            sample_metrics = []
-            for i in tqdm(
-                range(self.n_samples),
-                desc=f"{ds_name}/{solver_name}",
-                position=1,
-                leave=False,
-            ):
-                nc = noise_covs[i] if noise_covs else None
-                _, metrics = _compute_and_apply_worker(
-                    i,
-                    solver_module,
-                    solver_class,
-                    forward,
-                    info,
-                    x_batch[i],
-                    y_batch[i],
-                    adjacency,
-                    pos,
-                    require_data,
-                    nc,
-                    solver_params,
-                )
-                sample_metrics.append(self._metrics_from_dict(metrics))
-            return sample_metrics
+        """Fit and apply the public solver independently for every recording."""
 
-        sample_metrics_dict = {}
-        with ThreadPoolExecutor(max_workers=self.n_jobs) as executor:
-            futures = {
-                executor.submit(
-                    _compute_and_apply_worker,
+        def run_case(i):
+            try:
+                _, metrics = _compute_and_apply_worker(
                     i,
                     solver_module,
                     solver_class,
@@ -839,33 +783,17 @@ class BenchmarkRunner:
                     require_data,
                     noise_covs[i] if noise_covs else None,
                     solver_params,
-                ): i
-                for i in range(self.n_samples)
-            }
+                )
+                return self._metrics_from_dict(metrics)
+            except Exception as exc:
+                logger.exception("%s/%s case %d failed", ds_name, solver_name, i)
+                return SampleMetrics.failed(exc)
 
-            with tqdm(
-                total=self.n_samples,
-                desc=f"{ds_name}/{solver_name}",
-                position=1,
-                leave=False,
-            ) as pbar:
-                for future in as_completed(futures):
-                    try:
-                        idx, metrics = future.result()
-                        sample_metrics_dict[idx] = self._metrics_from_dict(metrics)
-                    except Exception as e:
-                        logger.error(f"Sample {futures[future]} failed: {e}")
-                        idx = futures[future]
-                        sample_metrics_dict[idx] = SampleMetrics(
-                            mle=float("nan"),
-                            emd=float("nan"),
-                            sd=float("nan"),
-                            ap=float("nan"),
-                            correlation=float("nan"),
-                        )
-                    pbar.update(1)
-
-        return [sample_metrics_dict[i] for i in range(self.n_samples)]
+        indices = range(len(x_batch))
+        if self.n_jobs == 1:
+            return [run_case(i) for i in indices]
+        with ThreadPoolExecutor(max_workers=self.n_jobs) as executor:
+            return list(executor.map(run_case, indices))
 
     @staticmethod
     def _metrics_from_dict(m: dict) -> SampleMetrics:
@@ -875,6 +803,7 @@ class BenchmarkRunner:
             sd=float(m["sd"]),
             ap=float(m["average_precision"]),
             correlation=float(m["correlation"]),
+            local_correlation=m.get("local_correlation"),
         )
 
     @staticmethod
@@ -894,16 +823,26 @@ class BenchmarkRunner:
             "average_precision": np.array([s.ap for s in samples]),
             "correlation": np.array([s.correlation for s in samples]),
         }
+        for i, sample in enumerate(samples):
+            sample.case_id = i
+        arrays["local_correlation"] = np.array(
+            [s.local_correlation for s in samples], dtype=float
+        )
         metrics = {}
         for key, arr in arrays.items():
             # For higher-is-better metrics, worst 10% = 10th percentile (lowest)
             # For lower-is-better metrics, worst 10% = 90th percentile (highest)
-            worst_pct = 10 if key in higher_is_better else 90
+            arr = arr[np.isfinite(arr)]
+            count = len(arr)
+            worst_pct = (
+                10 if key in higher_is_better or key == "local_correlation" else 90
+            )
             metrics[key] = AggregateStats(
-                mean=float(np.nanmean(arr)),
-                std=float(np.nanstd(arr)),
-                median=float(np.nanmedian(arr)),
-                worst_10_pct=float(np.nanpercentile(arr, worst_pct)),
+                valid_count=count,
+                mean=float(np.mean(arr)) if count else np.nan,
+                std=float(np.std(arr)) if count else np.nan,
+                median=float(np.median(arr)) if count else np.nan,
+                worst_10_pct=float(np.percentile(arr, worst_pct)) if count else np.nan,
             )
         return BenchmarkResult(
             solver_name=solver_name,
@@ -911,6 +850,7 @@ class BenchmarkRunner:
             category=get_solver_category(solver_name),
             metrics=metrics,
             samples=samples,
+            case_count=len(samples),
         )
 
     def _compute_best_solvers(self) -> dict[str, Any]:
@@ -922,7 +862,7 @@ class BenchmarkRunner:
             Structure: {dataset_name: {metric_name: {"solver": solver_name, "value": metric_value}}}
         """
         # Metrics where lower is better
-        lower_is_better = {"mean_localization_error", "emd", "spatial_dispersion"}
+        lower_is_better = {"mean_localization_error", "emd"}
         # Metrics where higher is better
         higher_is_better = {"average_precision", "correlation"}
 
@@ -930,11 +870,12 @@ class BenchmarkRunner:
         all_metrics: set[str] = set()
         for r in self._results:
             all_metrics.update(r.metrics.keys())
+        ranked_metrics = _ranked_metric_names(all_metrics)
 
         best_solvers: dict[str, Any] = {}
         for dataset in datasets:
             best_solvers[dataset] = {}
-            for metric in all_metrics:
+            for metric in ranked_metrics:
                 # Find all results for this dataset
                 dataset_results = [
                     r for r in self._results if r.dataset_name == dataset
@@ -949,7 +890,7 @@ class BenchmarkRunner:
                 for r in dataset_results:
                     if metric in r.metrics:
                         value = r.metrics[metric].mean
-                        if not np.isnan(value):
+                        if np.isfinite(value) and r.complete(metric):
                             solver_values[r.solver_name] = value
 
                 if not solver_values:
@@ -987,12 +928,13 @@ class BenchmarkRunner:
             - per_dataset_ranks: {dataset_name: {solver_name: avg_rank}}
             - global_ranks: {solver_name: avg_rank}
         """
-        lower_is_better = {"mean_localization_error", "emd", "spatial_dispersion"}
+        higher_is_better = {"average_precision", "correlation"}
 
         datasets = sorted(set(r.dataset_name for r in self._results))
         all_metrics: set[str] = set()
         for r in self._results:
             all_metrics.update(r.metrics.keys())
+        ranked_metrics = _ranked_metric_names(all_metrics)
 
         # Collect ranks per dataset: dataset -> solver_name -> list of ranks
         dataset_solver_ranks: dict[str, dict[str, list[float]]] = {}
@@ -1000,21 +942,22 @@ class BenchmarkRunner:
         for dataset in datasets:
             dataset_results = [r for r in self._results if r.dataset_name == dataset]
             dataset_solver_ranks[dataset] = {}
-            for metric in all_metrics:
+            for metric in ranked_metrics:
                 # Gather (solver, value) pairs, skip NaN
                 solver_values = []
                 for r in dataset_results:
                     if metric in r.metrics:
                         val = r.metrics[metric].mean
-                        if not np.isnan(val):
+                        if np.isfinite(val) and r.complete(metric):
                             solver_values.append((r.solver_name, val))
 
                 if not solver_values:
                     continue
 
-                # Sort: ascending for lower-is-better, descending for higher-is-better
-                reverse = metric not in lower_is_better
-                solver_values.sort(key=lambda x: x[1], reverse=reverse)
+                if metric in higher_is_better:
+                    solver_values.sort(key=lambda x: x[1], reverse=True)
+                else:
+                    solver_values.sort(key=lambda x: x[1], reverse=False)
 
                 # Dense ranking: tied values get the same rank
                 rank = 1
@@ -1034,6 +977,7 @@ class BenchmarkRunner:
                     dataset_solver_ranks[dataset].items(),
                     key=lambda x: np.mean(x[1]),
                 )
+                if len(ranks) == len(ranked_metrics)
             }
 
         # Global ranks: average of per-dataset ranks
@@ -1047,6 +991,7 @@ class BenchmarkRunner:
             for name, ranks in sorted(
                 solver_dataset_ranks.items(), key=lambda x: np.mean(x[1])
             )
+            if len(ranks) == len(datasets)
         }
 
         return per_dataset_ranks, global_ranks
@@ -1058,6 +1003,8 @@ class BenchmarkRunner:
         compact: bool = False,
         name: str | None = None,
         description: str | None = None,
+        ineligible_solvers: dict[str, str] | None = None,
+        provenance: dict | None = None,
     ) -> None:
         path = Path(path)
 
@@ -1067,6 +1014,11 @@ class BenchmarkRunner:
             key: cfg.model_dump() if isinstance(cfg, BaseModel) else dict(cfg)  # type: ignore[arg-type]
             for key, cfg in self.datasets.items()
         }
+
+        for config in datasets_payload.values():
+            config["n_samples"] = self.n_samples
+            if config.get("simulator_type") == "nmm":
+                config["n_timepoints"] = int(config["duration_s"] * config["sfreq"])
 
         m_electrodes: int | None = None
         n_leadfield_columns: int | None = None
@@ -1107,8 +1059,18 @@ class BenchmarkRunner:
         ):
             n_orient = int(n_leadfield_columns // n_sources_space)
 
+        pos_coord_frame = None
+        pos_original_units = None
+        try:
+            _pos, pos_info = pos_from_forward_info(self.forward, verbose=0)
+            pos_coord_frame = pos_info.get("coord_frame")
+            pos_original_units = pos_info.get("original_units")
+        except Exception:
+            pos_coord_frame = None
+            pos_original_units = None
+
         if compact:
-            # Minimal payload for the MkDocs dashboard: aggregated metrics only.
+            # Omit duplicate summaries while retaining the paired measurement records.
             output = {
                 "ranks": per_dataset_ranks,
                 "global_ranks": global_ranks,
@@ -1125,6 +1087,12 @@ class BenchmarkRunner:
                     "n_sources": n_sources_space,
                     "n_leadfield_columns": n_leadfield_columns,
                     "n_orient": n_orient,
+                    "pos_units": "m",
+                    "pos_coord_frame": pos_coord_frame,
+                    "pos_original_units": pos_original_units,
+                    "evaluation_protocol": _evaluation_protocol_metadata(),
+                    "ineligible_solvers": ineligible_solvers or {},
+                    "provenance": provenance or {},
                 },
                 "datasets": datasets_payload,
                 "results": [
@@ -1134,6 +1102,7 @@ class BenchmarkRunner:
                         "category": r.category,
                         "metrics": {
                             metric: {
+                                "valid_count": stats.valid_count,
                                 "mean": float(stats.mean),
                                 "std": float(stats.std),
                                 "median": float(stats.median),
@@ -1146,12 +1115,13 @@ class BenchmarkRunner:
                             for metric, stats in r.metrics.items()
                         },
                         "timing": r.timing.model_dump() if r.timing else None,
-                        "samples": [],
+                        "case_count": r.case_count,
+                        "samples": [s.model_dump() for s in r.samples],
                     }
                     for r in self._results
                 ],
             }
-            path.write_text(json.dumps(output, indent=2))
+            _write_results_file(path, output)
             logger.info("Compact results saved to %s", path)
             return
 
@@ -1180,17 +1150,23 @@ class BenchmarkRunner:
                 "n_sources": n_sources_space,
                 "n_leadfield_columns": n_leadfield_columns,
                 "n_orient": n_orient,
+                "pos_units": "m",
+                "pos_coord_frame": pos_coord_frame,
+                "pos_original_units": pos_original_units,
+                "evaluation_protocol": _evaluation_protocol_metadata(),
+                "ineligible_solvers": ineligible_solvers or {},
+                "provenance": provenance or {},
             },
             "datasets": datasets_payload,
             "results": [r.model_dump() for r in self._results],
         }
-        path.write_text(json.dumps(output, indent=2))
+        _write_results_file(path, output)
         logger.info("Results saved to %s", path)
 
     @classmethod
     def load(cls, path: str | Path) -> list[BenchmarkResult]:
         path = Path(path)
-        data = json.loads(path.read_text())
+        data = _read_results_file(path)
         results = []
         for r in data["results"]:
             # Populate category if missing (for backward compatibility)
@@ -1216,7 +1192,7 @@ class BenchmarkRunner:
             Path to the benchmark results JSON file.
         """
         path = Path(path)
-        data = json.loads(path.read_text())
+        data = _read_results_file(path)
         results = []
         for r in data["results"]:
             # Populate category if missing (for backward compatibility)
@@ -1250,5 +1226,5 @@ class BenchmarkRunner:
         data["global_ranks"] = global_ranks
 
         # Write back
-        path.write_text(json.dumps(data, indent=2))
+        _write_results_file(path, data)
         logger.info("Updated summary statistics in %s", path)

@@ -179,6 +179,11 @@ def sbl_iterate(
     rule_fn = _resolve_update_rule(update_rule)
     n_chans, n_atoms = L.shape
     n_times = Y.shape[1]
+    # Built-in updates only use mean squared posterior amplitudes. Thin QR
+    # preserves row energies. Rescale to preserve the mean over time as well.
+    energy_data = Y
+    if not callable(update_rule) and n_times > n_chans:
+        energy_data = np.linalg.qr(Y.T, mode="r").T * np.sqrt(n_chans / n_times)
 
     gammas = np.ones(n_atoms)
     active_set = np.arange(n_atoms)
@@ -189,7 +194,7 @@ def sbl_iterate(
     Sigma_y = 0.5 * (Sigma_y + Sigma_y.T)
     Sigma_y_inv = inverse_fn(Sigma_y)
     SiL = Sigma_y_inv @ L_act  # cached for z_diag and mu_x
-    mu_x = (SiL.T @ Y) * gammas[:, None]
+    mu_x = (SiL.T @ energy_data) * gammas[:, None]
 
     # Compute initial loss so we have a valid value even if the loop breaks
     # on iteration 0 (e.g. all gammas go to zero immediately).
@@ -236,7 +241,7 @@ def sbl_iterate(
         Sigma_y = 0.5 * (Sigma_y + Sigma_y.T)
         Sigma_y_inv = inverse_fn(Sigma_y)
         SiL = Sigma_y_inv @ L_act  # cached for z_diag in next iteration
-        mu_x = (SiL.T @ Y) * gammas[:, None]
+        mu_x = (SiL.T @ energy_data) * gammas[:, None]
 
         # Loss: negative log-marginal-likelihood
         # slogdet is faster than eigvalsh for just the log-determinant
@@ -255,6 +260,9 @@ def sbl_iterate(
                 loss_prev = loss
                 break
         loss_prev = loss
+
+    if energy_data is not Y:
+        mu_x = (SiL.T @ Y) * gammas[:, None]
 
     return SBLResult(
         active_set=active_set,

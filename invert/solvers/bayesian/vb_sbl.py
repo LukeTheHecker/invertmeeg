@@ -105,6 +105,9 @@ class SolverVBSBL(BaseSolver):
         conv_crit: float,
     ) -> np.ndarray:
         n_eff, n_times = Yw.shape
+        # Yw.T = Q R. Right multiplication by Q.T preserves every row norm,
+        # so the VB second moment needs at most n_eff temporal columns.
+        energy_data = np.linalg.qr(Yw.T, mode="r").T if n_times > n_eff else Yw
         L = G_white.copy()
         L_norm = np.linalg.norm(L, axis=0)
         L_norm = np.where(L_norm <= 0, 1.0, L_norm)
@@ -122,7 +125,9 @@ class SolverVBSBL(BaseSolver):
             z_diag = np.sum(L * L_Sigma, axis=0)
             diag_Sigma_x = gammas - gammas * gammas * z_diag
 
-            mu_x = (gammas[:, None] * (L.T @ (Sigma_y_inv @ Yw))).astype(np.float64)
+            mu_x = (gammas[:, None] * (L.T @ (Sigma_y_inv @ energy_data))).astype(
+                np.float64
+            )
 
             Ex2 = np.sum(mu_x * mu_x, axis=1) + float(n_times) * diag_Sigma_x
             gammas_new = (self.b0 + 0.5 * Ex2) / denom_const
