@@ -4,14 +4,14 @@ On this benchmark the old ceiling was largely a head-position problem. Rebuildin
 
 ## Results on seven separate heads
 
-Mean anatomical localization error in millimetres, equally weighted by head. All three columns below use the same covariance transport strength. The three-donor method averages positions for isolated sources and combines forward fields for simultaneous sources.
+Mean anatomical localization error (MLE) in millimetres, equally weighted across seven heads. Lower is better. Uncorrected fsaverage uses the nominal head pose and original leadfield. Fixed and free refer to dipole orientation. All transported models use the same covariance transport strength. The three-donor method averages positions for isolated sources and combines forward fields for simultaneous sources.
 
-| Signal | Fixed fsaverage | Free fsaverage | Three donors | Paired gain over free fsaverage, mm |
-|---|---:|---:|---:|---:|
-| EEG, single dipole at 20 dB | 15.6 | 10.6 | **6.2** | 4.38 [3.41, 5.35] |
-| MEG, single dipole at 20 dB | 13.9 | 12.2 | **6.7** | 5.49 [4.00, 7.12] |
-| EEG, two active neighborhoods | 22.6 | 11.4 | **9.5** | 1.95 [1.25, 2.66] |
-| MEG, two active neighborhoods | 18.4 | 16.6 | **10.3** | 6.34 [5.33, 7.33] |
+| Signal | Uncorrected fsaverage, fixed | Transported fsaverage, fixed | Uncorrected fsaverage, free | Transported fsaverage, free | Three transported donors | Paired gain over transported free fsaverage, mm |
+|---|---:|---:|---:|---:|---:|---:|
+| EEG, single dipole at 20 dB | 16.8 | 15.6 | 12.3 | 10.6 | **6.2** | 4.38 [3.41, 5.35] |
+| MEG, single dipole at 20 dB | 22.9 | 13.9 | 22.6 | 12.2 | **6.7** | 5.49 [4.00, 7.12] |
+| EEG, two active neighborhoods | 26.7 | 22.6 | 14.1 | 11.4 | **9.5** | 1.95 [1.25, 2.66] |
+| MEG, two active neighborhoods | 30.9 | 18.4 | 31.1 | 16.6 | **10.3** | 6.34 [5.33, 7.33] |
 
 Every paired comparison against transported free fsaverage favored the donor method in these four conditions. Brackets give descriptive 95% percentile bootstrap intervals, resampling seven paired heads 20,000 times with seed 123. The same seven people provide both modalities. The two-source success rate (both centers within 15 mm) rose from 62.6% to 82.1% for EEG and from 38.4% to 80.8% for MEG. With the individual free forward it was 96.1% and 91.6% respectively.
 
