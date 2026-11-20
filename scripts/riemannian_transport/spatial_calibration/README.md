@@ -67,6 +67,25 @@ For this second problem we fuse the **forward fields**. Each donor field is opti
 
 **Measured recording.** The saved median-nerve evoked response contains one average of 37 trials, 204 planar gradiometers and 40 digitized scalp points. We predict the preselected 35–45 ms mean topography in six folds, always withholding both gradiometers at each selected coil location. All channels are available in a separate 80–300 ms window for RT calibration, and pre-stimulus samples provide channel scales. Predictive score is one minus the held-out sum of squared residuals divided by signal energy, pooled across the six folds. For the digitized condition we initialize each donor in the nominal fsaverage head frame and fit it rigidly to the scalp samples with fiducial anchors. The comparison to the earlier individual-MRI ESMV peak is a proxy. There is no independent anatomical ground truth for this recording.
 
+## Known-source injections into the measured somatosensory average
+
+We located one 37-trial evoked average and its individual forward. The four prepared copies of the evoked data were byte-identical. We could not locate a separate participant-matched resting run locally, so the MLE for resting-calibrated transport remains unknown.
+
+We sampled 512 distinct dipole locations in the individual forward and injected a half-sine pulse of random polarity into ten disjoint 12-sample poststimulus windows (~40 ms each) from the average. The windows were reused across locations. SNR is the ratio of injected signal energy to measured background energy across sensors and time, after scaling each channel by its noise standard deviation. All models received identical injections and used the same matched temporal filter and free-orientation dipole fit. The individual anatomy supplied the generator, scoring coordinates and positive control. Localization error is Euclidean distance in physical head coordinates.
+
+The fsaverage baseline uses measured fiducials followed by rigid fitting to 40 digitized scalp points. The median fitted point-to-nearest-scalp-vertex distance was 4.0 mm (90th percentile 12.2 mm). This is an in-sample registration residual. Each donor uses the same recording's sensor geometry and scalp points. The auxiliary transport condition uses the approximately 200 ms prestimulus portion of the *same evoked average*, with 61 samples and covariance rank 56 for 204 gradiometers.
+
+| Injected SNR | Scalp-aligned fsaverage, uncorrected | Aligned donors, no transport | fsaverage + prestimulus RT | Donors + prestimulus RT | Individual-forward reference |
+|---|---:|---:|---:|---:|---:|
+| 0 dB | 17.54 | 16.02 | 28.02 | 29.13 | 14.11 |
+| 10 dB | 9.85 | 7.08 | 19.52 | 18.31 | 2.37 |
+| 20 dB | 9.26 | 6.23 | 18.79 | 17.40 | 0.12 |
+| Clean source control | 8.92 | 6.16 | 18.37 | 17.31 | 0.00 |
+
+A second uncorrected fsaverage baseline using the measured fiducials alone achieved 16.77, 8.19 and 7.39 mm at 0, 10 and 20 dB. At 10 dB the donor advantage over this stronger baseline was 1.11 mm.
+
+Values are mean localization errors in mm. At 10 dB, donor fusion without transport improved the paired mean by 2.77 mm and improved 363 of 512 locations. The short prestimulus calibration degraded both models. Generalization across subjects, single-trial backgrounds, and the effect of independent resting-state calibration remain open. Per-location errors, injection indices and window assignments are in [the injection results](somato_injection.json).
+
 ## Interpretation limits
 
 The cortical surfaces are individual. The HCP skull layers are approximate surfaces constructed from dilated segmentations. The legacy evaluator treats native AC-PC coordinates as approximately MNI with an identity transform. Millimetre differences here measure distance in that convention, with additional uncertainty from anatomical correspondence. HCP donor and target models share the same scalp-landmark extraction and sensor conventions. The real recording uses a different acquisition and head pose. Its baseline is an evoked average and the late evoked window is a different calibration signal from the simulation's broad cortical activity.
@@ -91,6 +110,7 @@ export OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1
 "$PY" "$S/eval_atlas_gain_fusion.py" "$HCP" "$FS" "$OUT/patch_replication.json" --confirm
 "$PY" "$S/eval_pose_dictionary.py" "$HCP" "$FS" "$OUT/pose_control.json"
 "$PY" "$S/eval_somato_gain_fusion.py" "$HCP" "$FS" "$EVOKED" "$OUT/somato.json"
+"$PY" "$S/eval_somato_injection.py" "$HCP" "$FS" "$EVOKED" "$OUT/somato_injection.json"
 "$PY" "$OUT/plot_replication.py"
 "$PY" "$S/plot_cortical_estimates.py" "$HCP" "$FS" "$OUT"
 ```
