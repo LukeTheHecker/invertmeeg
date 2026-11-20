@@ -8,6 +8,7 @@ from .flex_champagne import SolverFlexChampagne
 from .flex_nl_champagne import SolverFlexNLChampagne
 from .gamma_map import SolverGammaMAP
 from .gamma_map_msp import SolverGammaMAPMSP
+from .moraine import SolverMoraine
 from .msp import SolverMSP
 from .nl_champagne import SolverNLChampagne
 from .omni_champagne import SolverOmniChampagne
@@ -24,6 +25,7 @@ __all__ = [
     "SolverOmniChampagne",
     "SolverBlockChampagne",
     "SolverBCS",
+    "SolverMoraine",
     "SolverGammaMAP",
     "SolverSourceMAP",
     "SolverGammaMAPMSP",

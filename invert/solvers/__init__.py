@@ -43,6 +43,7 @@ __all__ = [
     "SolverBackusGilbert",
     "SolverSMAP",
     # Bayesian
+    "SolverMoraine",
     "SolverChampagne",
     "SolverNLChampagne",
     "SolverFlexChampagne",
@@ -97,6 +98,7 @@ __all__ = [
     "SolverBCS",
     # MUSIC / Subspace
     "SolverMUSIC",
+    "SolverVesper",
     "SolverFLEXMUSIC",
     "SolverSignalSubspaceMatching",
     "SolverAlternatingProjections",

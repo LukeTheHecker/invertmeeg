@@ -13,9 +13,11 @@ from .generalized_iterative import SolverGeneralizedIterative
 from .greedy_ml import SolverGreedyML
 from .music import SolverMUSIC
 from .signal_subspace_matching import SolverSignalSubspaceMatching
+from .vesper import SolverVesper
 
 __all__ = [
     "SolverMUSIC",
+    "SolverVesper",
     "SolverExSoMUSIC",
     "SolverFLEXMUSIC",
     "SolverSignalSubspaceMatching",

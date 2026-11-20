@@ -1,6 +1,7 @@
 all_solvers = [
     "MUSIC",
     "RAP-MUSIC",
+    "Vesper",
     "TRAP-MUSIC",
     "FLEX-MUSIC",
     "FLEX-AP",
@@ -39,6 +40,7 @@ all_solvers = [
     "Flex-Champagne",
     "Flex-NL-Champagne",
     "BCS",
+    "Moraine",
     "Gamma-MAP",
     "Source-MAP",
     "Gamma-MAP-MSP",

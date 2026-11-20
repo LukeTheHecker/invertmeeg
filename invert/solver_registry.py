@@ -361,6 +361,12 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
     ),
     # -- Other Bayesian -----------------------------------------------------
     SolverSpec(
+        solver_id="moraine",
+        module_path="invert.solvers.bayesian.moraine",
+        class_name="SolverMoraine",
+        display_name="Moraine",
+    ),
+    SolverSpec(
         solver_id="gamma-map",
         module_path="invert.solvers.bayesian.gamma_map",
         class_name="SolverGammaMAP",
@@ -768,6 +774,12 @@ _SOLVER_SPECS: tuple[SolverSpec, ...] = (
         class_name="SolverFlexGreedyML",
         aliases=("flexgreedyml", "flex-greedyml"),
         display_name="FLEX-GreedyML",
+    ),
+    SolverSpec(
+        solver_id="vesper",
+        module_path="invert.solvers.music.vesper",
+        class_name="SolverVesper",
+        display_name="Vesper",
     ),
     SolverSpec(
         solver_id="random-noise",

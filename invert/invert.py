@@ -137,6 +137,7 @@ def _build_registry() -> dict[str, Any]:
     )
 
     # -- Other Bayesian -----------------------------------------------------
+    _add("moraine", solvers.SolverMoraine)
     _add(["gamma-map", "gmap"], solvers.SolverGammaMAP)
     _add("source-map", solvers.SolverSourceMAP)
     _add("gamma-map-msp", solvers.SolverGammaMAPMSP)
@@ -209,6 +210,7 @@ def _build_registry() -> dict[str, Any]:
 
     # -- MUSIC / Subspace ---------------------------------------------------
     _add("music", solvers.SolverMUSIC)
+    _add("vesper", solvers.SolverVesper)
     _add(["rap-music", "rap"], partial(solvers.SolverFLEXMUSIC, name="RAP-MUSIC"))
     _add(["trap-music", "trap"], partial(solvers.SolverFLEXMUSIC, name="TRAP-MUSIC"))
     _add(["flex-rap-music", "flex-music", "flex"], solvers.SolverFLEXMUSIC)
