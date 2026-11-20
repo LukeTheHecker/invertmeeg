@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7.0.1
-      - uses: astral-sh/setup-uv@v10.3.0
+      - uses: astral-sh/setup-uv@v10.3.3
       - name: Run documented example against the base wheel
         run: |
           uv build --wheel --out-dir "$RUNNER_TEMP/wheels"
@@ -38,7 +38,7 @@ jobs:
       MKL_NUM_THREADS: "1"
     steps:
       - uses: actions/checkout@v7.0.1
-      - uses: astral-sh/setup-uv@v10.3.0
+      - uses: astral-sh/setup-uv@v10.3.3
         with:
           enable-cache: true
       - name: Install Python and all dependencies
