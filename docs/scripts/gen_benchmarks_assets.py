@@ -18,6 +18,7 @@ import json
 import os
 import re
 import tempfile
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -319,7 +320,7 @@ def _extract_meta_from_class(node: ast.ClassDef) -> dict[str, Any] | None:
         for kw in value.keywords:
             if not kw.arg:
                 continue
-            if kw.arg in {"slug", "acronym", "full_name", "category", "internal"}:
+            if kw.arg in {"slug", "acronym", "full_name", "internal"}:
                 meta[kw.arg] = _literal_value(kw.value)
         return meta
     return None
@@ -340,11 +341,12 @@ def _extract_meta_from_file(path: Path) -> dict[str, dict[str, Any]]:
     return found
 
 
-def _build_solver_pages_map(only_solvers: set[str] | None = None) -> dict[str, str]:
-    """Return mapping: benchmark solver_id -> docs-relative solver page URL."""
+def _build_solver_pages_map() -> dict[str, str]:
+    """Map solver IDs to catalog pages generated earlier in the MkDocs build."""
     from invert.solver_registry import iter_solver_specs
 
     repo_root = Path(__file__).resolve().parents[2]
+    files = mkdocs_gen_files.files
     file_cache: dict[Path, dict[str, dict[str, Any]]] = {}
     mapping: dict[str, str] = {}
 
@@ -353,8 +355,6 @@ def _build_solver_pages_map(only_solvers: set[str] | None = None) -> dict[str, s
         module_path = spec.module_path
         class_name = spec.class_name
 
-        if only_solvers is not None and solver_name not in only_solvers:
-            continue
         if "._old" in module_path or module_path.endswith("._old"):
             continue
 
@@ -381,13 +381,8 @@ def _build_solver_pages_map(only_solvers: set[str] | None = None) -> dict[str, s
         if meta_info.get("internal"):
             continue
 
-        category = meta_info.get("category")
-        if not isinstance(category, str) or not category:
-            folder = ""
-            if len(parts) >= 3 and parts[0] == "invert" and parts[1] == "solvers":
-                folder = parts[2]
-            category = FOLDER_TO_CATEGORY.get(folder, "Baseline")
-        cat_slug = _slugify(category)
+        # The catalog groups pages by module folder, including mixed-norm methods.
+        cat_slug = _slugify(FOLDER_TO_CATEGORY.get(parts[2], "Baseline"))
 
         solver_slug = meta_info.get("slug")
         if not isinstance(solver_slug, str) or not solver_slug:
@@ -395,9 +390,34 @@ def _build_solver_pages_map(only_solvers: set[str] | None = None) -> dict[str, s
                 meta_info.get("acronym") or meta_info.get("full_name") or solver_name
             )
 
-        mapping[solver_name] = f"solvers/{cat_slug}/{solver_slug}/"
+        page = files.get_file_from_path(f"solvers/{cat_slug}/{solver_slug}.md")
+        if page is not None:
+            mapping[solver_name] = page.url
 
     return mapping
+
+
+def _write_benchmark_solver_pages(
+    results: dict[str, list[tuple[str, str, float | None]]],
+) -> dict[str, str]:
+    """Publish recorded ranks for leaderboard entries without a catalog page."""
+    paths = {}
+    for solver, rows in sorted(results.items()):
+        path = f"benchmarks/solvers/{_slugify(solver)}.md"
+        paths[solver] = path
+        with mkdocs_gen_files.open(path, "w") as page:
+            page.write(f"# {solver}\n\n")
+            page.write("[Back to the leaderboard](../../benchmarks.md)\n\n")
+            page.write(
+                "Ranks from the published benchmark runs. Lower ranks are better.\n\n"
+            )
+            page.write("| Benchmark run | Dataset | Rank |\n| --- | --- | ---: |\n")
+            for run, dataset, rank in rows:
+                score = f"{rank:g}" if rank is not None else "—"
+                page.write(f"| {run} | {dataset} | {score} |\n")
+
+    urls = {file.src_uri: file.url for file in mkdocs_gen_files.files}
+    return {solver: urls[path] for solver, path in paths.items()}
 
 
 def main() -> None:
@@ -415,6 +435,10 @@ def main() -> None:
     default_run_id = _get_default_run_id(run_paths)
     manifest: dict[str, Any] = {"default_run": default_run_id, "runs": []}
     solvers_in_runs: set[str] = set()
+    solver_pages = _build_solver_pages_map()
+    benchmark_results: dict[str, list[tuple[str, str, float | None]]] = defaultdict(
+        list
+    )
 
     for path in run_paths:
         run_id = path.name.removesuffix(".gz").removesuffix(".json")
@@ -425,11 +449,28 @@ def main() -> None:
                 row.pop("samples", None)
         _compute_all_dataset_rows(data)
         _ensure_dataset_configs(data)
-        for row in data.get("results") or []:
-            if isinstance(row, dict) and isinstance(row.get("solver_name"), str):
-                solvers_in_runs.add(row["solver_name"])
-
         info = _extract_run_info(run_id=run_id, data=data, source_path=path)
+        datasets = data.get("datasets") or {}
+        per_dataset_ranks = data.get("ranks") or {}
+        global_ranks = data.get("global_ranks") or {}
+        for row in data["results"]:
+            if not isinstance(row, dict):
+                continue
+            solver = row.get("solver_name")
+            dataset = row.get("dataset_name")
+            if not isinstance(solver, str) or not isinstance(dataset, str):
+                continue
+            solvers_in_runs.add(solver)
+            if solver in solver_pages:
+                continue
+            if dataset == "all":
+                label = "All (aggregate)"
+                rank = global_ranks.get(solver)
+            else:
+                label = datasets.get(dataset, {}).get("name", dataset)
+                rank = (per_dataset_ranks.get(dataset) or {}).get(solver)
+            benchmark_results[solver].append((info.name or run_id, label, rank))
+
         manifest["runs"].append(
             {
                 "id": info.run_id,
@@ -449,9 +490,14 @@ def main() -> None:
     with mkdocs_gen_files.open("assets/benchmarks/manifest.json", "w") as f:
         json.dump(manifest, f, indent=2, sort_keys=True)
 
-    solver_pages = _build_solver_pages_map(only_solvers=solvers_in_runs)
+    solver_pages.update(_write_benchmark_solver_pages(benchmark_results))
     with mkdocs_gen_files.open("assets/benchmarks/solver_pages.json", "w") as f:
-        json.dump(solver_pages, f, indent=2, sort_keys=True)
+        json.dump(
+            {name: solver_pages[name] for name in solvers_in_runs},
+            f,
+            indent=2,
+            sort_keys=True,
+        )
 
 
 main()
