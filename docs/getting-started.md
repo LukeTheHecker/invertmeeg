@@ -30,21 +30,19 @@ pip install invertmeeg
 - **Visualization**: `pip install "invertmeeg[viz]"`
 - **Documentation**: `pip install "invertmeeg[docs]"`
 
-## Quick Start
+## Localize a simulated EEG source
+
+With Python 3.14 and the base package installed, run the example below. It builds
+a spherical head model and a coarse 20 mm grid in memory, adds seeded noise to
+a single dipole, and estimates its location at the known pulse peak. The final
+line gives the straight-line distance between the simulated source and the
+estimated peak. On the seeded example the error is 0.0 mm, meaning the estimated peak lands
+on the simulated grid point. The simulation and reconstruction share a head model.
+
+[Download the Python example](downloads/eeg_quickstart.py)
 
 ```python
-from invert import Solver
-
-# Assume you have an mne.Forward and mne.Evoked object
-# fwd = ...
-# evoked = ...
-
-solver = Solver("MNE")
-solver.make_inverse_operator(fwd)
-stc = solver.apply_inverse_operator(evoked)
-stc.plot()
+--8<-- "docs/downloads/eeg_quickstart.py"
 ```
 
-The `Solver` factory takes a `solver_id` string and returns the corresponding
-solver instance. Browse the [Solvers](solvers/index.md) catalog to find the full
-name and click-to-copy solver id for each method.
+To compare methods for your own recordings, see [Choosing a solver](benchmarks.md#choosing-a-solver).

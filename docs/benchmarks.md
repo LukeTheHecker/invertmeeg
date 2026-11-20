@@ -8,6 +8,12 @@ Each scenario uses 50 recordings on the fixed-orientation BioSemi32/ico3 forward
 
 [Download the corrected per-recording results (compressed JSON)](https://github.com/LukeTheHecker/invertmeeg/raw/refs/heads/main/results/release/leaderboard-protocol-v2.json.gz)
 
+## Choosing a solver
+
+- **One compact source.** Select *Focal Source* and compare mean localization error with MNE as a baseline. Check average precision too if the extent of the estimated activity matters.
+- **A patch of active cortex.** Select *Extended Source* and compare earth mover’s distance with a distributed baseline such as eLORETA. This metric penalizes placing estimated activity far from its true location even when the peak is correct.
+- **Weak signals or few electrodes.** Start with the *Noisy* scenario (−5 to 0 dB) and compare against a baseline on the same recordings. The published run uses 32 channels throughout. For a sparse montage, repeat the comparison with your electrode positions and noise level before choosing a method.
+
 ## Dashboard
 
 <div id="benchmarks-app" class="benchmarks-app">

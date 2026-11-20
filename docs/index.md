@@ -21,16 +21,8 @@ and deep learning models in a unified API.
 - [Benchmarks](benchmarks.md) — interactive benchmark dashboard (static, GitHub Pages friendly)
 - [API Reference](api.md) — full Python API via mkdocstrings
 
-## Quick Example
+## Try it
 
-```python
-from invert import Solver
-
-# fwd = ...   (mne.Forward object)
-# evoked = ... (mne.Evoked object)
-
-solver = Solver("MNE")
-solver.make_inverse_operator(fwd)
-stc = solver.apply_inverse_operator(evoked)
-stc.plot()
-```
+[Localize a simulated EEG source](getting-started.md#localize-a-simulated-eeg-source)
+with a 32-channel montage and measure the peak localization error in millimetres.
+The example runs offline after installation.

@@ -10,6 +10,21 @@ permissions:
   contents: read
 
 jobs:
+  quick-start:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v10.3.0
+      - name: Run documented example against the base wheel
+        run: |
+          uv build --wheel --out-dir "$RUNNER_TEMP/wheels"
+          uv venv --python 3.14 "$RUNNER_TEMP/quickstart"
+          python_bin="$RUNNER_TEMP/quickstart/bin/python"
+          uv pip install --python "$python_bin" "$RUNNER_TEMP"/wheels/*.whl
+          cd "$RUNNER_TEMP"
+          "$python_bin" -I "$GITHUB_WORKSPACE/docs/downloads/eeg_quickstart.py"
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 60
