@@ -41,7 +41,7 @@ on the simulated grid point. The simulation and reconstruction share a head mode
 
 [Download the Python example](downloads/eeg_quickstart.py)
 
-```python
+```{.python}
 --8<-- "docs/downloads/eeg_quickstart.py"
 ```
 
