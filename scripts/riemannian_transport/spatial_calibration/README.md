@@ -17,6 +17,29 @@ Every paired comparison against transported free fsaverage favored the donor met
 
 ![Each thin line is one head and the thick line is the mean](paired_errors.png)
 
+### Comparison with no correction
+
+Paired reductions in mean localization error (mm) for transported donors versus nominal fsaverage. Positive values favor donors. The interval resamples the seven heads as pairs with the same bootstrap procedure as above.
+
+| Signal | Reduction vs fixed | Reduction vs free [95% interval] | Heads improved vs free |
+|---|---:|---:|---:|
+| EEG, isolated dipole at 20 dB | 10.59 | 6.14 [4.84, 7.50] | 7/7 |
+| MEG, isolated dipole at 20 dB | 16.22 | 15.94 [14.13, 17.93] | 7/7 |
+| EEG, two patches | 17.25 | 4.63 [2.95, 6.34] | 7/7 |
+| MEG, two patches | 20.61 | 20.81 [18.45, 22.98] | 7/7 |
+
+### Cortical source scans
+
+These are individual two-patch trials from the first replication head (100610). For each modality, we selected the bilateral trial closest to the median improvement of donors over uncorrected free fsaverage across all 128 trials on that head. A second example uses the tenth percentile of improvement. Each panel compares the five models on the same sensor window. The saved script regenerates the trials and checks their 128-trial mean errors against the published JSON.
+
+![MEG median-gain example](cortex_meg_typical.png)
+
+![EEG median-gain example](cortex_eeg_typical.png)
+
+Warm colors show how well a candidate dipole at each vertex fits the two-dimensional signal subspace. Gray indicates a squared correlation below 0.60. All panels share the same scale. A free dipole can adjust its direction at each vertex, so a larger bright region can accompany an improvement in peak localization. Cyan circles mark the true centers projected onto fsaverage for display. Blue crosses mark the selected peaks, with rear-facing markers hidden in each view. Error is measured in the original anatomical coordinates before display projection and inflation. RT denotes Riemannian transport.
+
+Lower-gain examples for the same head are available for [MEG](cortex_meg_lower_tail.png) and [EEG](cortex_eeg_lower_tail.png).
+
 ### What accounts for the improvement?
 
 - The nominal fsaverage MRI origin differed from the donor origins by 22–32 mm in head coordinates. Moving fsaverage to the mean donor pose while keeping the cortex, BEM and RT fixed reduced two-source error from 11.44 to 9.94 mm (EEG) and from 16.64 to 11.74 mm (MEG). Full donor fusion improved a further 0.45 mm (five of seven heads) and 1.44 mm (six of seven). Selecting the pose from sensor covariance gave 11.37 mm for EEG and 11.58 mm for MEG. MEG carried more usable pose information under this calibration protocol.
@@ -69,6 +92,7 @@ export OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1
 "$PY" "$S/eval_pose_dictionary.py" "$HCP" "$FS" "$OUT/pose_control.json"
 "$PY" "$S/eval_somato_gain_fusion.py" "$HCP" "$FS" "$EVOKED" "$OUT/somato.json"
 "$PY" "$OUT/plot_replication.py"
+"$PY" "$S/plot_cortical_estimates.py" "$HCP" "$FS" "$OUT"
 ```
 
 Environment used for these results included Python 3.13.2, MNE 1.11.0, NumPy 2.4.1, SciPy 1.17.0 and NiBabel 5.3.3.
